@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: recap-corridor
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/ping
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: CODE_ADMIN
+        sync: false
+      - key: CODE_LECTURE
+        sync: false

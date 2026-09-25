@@ -1,0 +1,16 @@
+{
+  "name": "recap-corridor",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Extraction hebdomadaire des fichiers Récap National Corridor (ARP) : RHR, heures, paniers, données par agent.",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/engine.test.mjs && node test/legacy.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
