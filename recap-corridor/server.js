@@ -1,6 +1,7 @@
 /* ==========================================================================
    RÉCAP CORRIDOR — SERVEUR
-   Node 20+, une seule dépendance (pg). Sert l'interface et l'API.
+   Node 20+, une seule dépendance (pg). Sert la page index.html et l'API
+   (mêmes adresses que la version Netlify : session, etat, semaine, regles).
    Données : Postgres (Supabase), schéma « recap ».
 
    Variables d'environnement :
@@ -11,7 +12,7 @@
    ========================================================================== */
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
@@ -108,20 +109,17 @@ async function api(req, res, url) {
     const c = await p.query("select valeur from recap.config where cle = 'regles'");
     return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: c.rows[0]?.valeur || null });
   }
-  if (route === 'donnees' && req.method === 'GET') {
-    const d = await p.query('select week_id, data from recap.details order by week_id, agence_slug');
-    const semaines = {};
-    for (const { week_id, data } of d.rows) {
-      const s = semaines[week_id] || (semaines[week_id] = { meta: data.meta, agents: [], anomalies: [] });
-      for (const a of data.agents) s.agents.push(a);
-    }
-    return json(req, res, 200, { semaines });
+  if (route === 'semaine' && req.method === 'GET') {
+    const id = url.searchParams.get('id') || '';
+    if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
+    const d = await p.query('select data from recap.details where week_id = $1 order by agence_slug', [id]);
+    return json(req, res, 200, { docs: d.rows.map((x) => x.data) });
   }
   if (route === 'semaine' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas d’importer.' });
-    const { resume, details, restauration } = await readBody(req);
+    const { resume, details } = await readBody(req);
     if (!resume || !ID.test(resume.weekId || '') || !Array.isArray(details) || !details.length) return json(req, res, 400, { error: 'Données d’import incomplètes.' });
-    if (!(restauration && resume.importedAt)) resume.importedAt = new Date().toISOString();
+    if (!resume.importedAt) resume.importedAt = new Date().toISOString();
     const c = await p.connect();
     try {
       await c.query('begin');
@@ -146,27 +144,20 @@ async function api(req, res, url) {
   if (route === 'regles' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de modifier les règles.' });
     const body = await readBody(req);
-    await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [body]);
+    await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ ...body, majLe: new Date().toISOString() }]);
     return json(req, res, 200, { ok: true });
   }
   return json(req, res, 404, { error: 'Adresse inconnue.' });
 }
 
-/* ------------------------------------------------------------ fichiers */
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8', '.ico': 'image/x-icon' };
+/* ------------------------------------------------------------ page */
+const PAGE = join(ROOT, 'index.html');
 async function statique(req, res, url) {
-  let p = decodeURIComponent(url.pathname);
-  if (p === '/' || p === '') p = '/index.html';
-  const file = normalize(join(ROOT, p));
-  if (!file.startsWith(ROOT)) return send(req, res, 403, 'Interdit', 'text/plain; charset=utf-8');
-  try {
-    const buf = await readFile(file);
-    const etag = '"' + crypto.createHash('sha1').update(buf).digest('base64url').slice(0, 20) + '"';
-    if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag }); return res.end(); }
-    return send(req, res, 200, buf, TYPES[extname(file)] || 'application/octet-stream', { 'Cache-Control': 'no-cache', ETag: etag });
-  } catch (e) {
-    return send(req, res, 404, 'Page introuvable', 'text/plain; charset=utf-8');
-  }
+  if (url.pathname !== '/' && url.pathname !== '/index.html') return send(req, res, 404, 'Page introuvable', 'text/plain; charset=utf-8');
+  const buf = await readFile(PAGE);
+  const etag = '"' + crypto.createHash('sha1').update(buf).digest('base64url').slice(0, 20) + '"';
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag }); return res.end(); }
+  return send(req, res, 200, buf, 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache', ETag: etag });
 }
 
 http.createServer(async (req, res) => {

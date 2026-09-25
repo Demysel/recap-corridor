@@ -5,53 +5,32 @@ résidence, journées blanches, heures planifiées et heures sup, heures de nuit
 du dimanche, paniers repas, MHIS / DISPO / ATCMD, trajets seuls — par agent,
 par agence et par corps de métier, semaine par semaine ou cumulé.
 
-## Architecture
+## Contenu
 
-| Élément | Rôle |
+| Fichier | Rôle |
 |---|---|
-| `public/engine.js` | Moteur de calcul (lecture .xlsx, fusion des doublons, toutes les règles). Tourne dans le navigateur ; le fichier Excel n'est jamais envoyé, seules les données extraites le sont. |
-| `public/app.js` | Interface : synthèse, statistiques, agents, RHR, journées blanches, exports, import, réglages. |
-| `public/xlsx.js` | Écriture des exports Excel. |
-| `server.js` | Serveur Node (une dépendance : `pg`). Contrôle les codes d'accès et stocke les semaines. |
+| `public/index.html` | L'application entière, comme dans la version d'origine : lecture des .xlsx dans le navigateur, calculs, onglets, graphiques, exports Excel/CSV et rapport autonome. |
+| `server.js` | Serveur Node (une dépendance : `pg`). Contrôle les codes d'accès et stocke les semaines. Mêmes adresses que l'ancienne fonction Netlify : `session`, `etat`, `semaine`, `regles`. |
 | `db/schema.sql` | Schéma Postgres (Supabase), à exécuter une fois. |
-| `render.yaml` | Configuration Render (service web gratuit, Francfort). |
+| `package.json` | Démarrage (`npm start`) et dépendance. |
 
-Données : Supabase, schéma `recap`, accessible uniquement par le rôle `recap_app`
-utilisé par le serveur. Les règles de calcul sont rejouées à chaque affichage :
-modifier une règle dans l'onglet Réglages ne demande jamais de réimporter.
+Le fichier Excel n'est jamais envoyé au serveur : seules les données extraites
+le sont. Les règles de calcul sont rejouées à chaque affichage : modifier une
+règle dans l'onglet Réglages ne demande jamais de réimporter.
 
-## Variables d'environnement (Render)
+## Hébergement
 
-| Variable | Contenu |
-|---|---|
-| `DATABASE_URL` | `postgresql://recap_app.<ref>:<mot de passe>@aws-0-eu-west-3.pooler.supabase.com:5432/postgres` |
-| `CODE_ADMIN` | code d'accès complet (import, suppression, réglages) |
-| `CODE_LECTURE` | code de consultation et d'export, à distribuer |
-| `NODE_VERSION` | `22` |
+- **Render** (service web gratuit, Francfort) : build `cd recap-corridor && npm install --omit=dev`,
+  démarrage `cd recap-corridor && npm start`. Chaque envoi sur la branche `main`
+  remet le site à jour en deux à trois minutes.
+- **Supabase** : schéma `recap`, accessible uniquement par le rôle `recap_app`
+  qu'utilise le serveur.
 
-Changer un code : Render → service → Environment → modifier → Save. Le service
-redémarre, les données ne bougent pas.
+Variables d'environnement Render : `DATABASE_URL`, `CODE_ADMIN`, `CODE_LECTURE`,
+`NODE_VERSION=22`. Changer un code : Render → service → Environment.
 
-## Mises à jour
+## Mises à jour avec Claude
 
-Chaque envoi (push) sur la branche `main` redéploie automatiquement le site sur
-Render en deux à trois minutes. Pour faire évoluer l'outil avec Claude, ouvrez
-une session en y rattachant ce dépôt : les modifications sont poussées sur
-`main` et Render les met en ligne.
-
-## Sauvegarde
-
-Onglet Import → « Télécharger une sauvegarde » : toutes les semaines et les
-règles dans un fichier JSON. « Restaurer une sauvegarde » le recharge (les
-semaines du fichier remplacent celles de même numéro). Le fichier contient des
-données nominatives : à conserver en lieu sûr, jamais dans ce dépôt.
-
-## En local
-
-```
-npm install
-DATABASE_URL=postgresql://… CODE_ADMIN=… CODE_LECTURE=… npm start
-```
-
-Tests : `npm test`. Ils s'appuient sur des fichiers réels (données nominatives)
-qui ne sont pas versionnés ; sans eux, ils sont ignorés.
+Ouvrir une session sur claude.ai/code (ou l'app de bureau en mode Cloud) avec le
+dépôt `Demysel/recap-corridor` sélectionné sous la zone de saisie. L'app Claude
+doit être installée sur le dépôt (github.com/apps/claude/installations/new).

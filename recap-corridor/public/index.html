@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Extraction hebdomadaire des fichiers Récap National Corridor : repos hors résidence, heures, paniers et données par agent, métier et agence.">
+<meta name="description" content="Extraction hebdomadaire des fichiers Récap National Corridor : repos hors résidence, journées blanches, heures, paniers et données par agent, métier et agence.">
 <title>Récap Corridor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -135,7 +135,7 @@ input[type=search]{width:180px}
 @media (max-width:820px){.cols2{grid-template-columns:1fr}}
 
 /* KPI */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:1px;background:var(--line);
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .kpi{background:var(--surface);padding:13px 15px 14px;min-width:0}
 .kpi .k{font-family:var(--cond);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
@@ -153,7 +153,8 @@ th{font-family:var(--cond);font-size:10.5px;font-weight:600;letter-spacing:.07em
   background:var(--surface-2);position:sticky;top:0;z-index:3;border-bottom:1px solid var(--line-2)}
 tr.grp th{top:0;z-index:4;background:var(--surface-3);color:var(--ink-2);border-right:1px solid var(--line);
   font-size:10px;letter-spacing:.1em;padding-block:4px}
-table.hasgrp thead tr:nth-child(2) th{top:23px}
+table.sticky1 thead tr:nth-child(2) th{top:23px}
+table.sticky1 thead tr:only-child th{top:0}
 th.s{cursor:pointer;user-select:none}
 th.s:hover{color:var(--ink)}
 th.s[data-dir]{color:var(--accent)}
@@ -192,10 +193,6 @@ tbody tr.clk{cursor:pointer}
 .bd-blanche{background:var(--surface);border:1.5px dashed var(--warn-line)}
 .bd-blanche .cd{color:var(--warn);font-family:var(--cond);font-size:11px;font-weight:600;letter-spacing:.03em;margin-top:6px}
 .bd-hors{box-shadow:inset 0 -3px 0 var(--warn)}
-.bd .hc{margin-top:5px;padding-top:4px;border-top:1px dashed var(--warn-line);font-size:10px;color:var(--ink-3);line-height:1.35;word-break:break-word}
-.bd .hc s{font-family:var(--mono);color:var(--ink-3)}
-.bd-hc{background:var(--surface);border-style:dashed;border-color:var(--warn-line)}
-.bd-hc .cd{color:var(--warn);font-family:var(--cond);font-size:11px;letter-spacing:.03em}
 .legend{display:flex;gap:15px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);padding-top:11px}
 .lg{display:flex;align-items:center;gap:6px}
 .sw{width:13px;height:13px;border-radius:3px;border:1px solid var(--line-2);flex:none}
@@ -206,7 +203,7 @@ tbody tr.clk{cursor:pointer}
 
 /* graphiques */
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-.chart{max-width:1040px}
+.chart{max-width:720px}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
 .ct{font-family:var(--cond);font-size:11px;fill:var(--ink-3);letter-spacing:.04em}
 .cv{font-family:var(--mono);font-size:11px;fill:var(--ink-3)}
@@ -276,8 +273,14 @@ tbody tr.clk{cursor:pointer}
 .ml2{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));background:var(--surface);
   border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .ml2>div{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
-.ml2 .k{padding:0;border:0;font-family:var(--cond);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
-.ml2 .v{padding:0;border:0;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
+.ml2 .v small{font-size:11.5px;font-weight:500}
+.dw>*{flex-shrink:0}
+.bd .hc{margin-top:5px;padding-top:4px;border-top:1px dashed var(--warn-line);font-size:10px;color:var(--ink-3);line-height:1.35;word-break:break-word}
+.bd .hc s{font-family:var(--mono)}
+.card-h .btns{align-items:center}
+.rule .inl+.inl{margin-left:18px}
+.ml2 .k{font-family:var(--cond);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.ml2 .v{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
 
 /* connexion */
 .lgw{min-height:100dvh;display:grid;place-items:center;padding:24px 18px}
@@ -313,32 +316,6 @@ tbody tr.clk{cursor:pointer}
   th{position:static}
   .kpis{break-inside:avoid}
 }
-
-/* v2 */
-th.mono{font-family:var(--cond);font-size:10.5px}
-.stack.tight{gap:10px;padding-top:0}
-.kpi .pw{display:block;color:var(--ink-2);font-weight:500}
-.kpi.hot-sup{background:linear-gradient(0deg,var(--warn-soft),var(--surface) 70%)}
-.approx{font-size:13px;color:var(--warn);margin-left:4px;font-weight:600;cursor:help}
-.bt{position:relative}
-.bt em{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2);opacity:.55;z-index:1}
-.row.hl{background:var(--accent-soft);border-color:var(--accent-line)}
-.btn.del{color:var(--ink-2)}
-.btn.del:hover{color:var(--crit);border-color:var(--crit)}
-.btn.del svg{display:block}
-.confirm{font-size:12.5px;color:var(--crit);font-weight:600;align-self:center}
-.fld.inline{flex-direction:row;align-items:center;gap:8px}
-.ctrls-card{display:flex;flex-direction:column;gap:8px}
-.ctrls{border-bottom:0;padding-bottom:0;margin-bottom:0}
-.rule.grid{align-items:stretch}
-.rgrid{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 18px}
-.rgrid label{display:flex;flex-direction:column;gap:5px}
-.rgrid .inl{margin-top:0}
-.rgrid input{width:62px}
-.seg .sg+.sg{border-left:1px solid var(--line-2)}
-th.s{white-space:nowrap}
-.cdot{vertical-align:baseline}
-.bl .cdot{margin-right:6px}
 </style>
 </head>
 <body>
@@ -346,11 +323,14 @@ th.s{white-space:nowrap}
 <div id="shell" class="app" hidden>
   <header class="hdr">
     <div class="hdr-top">
-      <div class="brand"><span class="mark" id="markslot"></span><div><h1>Récap Corridor</h1><p id="brandsub">Extraction hebdomadaire ARP</p></div></div>
+      <div class="brand">
+        <span class="mark" id="markslot"></span>
+        <div><h1>Récap Corridor</h1><p id="brandsub">Extraction hebdomadaire ARP</p></div>
+      </div>
       <div class="hdr-act">
         <button class="btn btn-sm" id="btnTheme">Thème</button>
         <button class="btn btn-sm" id="btnOut">Quitter</button>
-        <button class="btn btn-pri" data-goto="import">Importer</button>
+        <button class="btn btn-pri" id="btnImport" data-goto="import">Importer</button>
       </div>
     </div>
     <div id="filters"></div>
@@ -359,9 +339,1935 @@ th.s{white-space:nowrap}
   <main id="view" class="stack"></main>
 </div>
 <script>
-window.MARK=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3" width="14" height="13" rx="3"/><path d="M5 10h14M9 20l-2 2M15 20l2 2M8.5 16v2M15.5 16v2"/><circle cx="8.6" cy="13" r=".9" fill="#fff" stroke="none"/><circle cx="15.4" cy="13" r=".9" fill="#fff" stroke="none"/></svg>`;
-document.getElementById('markslot').innerHTML=window.MARK;
+const MARK=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3" width="14" height="13" rx="3"/><path d="M5 10h14M9 20l-2 2M15 20l2 2M8.5 16v2M15.5 16v2"/><circle cx="8.6" cy="13" r=".9" fill="#fff" stroke="none"/><circle cx="15.4" cy="13" r=".9" fill="#fff" stroke="none"/></svg>`;
+document.getElementById('markslot').innerHTML=MARK;
 </script>
-<script type="module" src="/app.js"></script>
+<script>
+/* ==========================================================================
+   1. LECTURE DU FICHIER .XLSX  (ZIP + XML, sans dépendance externe)
+   Seules les parties utiles du classeur sont décompressées : les fichiers
+   lourds (images, autres feuilles) ne ralentissent plus la lecture.
+   ========================================================================== */
+async function inflateRaw(bytes){
+  const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+async function readZip(ab){
+  const by=new Uint8Array(ab), dv=new DataView(ab);
+  let eo=-1; const max=Math.min(by.length,66000);
+  for(let i=by.length-22;i>=by.length-max&&i>=0;i--) if(dv.getUint32(i,true)===0x06054b50){eo=i;break;}
+  if(eo<0) throw new Error("Ce fichier n'est pas un classeur Excel (.xlsx) lisible.");
+  let n=dv.getUint16(eo+10,true), cd=dv.getUint32(eo+16,true);
+  if(cd===0xffffffff||n===0xffff){
+    for(let i=eo-20;i>=0;i--) if(dv.getUint32(i,true)===0x07064b50){
+      const z=Number(dv.getBigUint64(i+8,true));
+      if(dv.getUint32(z,true)===0x06064b50){n=Number(dv.getBigUint64(z+32,true));cd=Number(dv.getBigUint64(z+48,true));}
+      break;}
+  }
+  const dec=new TextDecoder('utf-8'), ent=[]; let p=cd;
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true); let cs=dv.getUint32(p+20,true);
+    const nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true);
+    let off=dv.getUint32(p+42,true);
+    const name=dec.decode(by.subarray(p+46,p+46+nl));
+    if(cs===0xffffffff||off===0xffffffff){
+      let e=p+46+nl; const end=e+xl;
+      while(e<end){ const hid=dv.getUint16(e,true), hs=dv.getUint16(e+2,true);
+        if(hid===1){ let q=e+4;
+          if(dv.getUint32(p+24,true)===0xffffffff) q+=8;
+          if(cs===0xffffffff){cs=Number(dv.getBigUint64(q,true));q+=8;}
+          if(off===0xffffffff){off=Number(dv.getBigUint64(q,true));}
+          break;}
+        e+=4+hs;}
+    }
+    ent.push({name,method,cs,off}); p+=46+nl+xl+cl;
+  }
+  const out=new Map();
+  for(const e of ent){
+    const nl=dv.getUint16(e.off+26,true), xl=dv.getUint16(e.off+28,true);
+    const st=e.off+30+nl+xl;
+    out.set(e.name,{method:e.method,raw:by.subarray(st,st+e.cs)});
+  }
+  return {
+    has:k=>out.has(k),
+    async text(k){ const e=out.get(k); if(!e) return null;
+      return dec.decode(e.method===0?e.raw:await inflateRaw(e.raw)); },
+  };
+}
+const ENT={lt:'<',gt:'>',amp:'&',quot:'"',apos:"'"};
+const unesc=s=>s.replace(/&#(\d+);/g,(_,d)=>String.fromCharCode(+d))
+  .replace(/&#x([0-9a-fA-F]+);/g,(_,h)=>String.fromCharCode(parseInt(h,16)))
+  .replace(/&(lt|gt|amp|quot|apos);/g,(_,e)=>ENT[e]);
+const normTxt=s=>s.replace(/_x000D_/g,'').replace(/_x000A_/g,'\n').replace(/\r\n?/g,'\n');
+function colIdx(r){const m=/^([A-Z]+)/.exec(r);if(!m)return 0;let n=0;for(const c of m[1])n=n*26+(c.charCodeAt(0)-64);return n-1;}
+function parseSS(x){const o=[];for(const m of x.matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g)){let t='';for(const q of m[1].matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g))t+=unesc(q[1]);o.push(normTxt(t));}return o;}
+/** Lecture ligne par ligne, bornée aux 60 premières colonnes (les jours sont bien avant) */
+function parseSheet(x,ss,maxCols=60){
+  const rows=[];
+  const reRow=/<row\b([^>]*)>([\s\S]*?)<\/row>|<row\b([^>]*)\/>/g;
+  const reCell=/<c\b([^>]*?)\/>|<c\b([^>]*)>([\s\S]*?)<\/c>/g;
+  let r;
+  while((r=reRow.exec(x))){
+    const attrs=r[1]||r[3]||'';
+    const rm=/\br="(\d+)"/.exec(attrs);
+    const ri=rm?+rm[1]-1:rows.length, cells=[], body=r[2]||'';
+    reCell.lastIndex=0; let c;
+    while((c=reCell.exec(body))){
+      const at=c[1]||c[2]||'', bd=c[3]||'';
+      const cm=/\br="([A-Z]+)\d+"/.exec(at), tm=/\bt="([^"]+)"/.exec(at);
+      const ix=cm?colIdx(cm[1]):cells.length;
+      if(ix>=maxCols) continue;
+      const ty=tm?tm[1]:'n';
+      let v=null;
+      if(ty==='inlineStr'){let t='';for(const q of bd.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g))t+=unesc(q[1]);v=normTxt(t);}
+      else{const vm=/<v[^>]*>([\s\S]*?)<\/v>/.exec(bd);
+        if(vm){const raw=unesc(vm[1]);
+          v = ty==='s' ? (ss[+raw]??'') : (ty==='str'||ty==='e') ? normTxt(raw) : (raw===''?null:Number(raw));}}
+      cells[ix]=(typeof v==='string'&&v.trim()==='')?null:v;
+    }
+    rows[ri]=cells;
+  }
+  for(let i=0;i<rows.length;i++) if(!rows[i]) rows[i]=[];
+  return rows;
+}
+const serialDate=n=>{ if(typeof n!=='number'||!isFinite(n))return null;
+  const d=new Date(Math.round((n-25569)*864e5));
+  return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); };
+const deacc=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+async function readRecapSheet(ab){
+  const zip=await readZip(ab);
+  const wb=await zip.text('xl/workbook.xml');
+  if(!wb) throw new Error("Classeur Excel (.xlsx) attendu — le fichier ne contient pas de feuille.");
+  const rels=(await zip.text('xl/_rels/workbook.xml.rels'))||'', rm={};
+  for(const m of rels.matchAll(/<Relationship\b([^>]*)\/?>/g)){
+    const id=/\bId="([^"]+)"/.exec(m[1])?.[1], tg=/\bTarget="([^"]+)"/.exec(m[1])?.[1];
+    if(id&&tg) rm[id]=tg.replace(/^\/?xl\//,'').replace(/^\//,'');
+  }
+  const sheets=[];
+  for(const m of wb.matchAll(/<sheet\b([^>]*)\/?>/g))
+    sheets.push({name:unesc(/\bname="([^"]*)"/.exec(m[1])?.[1]??''), path:rm[/\br:id="([^"]+)"/.exec(m[1])?.[1]]});
+  const tgt=sheets.find(s=>deacc(s.name).toLowerCase().trim().startsWith('recap'))||sheets[0];
+  if(!tgt) throw new Error("Aucune feuille trouvée dans le classeur.");
+  const ss=zip.has('xl/sharedStrings.xml')?parseSS(await zip.text('xl/sharedStrings.xml')):[];
+  const sx=(await zip.text('xl/'+tgt.path))||(await zip.text(tgt.path));
+  if(!sx) throw new Error(`La feuille « ${tgt.name} » est introuvable dans le fichier.`);
+  return {sheetName:tgt.name, rows:parseSheet(sx,ss)};
+}
+
+/* ==========================================================================
+   2. LECTURE MÉTIER — indépendante des règles de calcul
+   ========================================================================== */
+const JN=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+const JS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const CODEF=[
+  {k:'RP',t:c=>/^RP(-|\b)/i.test(c)}, {k:'CP',t:c=>/^CP$/i.test(c)}, {k:'CPAT',t:c=>/^CPAT/i.test(c)},
+  {k:'RCL',t:c=>/^RCL/i.test(c)}, {k:'RCC',t:c=>/^RCC/i.test(c)}, {k:'MAL',t:c=>/^MAL/i.test(c)},
+];
+const CODEL={RP:'Repos périodique',CP:'Congé payé',CPAT:'Congé CPAT',RCL:'RCL',RCC:'RCC',MAL:'Maladie',AUTRE:'Autre code',HORS:'Mission datée hors de sa colonne'};
+const codeFam=c=>{const s=String(c).trim();for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
+const RE_P=/^P(\d?)\s*:/i;
+const RE_H=/^(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*$/;
+const RE_PF=/^P\d?\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*$/i;
+const H=36e5, DAY=864e5;
+function resolveDay(d,mon){for(let o=-2;o<=9;o++){const x=new Date(mon.getTime()+o*864e5);if(x.getUTCDate()===d)return x;}return null;}
+function mk(d,h,mi,mon){const x=resolveDay(d,mon);return x?new Date(x.getTime()+h*H+mi*6e4):null;}
+const r2=n=>Math.round(n*100)/100;
+function missionType(l){const s=String(l).trim();const m=/^(.*?)[-_]\s*\d{2,4}\b/.exec(s);return ((m?m[1]:s).trim().replace(/\s+/g,' '))||s;}
+
+/** Une cellule jour -> {kind:'VIDE'|'CODE'|'SERVICE'}
+    Les pauses « P: » sont conservées avec leurs horaires : les heures de nuit,
+    du dimanche et les paniers se calculent sur le temps réellement travaillé. */
+function parseDayCell(raw,mon){
+  if(raw==null) return {kind:'VIDE'};
+  const t=normTxt(String(raw)).trim();
+  if(!t) return {kind:'VIDE'};
+  if(!t.includes('\n')) return {kind:'CODE',code:t,family:codeFam(t)};
+  const lines=t.split('\n').map(x=>x.trim()).filter(Boolean);
+  const ms=[]; let cur=null; const anom=[];
+  for(const line of lines){
+    if(RE_P.test(line)){
+      if(!cur) continue;
+      const m=RE_PF.exec(line);
+      if(m){const s=mk(+m[1],+m[2],+m[3],mon); let e=mk(+m[4],+m[5],+m[6],mon);
+        if(s&&e){ if(e<s)e=new Date(e.getTime()+864e5); cur.pauses.push([s,e]); }}
+      continue;
+    }
+    const h=RE_H.exec(line);
+    if(h&&cur){
+      const s=mk(+h[1],+h[2],+h[3],mon); let e=mk(+h[4],+h[5],+h[6],mon);
+      if(s&&e){ if(e<s)e=new Date(e.getTime()+864e5); cur.start=s; cur.end=e; }
+      else anom.push(`horaire illisible « ${line} »`);
+      continue;
+    }
+    if(cur&&!cur.od&&/ - /.test(line)){
+      const i=line.indexOf(' - '); cur.od=true; cur.from=line.slice(0,i).trim(); cur.to=line.slice(i+3).trim(); continue;
+    }
+    cur={label:line,from:null,to:null,od:false,start:null,end:null,pauses:[]}; ms.push(cur);
+  }
+  for(const m of ms) if(!m.start||!m.end) anom.push(`mission sans horaire « ${m.label} »`);
+  const ok=ms.filter(m=>m.start&&m.end).sort((a,b)=>a.start-b.start);
+  if(!ok.length) return {kind:'CODE',code:lines[0],family:'AUTRE',anom};
+  return {kind:'SERVICE', anom, missions: ok.map(m=>{
+    const amp=(m.end-m.start)/H;
+    const ps=m.pauses.map(([s,e])=>[new Date(Math.max(s,m.start)),new Date(Math.min(e,m.end))]).filter(([s,e])=>e>s);
+    const pm=Math.round(ps.reduce((acc,[s,e])=>acc+(e-s),0)/6e4);
+    return {label:m.label,type:missionType(m.label),from:m.from,to:m.to,
+      start:m.start.toISOString(),end:m.end.toISOString(),
+      amplitude:r2(amp),pauseMin:pm,travail:r2(amp-pm/60),nbPauses:ps.length,
+      pauses:ps.map(([s,e])=>[s.toISOString(),e.toISOString()])};
+  })};
+}
+function isoWeek(dt){
+  const d=new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate()));
+  d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7)+3);
+  const ft=new Date(Date.UTC(d.getUTCFullYear(),0,4));
+  ft.setUTCDate(ft.getUTCDate()-((ft.getUTCDay()+6)%7)+3);
+  return {year:d.getUTCFullYear(), week:1+Math.round((d-ft)/(7*864e5))};
+}
+const isoD=d=>d.toISOString().slice(0,10);
+const slug=s=>deacc(s).replace(/[^A-Za-z0-9._~:@+-]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase()||'x';
+
+/** Feuille Récap -> structure de semaine brute (sans règles) */
+function parseWeek(rows){
+  if(!rows.length) throw new Error('Feuille vide.');
+  const r1=rows[0]||[], r2r=rows[1]||[];
+  const hd=r2r.map(c=>c?deacc(String(c)).toLowerCase().trim():'');
+  const fc=(...n)=>{for(const x of n){const i=hd.indexOf(x);if(i>=0)return i;}return -1;};
+  let cMat=fc('matricule'), cNom=fc('nom'), cPre=fc('prenom'), cCor=fc('corridor'),
+      cAge=fc('agence'), cMet=fc('metier'), cLun=fc('lundi');
+  if(cMat<0||cNom<0||cLun<0)
+    throw new Error("En-têtes introuvables en ligne 2. Attendu : Matricule, Nom, Prénom, Corridor, Agence, Metier, puis Lundi…Dimanche.");
+  if(cPre<0)cPre=cNom+1; if(cCor<0)cCor=cNom+2; if(cAge<0)cAge=cNom+3; if(cMet<0)cMet=cNom+4;
+
+  let mon=serialDate(r1[cLun]);
+  if(!mon) for(let i=cLun;i<cLun+7;i++){const d=serialDate(r1[i]); if(d){mon=new Date(d.getTime()-(i-cLun)*864e5);break;}}
+  if(!mon) throw new Error("Date du lundi introuvable en ligne 1 (cellule juste au-dessus de « Lundi »).");
+  const ex=serialDate(r1[2])||serialDate(r1[1])||null;
+  const days=Array.from({length:7},(_,i)=>new Date(mon.getTime()+i*864e5));
+  const {year,week}=isoWeek(mon);
+
+  const anomalies=[], agents=[];
+  for(let i=2;i<rows.length;i++){
+    const r=rows[i]; if(!r||!r.length) continue;
+    const mat=r[cMat], nom=r[cNom];
+    if((mat==null)&&(nom==null)) continue;
+    if(!nom&&!mat) continue;
+    const jours=[];
+    for(let d=0;d<7;d++){
+      const c=parseDayCell(r[cLun+d],mon);
+      (c.anom||[]).forEach(a=>anomalies.push({agent:`${nom??''} ${r[cPre]??''}`.trim(),jour:JN[d],message:a}));
+      delete c.anom; jours.push(c);
+    }
+    agents.push({
+      matricule: mat==null?'':String(mat).trim(),
+      nom:String(nom??'').trim(), prenom:String(r[cPre]??'').trim(),
+      corridor:String(r[cCor]??'').trim(),
+      agence:String(r[cAge]??'').trim()||'(sans agence)',
+      metier:String(r[cMet]??'').trim().toUpperCase()||'(SANS MÉTIER)',
+      jours
+    });
+  }
+  if(!agents.length) throw new Error("Aucune ligne d'agent trouvée sous les en-têtes.");
+  return {
+    meta:{format:2, weekId:`${year}-S${String(week).padStart(2,'0')}`, year, week,
+      monday:isoD(mon), sunday:isoD(days[6]), days:days.map(isoD),
+      extractDate:ex?isoD(ex):null, nbAgents:agents.length,
+      corridors:[...new Set(agents.map(a=>a.corridor).filter(Boolean))]},
+    agents, anomalies};
+}
+
+/* ==========================================================================
+   3. RÈGLES DE CALCUL — rejouées à chaque affichage
+   ========================================================================== */
+const DEFAULT_RULES={
+  rhrMetiers:['CONDUCTEUR'],
+  rhrMinHours:0,
+  rhrCountPending:true,
+  jbExcludeNightOverlap:true,
+  jbRequireFramed:true,
+  residences:{},
+  seuilHebdo:35,              // heures sup au-delà, par agent et par semaine
+  heuresATCMD:5,              // une ATCMD compte pour 5 h de travail
+  nuitAFR:[22,7],             // heures de nuit des AFR
+  nuitCDR:[22,5],             // heures de nuit des conducteurs
+  trajetTypes:['VOY','VS'],   // « trajet seul » : mission dont l'intitulé se réduit à l'un de ces types
+  panierMidi:[11.5,13.5,1],   // plage horaire, heures travaillées minimum
+  panierSoir:[18.5,20.5,1],
+  panierNuit:[22,5,3],
+  panierRHR:true,             // un RHR qui englobe la plage midi ou soir donne un panier
+  horsColonne:'ecarter',      // mission datée hors de sa colonne : 'ecarter' ou 'garder'
+  horsColonneTolerance:6,     // un service qui démarre le lendemain avant cette heure reste rattaché à sa colonne
+};
+/** Une personne = son matricule (à défaut, nom + prénom) */
+const personKey=a=>a.matricule?'m:'+a.matricule:'n:'+deacc(`${a.nom}|${a.prenom}`).toUpperCase();
+const isAFR=m=>/AFR/i.test(m||'');
+
+/** Missions dont la date écrite dans la case ne correspond pas à la colonne
+    (lignes d'une autre semaine recopiées dans le fichier) */
+function splitHorsColonne(agents,days,rules){
+  const tol=(Number(rules.horsColonneTolerance)||0)*H, liste=[];
+  const out=agents.map(a=>{
+    let touched=false;
+    const jours=a.jours.map((j,d)=>{
+      if(j.kind!=='SERVICE') return j;
+      const D=days[d], ok=[], hors=[];
+      for(const m of j.missions){ const S=Date.parse(m.start), E=Date.parse(m.end); (S<D+DAY+tol&&E>D?ok:hors).push(m); }
+      if(!hors.length) return j;
+      touched=true;
+      const hc=hors.map(m=>({label:m.label,start:m.start,end:m.end}));
+      hc.forEach(m=>liste.push({agent:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,jour:JN[d],...m}));
+      return ok.length?{kind:'SERVICE',missions:ok,horsColonne:hc}:{kind:'CODE',code:'Hors colonne',family:'HORS',horsColonne:hc};
+    });
+    return touched?{...a,jours}:a;
+  });
+  return {agents:out,liste};
+}
+function withHC(cell,cells){
+  const seen=new Set(), hc=[];
+  for(const c of cells) for(const m of c.horsColonne||[]){const k=m.label+'|'+m.start; if(!seen.has(k)){seen.add(k);hc.push(m);}}
+  const {horsColonne,...rest}=cell;
+  return hc.length?{...rest,horsColonne:hc}:rest;
+}
+/** Une personne présente sur plusieurs lignes du fichier : fusion jour par jour
+    (un service l'emporte sur un code, un code sur une case vide) */
+function mergeDuplicates(agents){
+  const groups=new Map(), order=[];
+  for(const a of agents){ const k=personKey(a); if(!groups.has(k)){groups.set(k,[]);order.push(k);} groups.get(k).push(a); }
+  const out=[];
+  for(const k of order){
+    const rows=groups.get(k);
+    if(rows.length===1){ out.push({...rows[0],fusion:null}); continue; }
+    const svcDays=a=>a.jours.filter(j=>j.kind==='SERVICE').length;
+    const main=rows.reduce((b,a)=>svcDays(a)>svcDays(b)?a:b,rows[0]);
+    const jours=[];
+    for(let d=0;d<7;d++){
+      const cells=rows.map(r=>r.jours[d]);
+      const svcs=cells.filter(c=>c.kind==='SERVICE'), codes=cells.filter(c=>c.kind==='CODE');
+      if(svcs.length){
+        const seen=new Set(), ms=[];
+        for(const c of svcs) for(const m of c.missions){const key=m.label+'|'+m.start+'|'+m.end; if(!seen.has(key)){seen.add(key);ms.push(m);}}
+        ms.sort((a,b)=>new Date(a.start)-new Date(b.start));
+        jours.push(withHC({kind:'SERVICE',missions:ms},cells));
+      }else if(codes.length){
+        const mc=main.jours[d];
+        jours.push(withHC(mc.kind==='CODE'&&mc.family!=='HORS'?mc:(codes.find(c=>c.family!=='HORS')||codes[0]),cells));
+      }else jours.push({kind:'VIDE'});
+    }
+    out.push({...main,jours,fusion:{lignes:rows.length,agences:[...new Set(rows.map(r=>r.agence))]}});
+  }
+  return out;
+}
+function deduceResidences(agents,rules){
+  const cnt={}, res={}, src={};
+  for(const a of agents){
+    if(!rules.rhrMetiers.includes(a.metier)) continue;
+    cnt[a.agence]=cnt[a.agence]||{};
+    for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions)
+      for(const l of [m.from,m.to]) if(l) cnt[a.agence][l]=(cnt[a.agence][l]||0)+1;
+  }
+  for(const ag of new Set(agents.map(a=>a.agence))){
+    if(rules.residences&&rules.residences[ag]){res[ag]=rules.residences[ag];src[ag]='manuel';}
+    else{const b=Object.entries(cnt[ag]||{}).sort((x,y)=>y[1]-x[1])[0];
+      res[ag]=b?b[0]:null; src[ag]=b?'auto':'indéterminée';}
+  }
+  return {residences:res, residenceSource:src, locCounts:cnt};
+}
+function applyRules(parsed, rulesIn){
+  const rules={...DEFAULT_RULES,...rulesIn};
+  const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
+  const hc=rules.horsColonne==='garder'?{agents:parsed.agents,liste:[]}:splitHorsColonne(parsed.agents,days.map(d=>d.getTime()),rules);
+  const merged=mergeDuplicates(hc.agents);
+  const {residences,residenceSource,locCounts}=deduceResidences(merged,rules);
+  const agents=merged.map(a=>computeAgent(a,days,rules,residences[a.agence]));
+  return {meta:{...parsed.meta,residences,residenceSource,locCounts,rules,horsColonne:hc.liste,
+    fusions:merged.filter(a=>a.fusion).length}, agents, anomalies:parsed.anomalies||[]};
+}
+function dayIndexOf(t,days){for(let i=0;i<7;i++)if(t>=days[i].getTime()&&t<days[i].getTime()+864e5)return i;return t<days[0].getTime()?-1:7;}
+function nights(a,b){
+  const x=Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),a.getUTCDate());
+  const y=Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate());
+  return Math.round((y-x)/864e5);
+}
+/* temps travaillé : la mission moins ses pauses, en intervalles [début, fin] (ms) */
+const ovl=(a0,a1,b0,b1)=>Math.max(0,Math.min(a1,b1)-Math.max(a0,b0));
+const segOvl=(segs,w0,w1)=>segs.reduce((s,[a,b])=>s+ovl(a,b,w0,w1),0);
+function workSegments(m){
+  const S=Date.parse(m.start), E=Date.parse(m.end);
+  const ps=(m.pauses||[]).filter(Array.isArray).map(([s,e])=>[Date.parse(s),Date.parse(e)]).sort((x,y)=>x[0]-y[0]);
+  const out=[]; let cur=S;
+  for(const [s,e] of ps){ if(s>cur) out.push([cur,Math.min(s,E)]); cur=Math.max(cur,e); }
+  if(cur<E) out.push([cur,E]);
+  return out.filter(([a,b])=>b>a);
+}
+/** Plage [de, à) d'une date, en heures décimales (à < de : plage à cheval sur minuit) */
+function windowOf(dayMs,de,a){ const w0=dayMs+de*H; return [w0, a>de?dayMs+a*H:dayMs+DAY+a*H]; }
+function hoursInDailyWindow(segs,de,a,fromDay,toDay){
+  let t=0; for(let d=fromDay;d<=toDay;d+=DAY){ const [w0,w1]=windowOf(d,de,a); t+=segOvl(segs,w0,w1); }
+  return t/H;
+}
+function computeAgent(a,days,rules,residence){
+  const rhrOk=rules.rhrMetiers.includes(a.metier);
+  const nuitW=isAFR(a.metier)?rules.nuitAFR:rules.nuitCDR;
+  const reTrajet=new Set((rules.trajetTypes||[]).map(x=>String(x).toUpperCase().trim()));
+  const jours=a.jours.map((j,d)=>({...j,d,date:isoD(days[d])}));
+  const all=[];
+  let joursService=0,nbMissions=0,amp=0,pauseMin=0,plan=0,nuit=0,dim=0,ampMax=0,wk=0,priseMin=null,finMax=null;
+  let nbMHIS=0,nbDISPO=0,nbATCMD=0,nbTrajetsSeuls=0,pausesInconnues=0;
+  const codeCounts={}, types={}, dests={};
+  const sun0=days[6].getTime(), sun1=sun0+DAY;
+  for(const j of jours){
+    if(j.kind==='CODE') codeCounts[j.family]=(codeCounts[j.family]||0)+1;
+    else if(j.kind==='SERVICE'){
+      joursService++; if(j.d>=5) wk++;
+      j.amplitude=r2(j.missions.reduce((s,m)=>s+m.amplitude,0));
+      let hj=0;
+      for(const m of j.missions){
+        const S=new Date(m.start), E=new Date(m.end), Sm=S.getTime(), Em=E.getTime();
+        const atcmd=/ATCMD/i.test(m.label), segs=workSegments(m);
+        if(m.pauseMin>0&&!(m.pauses&&m.pauses.length&&Array.isArray(m.pauses[0]))) pausesInconnues++;
+        const hPlan=atcmd?rules.heuresATCMD:Math.max(0,m.amplitude-(m.pauseMin||0)/60);
+        const hNuit=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
+        const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H;
+        all.push({...m,S,E,segs,atcmd});
+        nbMissions++; amp+=m.amplitude; pauseMin+=m.pauseMin||0; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
+        if(m.amplitude>ampMax) ampMax=m.amplitude;
+        const sh=S.getUTCHours()+S.getUTCMinutes()/60, eh=E.getUTCHours()+E.getUTCMinutes()/60;
+        if(priseMin===null||sh<priseMin) priseMin=sh;
+        if(finMax===null||eh>finMax) finMax=eh;
+        types[m.type]=(types[m.type]||0)+1;
+        if(m.to) dests[m.to]=(dests[m.to]||0)+1;
+        if(/MHIS/i.test(m.label)) nbMHIS++;
+        if(/DISPO/i.test(m.label)) nbDISPO++;
+        if(atcmd) nbATCMD++;
+        if(reTrajet.has(String(m.type||missionType(m.label)).toUpperCase().trim())) nbTrajetsSeuls++;
+      }
+      j.heures=r2(hj);
+    }
+  }
+  all.sort((x,y)=>x.S-y.S);
+
+  /* --- RHR : 1 par coupure hors résidence (jour ou nuit) --- */
+  const rhr=[], warn=[];
+  let pending=0;
+  if(rhrOk&&residence){
+    for(let i=0;i<all.length;i++){
+      const m=all[i]; if(!m.to||m.to===residence) continue;
+      const nx=all[i+1];
+      if(nx){
+        const dur=(nx.S-m.E)/H;
+        if(dur<rules.rhrMinHours) continue;
+        if(nx.from&&nx.from!==m.to) warn.push(`reprise à ${nx.from} après une fin de service à ${m.to}`);
+        rhr.push({lieu:m.to,debut:m.end,fin:nx.start,dureeH:r2(dur),nuits:nights(m.E,nx.S),
+          jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:nx.label,enCours:false});
+      }else if(rules.rhrCountPending){
+        pending=1;
+        rhr.push({lieu:m.to,debut:m.end,fin:null,dureeH:null,nuits:null,
+          jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:null,enCours:true});
+      }
+    }
+  }
+
+  /* --- Journées blanches : case vide entre deux services --- */
+  const svcIdx=jours.filter(j=>j.kind==='SERVICE').map(j=>j.d);
+  const f=svcIdx[0]??-1, l=svcIdx[svcIdx.length-1]??-1;
+  const blanches=[];
+  for(const j of jours){
+    if(j.kind!=='VIDE') continue;
+    if(rules.jbRequireFramed && !(f>=0 && j.d>f && j.d<l)) continue;
+    const ds=days[j.d].getTime(), de=ds+864e5;
+    const enService=all.some(m=>m.S.getTime()<de&&m.E.getTime()>ds);
+    if(enService){ j.nuitDebordante=true; if(rules.jbExcludeNightOverlap) continue; }
+    const hors=rhr.some(x=>{const s=new Date(x.debut).getTime(), e=x.fin?new Date(x.fin).getTime():Infinity;return s<de&&e>ds;});
+    const prev=[...jours].filter(y=>y.d<j.d&&y.kind==='SERVICE').pop();
+    const next=jours.find(y=>y.d>j.d&&y.kind==='SERVICE');
+    blanches.push({d:j.d,date:j.date,horsResidence:hors,
+      finPrec:prev?prev.missions[prev.missions.length-1].end:null,
+      debutSuiv:next?next.missions[0].start:null});
+    j.blanche=true; if(hors) j.horsResidence=true;
+  }
+  for(const x of rhr){
+    const s=new Date(x.debut).getTime(), e=x.fin?new Date(x.fin).getTime():days[6].getTime()+864e5;
+    for(const j of jours){const ds=days[j.d].getTime();if(s<ds+864e5&&e>ds) j.horsResidence=true;}
+  }
+
+  /* --- Paniers repas : un par plage et par jour --- */
+  const paniers=computePaniers(all,rhr,days,rules);
+
+  const toucheRes=all.some(m=>m.from===residence||m.to===residence);
+  const heuresPlanifiees=r2(plan);
+  return {
+    matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
+    residence:residence||null, rhrApplicable:rhrOk, jours, fusion:a.fusion||null,
+    joursService, nbMissions,
+    joursRepos:codeCounts.RP||0,
+    joursCP:(codeCounts.CP||0)+(codeCounts.CPAT||0),
+    joursAbsence:Object.entries(codeCounts).reduce((s,[k,v])=>s+(k==='RP'||k==='HORS'?0:v),0),
+    codeCounts, joursVides:jours.filter(j=>j.kind==='VIDE').length,
+    journeesBlanches:blanches.length, blanches,
+    weekendTravaille:wk,
+    amplitudeTotale:r2(amp), amplitudeMoyenne:joursService?r2(amp/joursService):0, amplitudeMax:r2(ampMax),
+    pauseTotaleMin:pauseMin,
+    heuresPlanifiees, heuresSup:r2(Math.max(0,heuresPlanifiees-rules.seuilHebdo)),
+    heuresNuit:r2(nuit), heuresDimanche:r2(dim),
+    nbMHIS, nbDISPO, nbATCMD, nbTrajetsSeuls,
+    paniers, nbPaniers:paniers.length,
+    paniersMidi:paniers.filter(p=>p.plage==='midi').length, paniersSoir:paniers.filter(p=>p.plage==='soir').length,
+    paniersNuit:paniers.filter(p=>p.plage==='nuit').length, paniersRHR:paniers.filter(p=>p.source==='RHR').length,
+    priseServicePlusTot:priseMin===null?null:r2(priseMin), finServicePlusTard:finMax===null?null:r2(finMax),
+    nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
+    rhrNuits:rhr.reduce((s,x)=>s+(x.nuits||0),0), rhrLieux:[...new Set(rhr.map(x=>x.lieu))], rhr,
+    warnings:warn, typesMission:types, destinations:dests, pausesInconnues,
+    nbHorsColonne:jours.reduce((s,j)=>s+(j.horsColonne?j.horsColonne.length:0),0),
+    jamaisEnResidence: rhrOk&&!!residence&&all.length>0&&!toucheRes,
+    premiereMission: all.length?{label:all[0].label,from:all[0].from,start:all[0].start}:null
+  };
+}
+/** Paniers : 1 h travaillée entre 11h30 et 13h30, 1 h entre 18h30 et 20h30, 3 h entre 22h et 5h,
+    ou un RHR qui englobe la plage du midi ou du soir. Un panier au plus par plage et par jour. */
+function computePaniers(all,rhr,days,rules){
+  const got=new Map();
+  const add=(dayMs,plage,source)=>{const k=isoD(new Date(dayMs))+'|'+plage; if(!got.has(k)) got.set(k,{date:isoD(new Date(dayMs)),plage,source});};
+  if(!all.length&&!rhr.length) return [];
+  const segs=all.flatMap(m=>m.segs);
+  const t0=all.length?Math.floor(all[0].S.getTime()/DAY)*DAY-DAY:days[0].getTime();
+  const t1=all.length?Math.floor(Math.max(...all.map(m=>m.E.getTime()))/DAY)*DAY:days[6].getTime();
+  const plages=[['midi',rules.panierMidi],['soir',rules.panierSoir],['nuit',rules.panierNuit]];
+  for(let d=t0;d<=t1;d+=DAY) for(const [nom,[de,a,min]] of plages){
+    const [w0,w1]=windowOf(d,de,a); if(segOvl(segs,w0,w1)/H>=min-1e-9) add(d,nom,'travail');
+  }
+  if(rules.panierRHR) for(const x of rhr){
+    const s=Date.parse(x.debut), e=x.fin?Date.parse(x.fin):days[6].getTime()+DAY;
+    for(let d=Math.floor(s/DAY)*DAY;d<=e;d+=DAY) for(const [nom,[de,a]] of [['midi',rules.panierMidi],['soir',rules.panierSoir]]){
+      const [w0,w1]=windowOf(d,de,a); if(s<=w0&&e>=w1) add(d,nom,'RHR');
+    }
+  }
+  return [...got.values()].sort((x,y)=>(x.date+x.plage).localeCompare(y.date+y.plage));
+}
+/** Clôture les RHR ouverts grâce à la première mission de la semaine suivante */
+function reconcile(weeks,rulesIn){
+  const rules={...DEFAULT_RULES,...rulesIn};
+  const ids=[...weeks.keys()].sort();
+  for(let i=0;i<ids.length-1;i++){
+    const c=weeks.get(ids[i]), n=weeks.get(ids[i+1]);
+    if(!c||!n) continue;
+    if(new Date(n.meta.monday+'T00:00:00Z')-new Date(c.meta.sunday+'T00:00:00Z')!==864e5) continue;
+    const idx=new Map(n.agents.map(a=>[personKey(a),a]));
+    for(const a of c.agents){
+      const p=a.rhr.find(x=>x.enCours&&!x.fin);
+      if(!p) continue;
+      const pm=(idx.get(personKey(a))||{}).premiereMission;
+      if(!pm) continue;
+      const fin=new Date(pm.start), deb=new Date(p.debut);
+      if(fin<=deb) continue;
+      p.fin=pm.start; p.dureeH=r2((fin-deb)/H); p.nuits=nights(deb,fin); p.retour=pm.label; p.cloturee=true;
+      a.rhrHeures=r2(a.rhr.reduce((s,x)=>s+(x.dureeH||0),0));
+      a.rhrNuits=a.rhr.reduce((s,x)=>s+(x.nuits||0),0);
+      if(rules.panierRHR){   // paniers pris pendant la partie du RHR qui déborde sur la semaine suivante
+        const seen=new Set(a.paniers.map(q=>q.date+'|'+q.plage));
+        const sun1=new Date(c.meta.sunday+'T00:00:00Z').getTime()+DAY, e=fin.getTime(), s=deb.getTime();
+        for(let d=sun1;d<=e;d+=DAY) for(const [nom,[de,aa]] of [['midi',rules.panierMidi],['soir',rules.panierSoir]]){
+          const [w0,w1]=windowOf(d,de,aa), k=isoD(new Date(d))+'|'+nom;
+          if(s<=w0&&e>=w1&&!seen.has(k)){ a.paniers.push({date:isoD(new Date(d)),plage:nom,source:'RHR'}); seen.add(k); }
+        }
+        a.nbPaniers=a.paniers.length; a.paniersMidi=a.paniers.filter(q=>q.plage==='midi').length;
+        a.paniersSoir=a.paniers.filter(q=>q.plage==='soir').length; a.paniersRHR=a.paniers.filter(q=>q.source==='RHR').length;
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   4. AGRÉGATIONS
+   ========================================================================== */
+const FIELDS=[
+  {k:'joursService',l:'Jours de service',u:''},
+  {k:'nbMissions',l:'Missions',u:''},
+  {k:'nbTrajetsSeuls',l:'Trajets seuls',u:''},
+  {k:'nbMHIS',l:'MHIS',u:''},
+  {k:'nbDISPO',l:'DISPO',u:''},
+  {k:'nbATCMD',l:'ATCMD',u:''},
+  {k:'nbRHR',l:'RHR',u:''},
+  {k:'rhrNuits',l:'Nuits hors résidence',u:''},
+  {k:'rhrHeures',l:'Heures hors résidence',u:'h'},
+  {k:'journeesBlanches',l:'Journées blanches',u:''},
+  {k:'joursRepos',l:'Repos (RP)',u:''},
+  {k:'joursCP',l:'Congés',u:''},
+  {k:'joursAbsence',l:'Jours d’absence',u:''},
+  {k:'weekendTravaille',l:'Jours de week-end',u:''},
+  {k:'amplitudeTotale',l:'Amplitude',u:'h'},
+  {k:'heuresPlanifiees',l:'Heures planifiées',u:'h'},
+  {k:'heuresSup',l:'Heures sup',u:'h'},
+  {k:'heuresNuit',l:'Heures de nuit',u:'h'},
+  {k:'heuresDimanche',l:'Heures du dimanche',u:'h'},
+  {k:'nbPaniers',l:'Paniers repas',u:''},
+  {k:'paniersMidi',l:'Paniers midi',u:''},
+  {k:'paniersSoir',l:'Paniers soir',u:''},
+  {k:'paniersNuit',l:'Paniers nuit',u:''},
+  {k:'paniersRHR',l:'Paniers en RHR',u:''},
+];
+/** Mesures RHR : moyennées uniquement sur les agents qui ont eu au moins un RHR (ni AFR, ni agents à 0) */
+const RHR_KEYS=new Set(['nbRHR','rhrNuits','rhrHeures']);
+function agg(list){
+  const persons=new Set(list.map(personKey)), withRHR=list.filter(a=>a.nbRHR>0);
+  const o={nbLignes:list.length, nbAgents:persons.size,
+    nbSemaines:new Set(list.map(a=>a.weekId)).size||1,
+    agentsAvecRHR:new Set(withRHR.map(personKey)).size, lignesAvecRHR:withRHR.length,
+    agentsAvecBlanche:new Set(list.filter(a=>a.journeesBlanches>0).map(personKey)).size,
+    agentsHeuresSup:new Set(list.filter(a=>a.heuresSup>0).map(personKey)).size,
+    rhrEnCours:list.reduce((s,a)=>s+a.rhr.filter(x=>x.enCours&&!x.fin).length,0)};
+  for(const f of FIELDS){
+    const v=list.map(a=>a[f.k]||0), t=v.reduce((s,x)=>s+x,0);
+    const den=RHR_KEYS.has(f.k)?withRHR.length:list.length;
+    o[f.k]=r2(t); o[f.k+'_moy']=den?r2(t/den):0; o[f.k+'_max']=v.length?r2(Math.max(...v)):0;
+    o[f.k+'_sem']=r2(t/o.nbSemaines);
+  }
+  const svc=list.filter(a=>a.joursService>0);
+  o.amplitudeParJour=svc.length?r2(svc.reduce((s,a)=>s+a.amplitudeTotale,0)/svc.reduce((s,a)=>s+a.joursService,0)):0;
+  o.ratioPanierJS=o.joursService?r2(o.nbPaniers/o.joursService):0;
+  return o;
+}
+/** Valeur d'une mesure selon le mode choisi : total, moyenne par agent (par ligne agent-semaine), moyenne par semaine */
+const modeVal=(g,k,mode)=>mode==='agent'?g[k+'_moy']:mode==='semaine'?g[k+'_sem']:g[k];
+const groupBy=(l,f)=>{const m=new Map();for(const x of l){const k=f(x);if(!m.has(k))m.set(k,[]);m.get(k).push(x);}return m;};
+/** Une ligne par personne sur toutes les semaines sélectionnées : un nom n'apparaît jamais deux fois */
+function mergeAcrossWeeks(rows){
+  const out=[];
+  for(const [,list] of groupBy(rows,personKey)){
+    list.sort((a,b)=>String(a.weekId).localeCompare(String(b.weekId)));
+    const last=list[list.length-1];
+    const p={...last, parSemaine:list, nbSemaines:list.length, semaines:list.map(a=>a.weekId),
+      agences:[...new Set(list.map(a=>a.agence))],
+      rhr:list.flatMap(a=>a.rhr.map(r=>({...r,weekId:a.weekId}))),
+      blanches:list.flatMap(a=>a.blanches.map(b=>({...b,weekId:a.weekId}))),
+      rhrLieux:[...new Set(list.flatMap(a=>a.rhrLieux))],
+      rhrApplicable:list.some(a=>a.rhrApplicable), fusion:list.some(a=>a.fusion)?list.find(a=>a.fusion).fusion:null,
+      jamaisEnResidence:list.every(a=>a.jamaisEnResidence), warnings:list.flatMap(a=>a.warnings)};
+    for(const f of FIELDS) p[f.k]=r2(list.reduce((s,a)=>s+(a[f.k]||0),0));
+    for(const k of ['pauseTotaleMin','joursVides','nbHorsColonne','pausesInconnues']) p[k]=list.reduce((s,a)=>s+(a[k]||0),0);
+    p.rhrEnCours=p.rhr.filter(x=>x.enCours&&!x.fin).length;
+    p.amplitudeMoyenne=p.joursService?r2(p.amplitudeTotale/p.joursService):0;
+    p.amplitudeMax=r2(Math.max(0,...list.map(a=>a.amplitudeMax||0)));
+    const pr=list.map(a=>a.priseServicePlusTot).filter(x=>x!=null), fi=list.map(a=>a.finServicePlusTard).filter(x=>x!=null);
+    p.priseServicePlusTot=pr.length?Math.min(...pr):null; p.finServicePlusTard=fi.length?Math.max(...fi):null;
+    const sumObj=k=>list.reduce((o,a)=>{for(const [x,v] of Object.entries(a[k]||{})) o[x]=(o[x]||0)+v; return o;},{});
+    p.codeCounts=sumObj('codeCounts'); p.typesMission=sumObj('typesMission'); p.destinations=sumObj('destinations');
+    p.ratioPanierJS=p.joursService?r2(p.nbPaniers/p.joursService):0;
+    out.push(p);
+  }
+  return out;
+}
+
+/* ==========================================================================
+   6. ÉCRITURE DE CLASSEURS EXCEL (.xlsx) — sans dépendance
+   ========================================================================== */
+const CRC_T = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=CRC_T[(c^b[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+const te = new TextEncoder();
+/** ZIP « stored » (sans compression) — suffisant et parfaitement lisible par Excel */
+function zipFiles(files){
+  const parts=[], cd=[]; let off=0;
+  const u16=n=>[n&255,(n>>8)&255], u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];
+  for(const f of files){
+    const name=te.encode(f.name), data=f.data, crc=crc32(data);
+    const lh=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),
+      ...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0)]);
+    parts.push(lh,name,data);
+    cd.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),
+      ...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...u16(0),...u16(0),...u16(0),
+      ...u32(0),...u32(off)]),name);
+    off+=lh.length+name.length+data.length;
+  }
+  let cdLen=0; for(const c of cd) cdLen+=c.length;
+  const eocd=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),
+    ...u32(cdLen),...u32(off),...u16(0)]);
+  const all=[...parts,...cd,eocd];
+  let total=0; for(const a of all) total+=a.length;
+  const out=new Uint8Array(total); let p=0;
+  for(const a of all){ out.set(a,p); p+=a.length; }
+  return out;
+}
+const xe=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
+function colName(n){ let s=''; n++; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26);} return s; }
+/**
+ * sheets : [{name, cols:[{t,w,fmt}], rows:[[v,…]], title?}]
+ *   fmt : 'txt' | 'int' | 'dec' | 'h'
+ */
+function buildXlsx(sheets){
+  const STY={txt:0,int:2,dec:3,h:3};
+  const sheetXml=(sh)=>{
+    const nc=sh.cols.length;
+    const cols=`<cols>${sh.cols.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c.w||14}" customWidth="1"/>`).join('')}</cols>`;
+    const head=`<row r="1" ht="22" customHeight="1">${sh.cols.map((c,i)=>
+      `<c r="${colName(i)}1" s="1" t="inlineStr"><is><t xml:space="preserve">${xe(c.t)}</t></is></c>`).join('')}</row>`;
+    const body=sh.rows.map((r,ri)=>`<row r="${ri+2}">${r.map((v,i)=>{
+      const f=sh.cols[i]?.fmt||'txt';
+      if(v==null||v==='') return '';
+      if(f!=='txt'&&typeof v==='number'&&isFinite(v))
+        return `<c r="${colName(i)}${ri+2}" s="${STY[f]}"><v>${v}</v></c>`;
+      return `<c r="${colName(i)}${ri+2}" s="0" t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+    }).join('')}</row>`).join('');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${colName(nc-1)}${sh.rows.length+1}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${head}${body}</sheetData><autoFilter ref="A1:${colName(nc-1)}${sh.rows.length+1}"/></worksheet>`;
+  };
+  const files=[
+    {name:'[Content_Types].xml',data:te.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`)},
+    {name:'_rels/.rels',data:te.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`)},
+    {name:'xl/workbook.xml',data:te.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xe(s.name).slice(0,31)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`)},
+    {name:'xl/_rels/workbook.xml.rels',data:te.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`)},
+    {name:'xl/styles.xml',data:te.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF175E82"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`)},
+  ];
+  sheets.forEach((s,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`,data:te.encode(sheetXml(s))}));
+  return zipFiles(files);
+}
+/* ==========================================================================
+   7. FORMATAGE
+   ========================================================================== */
+const nf=(n,d=0)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtH=h=>h==null?'—':`${Math.floor(h)}h${String(Math.round((h-Math.floor(h))*60)).padStart(2,'0')}`;
+const fmtHour=h=>h==null?'—':`${String(Math.floor(h)).padStart(2,'0')}h${String(Math.round((h-Math.floor(h))*60)).padStart(2,'0')}`;
+const dISO=s=>{const d=new Date(s);return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`;};
+const dFull=s=>{const d=new Date(s);return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;};
+const dtISO=s=>{const d=new Date(s);return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;};
+const hm=s=>{const d=new Date(s);return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const weekLabel=m=>`S${String(m.week).padStart(2,'0')} ${m.year}`;
+const weekRange=m=>`${dISO(m.monday)} → ${dISO(m.sunday)}`;
+/* ==========================================================================
+   8. ACCÈS AU SERVEUR
+   ========================================================================== */
+const LSK='recap-corridor';
+
+/* Deux dos possibles, même interface :
+   - « artifact » : base partagée de l'artifact Claude (usage personnel)
+   - « web »      : API du site Netlify, protégée par code d'accès        */
+let ADB=null;
+const backend={
+  mode:'web', code:'',
+  async detect(){
+    try{ ADB = await window.claude?.use?.('db'); }catch(e){ ADB=null; }
+    backend.mode = ADB ? 'artifact' : 'web';
+    return backend.mode;
+  },
+  url(p){
+    const i=p.indexOf('?'), route=i<0?p:p.slice(0,i), qs=i<0?'':p.slice(i+1);
+    return window.__API__ ? window.__API__+route+(qs?'&'+qs:'') : '/api/'+p;
+  },
+  async call(path,opt={}){
+    const r=await fetch(backend.url(path),{...opt,headers:{...(opt.headers||{}),'x-acces':backend.code,
+      ...(opt.body?{'content-type':'application/json'}:{})}});
+    let d=null; try{ d=await r.json(); }catch(e){}
+    if(!r.ok) throw Object.assign(new Error((d&&d.error)||`Erreur ${r.status}`),{status:r.status});
+    return d;
+  },
+  async session(){
+    if(backend.mode==='artifact') return {role:'admin'};
+    return backend.call('session');
+  },
+  async etat(){
+    if(backend.mode!=='artifact') return backend.call('etat');
+    const s=await ADB.collection('semaines').get();
+    const weeks=s.docs.map(d=>d.data()).sort((a,b)=>String(b.weekId).localeCompare(String(a.weekId)));
+    const rg=await ADB.doc('config/regles').get();
+    return {role:'admin',weeks,regles:rg.exists?rg.data():null};
+  },
+  async semaine(id){
+    if(backend.mode!=='artifact') return backend.call('semaine?id='+encodeURIComponent(id));
+    const s=await ADB.collection('detail').where('weekId','==',id).get();
+    return {docs:s.docs.map(d=>d.data())};
+  },
+  async saveSemaine(resume,details){
+    if(backend.mode!=='artifact') return backend.call('semaine',{method:'PUT',body:JSON.stringify({resume,details})});
+    for(const d of details) await ADB.doc(`detail/${resume.weekId}__${d.agenceSlug}`).set(d);
+    await ADB.doc(`semaines/${resume.weekId}`).set(resume);
+    return {ok:true};
+  },
+  async delSemaine(id){
+    if(backend.mode!=='artifact') return backend.call('semaine?id='+encodeURIComponent(id),{method:'DELETE'});
+    const s=await ADB.collection('detail').where('weekId','==',id).get();
+    for(const d of s.docs) await ADB.doc('detail/'+d.id).delete();
+    await ADB.doc('semaines/'+id).delete();
+    return {ok:true};
+  },
+  async saveRegles(r){
+    if(backend.mode!=='artifact') return backend.call('regles',{method:'PUT',body:JSON.stringify(r)});
+    await ADB.doc('config/regles').set({...r,majLe:new Date().toISOString()});
+    return {ok:true};
+  },
+};
+const api=backend;
+/* ==========================================================================
+   9. ÉTAT
+   ========================================================================== */
+const S={
+  role:null, tab:'synthese', weeks:[], rules:{...DEFAULT_RULES},
+  selWeek:'__all__', selAgences:null, selMetiers:null, search:'',
+  loaded:new Map(), parsedCache:new Map(),
+  queue:[], busy:false, err:null, msg:null, delAsk:null,
+  sort:{k:'nom',dir:'asc'}, sorts:{}, drawer:null, scopeOpen:false,
+  cols:{identite:true,activite:true,rhr:true,temps:true,paniers:true,absences:true},
+  mode:'total',
+  chart:{metric:'nbRHR',top:25},
+};
+function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
+function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
+  code:api.code, selAgences:S.selAgences, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
+  theme:document.documentElement.dataset.theme||'', cols:S.cols, chart:S.chart}));}catch(e){} }
+
+const allAgences=()=>[...new Set(S.weeks.flatMap(w=>w.agences||[]))].sort();
+const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]))].sort();
+const activeWeeks=()=>S.selWeek==='__all__'?S.weeks.map(w=>w.weekId):[S.selWeek];
+const SER=['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+const agenceColor=ag=>`var(${SER[Math.max(0,allAgences().indexOf(ag))%8]})`;
+
+/** Lignes agent-semaine du périmètre (une par personne et par semaine, doublons du fichier déjà fusionnés) */
+function scopeAgents(opts={}){
+  const out=[];
+  for(const id of (opts.allWeeks?S.weeks.map(w=>w.weekId):activeWeeks())){
+    const w=S.loaded.get(id); if(!w) continue;
+    for(const a of w.agents){
+      if(S.selAgences&&!S.selAgences.includes(a.agence)) continue;
+      if(S.selMetiers&&!S.selMetiers.includes(a.metier)) continue;
+      if(S.search&&!deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(deacc(S.search).toLowerCase())) continue;
+      out.push(a.weekId?a:Object.assign(a,{weekId:id}));
+    }
+  }
+  return out;
+}
+/** Une ligne par personne : un nom n'apparaît jamais deux fois */
+const scopePersons=(opts)=>mergeAcrossWeeks(scopeAgents(opts));
+const scopeAgences=()=>S.selAgences||allAgences();
+const scopeMetiers=()=>S.selMetiers||allMetiers();
+const nbWeeksLoaded=()=>activeWeeks().filter(id=>S.loaded.has(id)).length;
+
+async function ensureLoaded(ids){
+  for(const id of ids){
+    if(S.loaded.has(id)) continue;
+    const {docs}=await api.semaine(id);
+    if(!docs||!docs.length) continue;
+    const meta=docs[0].meta;
+    const agents=docs.flatMap(d=>d.agents);
+    S.parsedCache.set(id,{meta,agents});
+    const v=applyRules({meta,agents},S.rules); v.agents.forEach(a=>a.weekId=id);
+    S.loaded.set(id,v);
+  }
+  reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
+}
+function recomputeLoaded(){
+  for(const [id,p] of S.parsedCache){ const v=applyRules(p,S.rules); v.agents.forEach(a=>a.weekId=id); S.loaded.set(id,v); }
+  reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
+}
+/** L'évolution hebdomadaire et l'historique portent sur toutes les semaines enregistrées */
+const needsAll=()=>['graphiques','exports'].includes(S.tab);
+const toLoad=()=>needsAll()?S.weeks.map(w=>w.weekId):activeWeeks();
+/* ==========================================================================
+   10. GRAPHIQUES
+   ========================================================================== */
+let TIP=null;
+function tipShow(html,x,y){
+  if(!TIP){ TIP=document.createElement('div'); TIP.className='tip'; document.body.appendChild(TIP); }
+  TIP.innerHTML=html; TIP.hidden=false;
+  const r=TIP.getBoundingClientRect();
+  TIP.style.left=Math.min(Math.max(8,x+14),innerWidth-r.width-8)+'px';
+  TIP.style.top=Math.max(8,y-r.height-12)+'px';
+}
+function tipHide(){ if(TIP) TIP.hidden=true; }
+const niceStep=m=>{const raw=m/4,p=Math.pow(10,Math.floor(Math.log10(raw||1)));const n=raw/p;
+  return (n<=1?1:n<=2?2:n<=5?5:10)*p;};
+
+/** Courbes multi-séries avec repère et infobulle */
+function lineChart(series,labels,fmt){
+  if(!labels.length||!series.length) return '<p class="mut sm">Pas encore assez de semaines pour tracer une évolution.</p>';
+  const W=520,Hh=190,ml=46,mr=58,mt=14,mb=28;
+  const maxV=Math.max(1,...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  const step=niceStep(maxV), top=Math.ceil(maxV/step)*step||step;
+  const X=i=>ml+(labels.length===1?(W-ml-mr)/2:i*(W-ml-mr)/(labels.length-1));
+  const Y=v=>mt+(1-v/top)*(Hh-mt-mb);
+  let g='';
+  for(let v=0;v<=top+1e-9;v+=step)
+    g+=`<line class="grid-l" x1="${ml}" y1="${Y(v).toFixed(1)}" x2="${W-mr}" y2="${Y(v).toFixed(1)}"/>`
+      +`<text class="cv" x="${ml-7}" y="${(Y(v)+3.5).toFixed(1)}" text-anchor="end">${nf(v)}</text>`;
+  labels.forEach((l,i)=>{ if(labels.length>10&&i%Math.ceil(labels.length/10)!==0&&i!==labels.length-1) return;
+    g+=`<text class="ct" x="${X(i).toFixed(1)}" y="${Hh-9}" text-anchor="middle">${esc(l)}</text>`;});
+  let p='';
+  series.forEach(s=>{
+    const pts=s.values.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean);
+    if(!pts.length) return;
+    p+=`<path d="${pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach(q=>p+=`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="3.4" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`);
+    const last=pts[pts.length-1];
+    p+=`<text class="cvb" x="${(last[0]+8).toFixed(1)}" y="${(last[1]+4).toFixed(1)}">${esc(s.short||s.name)}</text>`;
+  });
+  let hz='';
+  labels.forEach((l,i)=>{
+    const w=(W-ml-mr)/Math.max(1,labels.length-1);
+    const rows=series.map(s=>({n:s.name,c:s.color,v:s.values[i]})).filter(r=>r.v!=null);
+    hz+=`<rect class="hovz" x="${(X(i)-w/2).toFixed(1)}" y="${mt}" width="${w.toFixed(1)}" height="${Hh-mt-mb}"
+      data-tip="${esc(`<b>${l}</b>`+rows.map(r=>`<span class="tr"><span><i class="cdot" style="background:${r.c}"></i>${r.n}</span><b>${fmt?fmt(r.v):nf(r.v)}</b></span>`).join(''))}"/>`;
+  });
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${Hh}" role="img" preserveAspectRatio="xMidYMid meet">
+    ${g}<line class="axis-l" x1="${ml}" y1="${mt}" x2="${ml}" y2="${Hh-mb}"/>${p}${hz}</svg></div>`;
+}
+/** Barres horizontales avec infobulle */
+function barChart(items,opts={}){
+  if(!items.length) return '<p class="mut sm">Aucune donnée sur ce périmètre.</p>';
+  const max=Math.max(1,...items.map(i=>i.v));
+  const f=opts.fmt||(v=>nf(v,opts.dec||0));
+  return `<div class="bars">${items.map(i=>`
+    <div class="bar" data-tip="${esc(`<b>${i.l}</b><span class="tr"><span>${opts.label||'Valeur'}</span><b>${f(i.v)}</b></span>${i.sub?`<span class="tr"><span>${i.sub2||''}</span><b>${i.sub}</b></span>`:''}`)}">
+      <span class="bl">${esc(i.l)}</span>
+      <span class="bt"><i style="width:${(i.v/max*100).toFixed(1)}%;background:${i.c||'var(--s1)'}"></i></span>
+      <span class="bv">${f(i.v)}</span></div>`).join('')}</div>`;
+}
+
+/* ==========================================================================
+   11. VUES
+   ========================================================================== */
+const el=id=>document.getElementById(id);
+const TABS=[
+  {k:'synthese',l:'Synthèse'},{k:'agents',l:'Agents'},{k:'rhr',l:'RHR'},
+  {k:'blanches',l:'Journées blanches'},{k:'graphiques',l:'Graphiques'},
+  {k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
+];
+/** Valeur à afficher : entier en total, deux décimales en moyenne */
+const nfa=v=>nf(v,Number.isInteger(v)?0:2);
+/** Mesures des statistiques (graphiques) */
+const METRICS=[
+  {k:'nbRHR',l:'Repos hors résidence',c:'RHR',f:nfa},
+  {k:'journeesBlanches',l:'Journées blanches',c:'J. blanches',f:nfa},
+  {k:'nbMissions',l:'Missions',c:'Missions',f:nfa},
+  {k:'nbTrajetsSeuls',l:'Trajets seuls',c:'Trajets seuls',f:nfa},
+  {k:'heuresPlanifiees',l:'Heures planifiées',c:'H. planifiées',f:fmtH},
+];
+const MODES=[['total','Total'],['agent','Moyenne par agent'],['semaine','Moyenne par semaine']];
+const modeSeg=()=>`<div class="seg">${MODES.map(([k,l])=>`<button class="sg" data-vmode="${k}" aria-pressed="${S.mode===k}">${l}</button>`).join('')}</div>`;
+const modeHint=()=>S.mode==='agent'?'moyenne par agent et par semaine — pour le RHR, uniquement les agents qui en ont eu (AFR et agents sans RHR exclus)'
+  :S.mode==='semaine'?'moyenne par semaine':'totaux';
+
+/** Tableau triable : cliquez un en-tête pour ordonner la colonne */
+function stable(id,cols,rows,opt={}){
+  const st=S.sorts[id]||opt.sort||{k:cols[0].k,dir:'asc'};
+  const col=cols.find(c=>c.k===st.k)||cols[0];
+  const val=r=>col.v?col.v(r):r[col.k];
+  const list=[...rows].sort((a,b)=>{const x=val(a),y=val(b);
+    const r=(typeof x==='number'&&typeof y==='number')?x-y:String(x??'').localeCompare(String(y??''),'fr');
+    return st.dir==='asc'?r:-r;});
+  S['rows_'+id]=list;
+  const cell=(c,r)=>c.f?c.f(r):(typeof r[c.k]==='number'?(r[c.k]?nfa(r[c.k]):'<span class="z">0</span>'):esc(r[c.k]));
+  return `<div class="tw${opt.tall?' tall':''}"><table class="${opt.sticky?'sticky1':''}">
+    <thead><tr>${cols.map(c=>`<th class="s ${c.cls||''}${c.st?' st':''}" data-tsort="${id}|${c.k}"${st.k===c.k?` data-dir="${st.dir}"`:''}>${c.l}</th>`).join('')}</tr></thead>
+    <tbody>${list.map((r,i)=>`<tr${opt.onRow?` class="clk" data-trow="${id}|${i}"`:''}>${cols.map(c=>`<td class="${c.cls||''}${c.st?' st':''}">${cell(c,r)}</td>`).join('')}</tr>`).join('')}
+    ${opt.foot?`<tr class="tot">${cols.map(c=>`<td class="${c.cls||''}${c.st?' st':''}">${opt.foot(c)??''}</td>`).join('')}</tr>`:''}</tbody></table></div>`;
+}
+
+function renderTabs(){
+  const sc=scopeAgents();
+  const cnt={agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
+  el('tabs').innerHTML=TABS.filter(t=>S.role==='admin'||!['import','reglages'].includes(t.k))
+    .map(t=>`<button class="tab" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}">${t.l}${
+      cnt[t.k]!=null&&S.weeks.length?`<span class="cnt">${nf(cnt[t.k])}</span>`:''}</button>`).join('');
+}
+function renderFilters(){
+  if(!S.weeks.length){ el('filters').innerHTML=''; return; }
+  const ags=allAgences(), mets=allMetiers();
+  const selA=scopeAgences(), selM=scopeMetiers();
+  const resume=`${selA.length===ags.length?'Toutes les agences':selA.length===1?selA[0]:selA.length+' agences'} · ${selM.length===mets.length?'tous métiers':selM.join(', ')}`;
+  el('filters').innerHTML=`
+    <div class="fbar">
+      <label class="fld"><span class="flabel">Semaine</span>
+        <select id="fWeek">
+          <option value="__all__"${S.selWeek==='__all__'?' selected':''}>Toutes — ${S.weeks.length} semaine${S.weeks.length>1?'s':''}</option>
+          ${S.weeks.map(w=>`<option value="${w.weekId}"${S.selWeek===w.weekId?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}
+        </select></label>
+      <div class="fld"><span class="flabel">Périmètre</span>
+        <button class="sel" id="scopeBtn" aria-expanded="${S.scopeOpen}">${esc(resume)}<span class="car">▾</span></button></div>
+      <label class="fld"><span class="flabel">Agent</span>
+        <input type="search" id="fSearch" placeholder="Nom ou matricule" value="${esc(S.search)}"></label>
+      <div class="fld grow"></div>
+      ${backend.mode==='web'?`<div class="fld"><span class="flabel">&nbsp;</span><span class="badge">${S.role==='admin'?'Accès complet':'Lecture seule'}</span></div>`:''}
+    </div>
+    ${S.scopeOpen?`<div class="scope">
+      <div class="sgrp"><span class="flabel">Agences</span><div class="frow">
+        ${ags.map(a=>`<button class="chip" data-ag="${esc(a)}" aria-pressed="${selA.includes(a)}">${esc(a)}</button>`).join('')}
+        <button class="chip chip-mini" id="agAll">Toutes</button>
+        ${['Hendaye','Bordeaux-St-Jean'].every(x=>ags.includes(x))?'<button class="chip chip-mini" id="agHeBx">Hendaye + Bordeaux</button>':''}
+      </div></div>
+      <div class="sgrp"><span class="flabel">Métiers</span><div class="frow">
+        ${mets.map(m=>`<button class="chip" data-me="${esc(m)}" aria-pressed="${selM.includes(m)}">${esc(m)}</button>`).join('')}
+        <button class="chip chip-mini" id="meAll">Tous</button></div></div>
+    </div>`:''}`;
+}
+function kpiRow(g){
+  const nW=S.rules.nuitAFR, nC=S.rules.nuitCDR;
+  return `<div class="kpis">
+    <div class="kpi"><div class="k">Agents</div><div class="v">${nf(g.nbAgents)}</div><div class="n">${nf(g.joursService)} jours de service</div></div>
+    <div class="kpi${g.nbRHR?' hot':''}"><div class="k">Repos hors résidence</div><div class="v">${nf(g.nbRHR)}</div>
+      <div class="n">${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} en cours`:''}</div></div>
+    <div class="kpi"><div class="k">Nuits hors résidence</div><div class="v">${nf(g.rhrNuits)}</div><div class="n">${fmtH(g.rhrHeures)} cumulées</div></div>
+    <div class="kpi${g.journeesBlanches?' hot':''}"><div class="k">Journées blanches</div><div class="v">${nf(g.journeesBlanches)}</div>
+      <div class="n">${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}</div></div>
+    <div class="kpi${g.heuresSup?' hot':''}"><div class="k">Heures sup</div><div class="v">${fmtH(g.heuresSup)}</div>
+      <div class="n">${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''} au-delà de ${nf(S.rules.seuilHebdo)} h / semaine</div></div>
+    <div class="kpi"><div class="k">Amplitude / jour</div><div class="v">${fmtH(g.amplitudeParJour)}</div><div class="n">${fmtH(g.heuresPlanifiees)} planifiées</div></div>
+    <div class="kpi"><div class="k">Heures de nuit</div><div class="v">${fmtH(g.heuresNuit)}</div><div class="n">hors pauses · AFR ${nW[0]}h–${nW[1]}h, CDR ${nC[0]}h–${nC[1]}h</div></div>
+    <div class="kpi"><div class="k">Missions</div><div class="v">${nf(g.nbMissions)}</div><div class="n">${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls</div></div>
+    <div class="kpi"><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> RP</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
+  </div>`;
+}
+function viewSynthese(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const g=agg(sc), m=S.mode;
+  const groups=[...groupBy(sc,a=>a.agence+'||'+a.metier)].map(([k,list])=>{const [ag,me]=k.split('||'); return {ag,me,x:agg(list),rhr:list.some(a=>a.rhrApplicable)};});
+  const nW=nbWeeksLoaded();
+  const V=(r,k)=>modeVal(r.x,k,m);
+  const cnt=(k,bold)=>({k,v:r=>V(r,k),f:r=>{const v=V(r,k);return v?(bold?`<b>${nfa(v)}</b>`:nfa(v)):'<span class="z">0</span>';}});
+  const hrs=(k)=>({k,v:r=>V(r,k),f:r=>{const v=V(r,k);return v?fmtH(v):'<span class="z">—</span>';}});
+  const cols=[
+    {k:'ag',l:'Agence',cls:'l nm',f:r=>esc(r.ag)},
+    {k:'me',l:'Métier',cls:'l',f:r=>esc(r.me)},
+    {k:'nbAgents',l:'Agents',v:r=>r.x.nbAgents,f:r=>nf(r.x.nbAgents)},
+    {k:'joursService',l:'Jours service',v:r=>V(r,'joursService'),f:r=>m==='total'?`${nf(r.x.joursService)}<span class="mut"> · ${nf(r.x.joursService_moy,1)}</span>`:nfa(V(r,'joursService'))},
+    {k:'nbRHR',l:'RHR',v:r=>r.rhr?V(r,'nbRHR'):-1,f:r=>!r.rhr?'<span class="z">n/a</span>':m==='total'?`${r.x.nbRHR?`<b>${nf(r.x.nbRHR)}</b>`:'<span class="z">0</span>'}<span class="mut"> · ${nf(r.x.nbRHR_moy,2)}</span>`:(V(r,'nbRHR')?`<b>${nfa(V(r,'nbRHR'))}</b>`:'<span class="z">0</span>')},
+    {...cnt('rhrNuits'),l:'Nuits'},
+    {...hrs('rhrHeures'),l:'Heures HR'},
+    {...cnt('journeesBlanches',true),l:'J. blanches'},
+    {...cnt('nbMissions'),l:'Missions'},
+    {...cnt('nbTrajetsSeuls'),l:'Trajets seuls'},
+    {k:'amplitudeParJour',l:'Ampl./jour',v:r=>r.x.amplitudeParJour,f:r=>fmtH(r.x.amplitudeParJour)},
+    {k:'amplitudeTotale_moy',l:'Ampl./agent',v:r=>r.x.amplitudeTotale_moy,f:r=>fmtH(r.x.amplitudeTotale_moy)},
+    {...hrs('heuresPlanifiees'),l:'H. planifiées'},
+    {...hrs('heuresSup'),l:'H. sup'},
+    {...hrs('heuresNuit'),l:'H. nuit'},
+    {...cnt('joursRepos'),l:'RP'},{...cnt('joursCP'),l:'Congés'},{...cnt('joursAbsence'),l:'Absences'},
+  ];
+  const foot=c=>({ag:'Total',me:'',nbAgents:nf(g.nbAgents),amplitudeParJour:fmtH(g.amplitudeParJour),amplitudeTotale_moy:fmtH(g.amplitudeTotale_moy),
+    joursService:nfa(modeVal(g,'joursService',m)),nbRHR:nfa(modeVal(g,'nbRHR',m))})[c.k]
+    ??(['rhrHeures','heuresPlanifiees','heuresSup','heuresNuit'].includes(c.k)?fmtH(modeVal(g,c.k,m)):nfa(modeVal(g,c.k,m)));
+  const persons=mergeAcrossWeeks(sc);
+  const perAgent=persons.filter(a=>a.nbRHR>0).sort((a,b)=>b.nbRHR-a.nbRHR||a.nom.localeCompare(b.nom)).slice(0,12)
+    .map(a=>({l:`${a.nom} ${a.prenom.slice(0,1)}.`,v:a.nbRHR,c:agenceColor(a.agence),sub:a.agence,sub2:'Agence'}));
+  const lieux={}; sc.forEach(a=>a.rhr.forEach(r=>lieux[r.lieu]=(lieux[r.lieu]||0)+1));
+  const perLieu=Object.entries(lieux).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([l,v])=>({l,v}));
+  const vig=persons.filter(a=>a.jamaisEnResidence), warn=persons.filter(a=>a.warnings.length);
+  const fus=sc.filter(a=>a.fusion), hc=sc.filter(a=>a.nbHorsColonne>0), nHC=hc.reduce((s,a)=>s+a.nbHorsColonne,0);
+  return `
+  ${nW>1?`<div class="note">Périmètre cumulé sur <b>${nW} semaines</b>. Chaque agent n'apparaît qu'une fois ; les moyennes par agent sont calculées par agent et par semaine.</div>`:''}
+  ${kpiRow(g)}
+  <section class="card">
+    <div class="card-h"><div><h2>Par agence et corps de métier</h2><p class="card-s">${m==='total'?'total <span class="mut">· moyenne par agent</span>':modeHint()} — cliquez un en-tête pour trier</p></div>
+      <div class="btns">${modeSeg()}<button class="btn btn-sm" data-goto="exports">Exporter</button></div></div>
+    <div class="card-b">${stable('synth',cols,groups,{sort:{k:'ag',dir:'asc'},foot})}</div>
+  </section>
+  <div class="charts">
+    <section class="card"><div class="card-h"><div><h2>RHR par agent</h2><p class="card-s">12 premiers — couleur par agence</p></div></div>
+      <div class="card-b">${barChart(perAgent,{label:'RHR'})}</div></section>
+    <section class="card"><div class="card-h"><div><h2>RHR par lieu de repos</h2><p class="card-s">destination du service aller</p></div></div>
+      <div class="card-b">${barChart(perLieu,{label:'RHR'})}</div></section>
+  </div>
+  ${(vig.length||warn.length||fus.length||hc.length)?`<section class="card"><div class="card-h"><h2>Points de vigilance</h2></div>
+    <div class="card-b stack" style="padding-top:0;gap:9px">
+    ${fus.length?`<div class="note"><b>${fus.length} agent${fus.length>1?'s':''} apparaissai${fus.length>1?'en':''}t sur plusieurs lignes du fichier</b> et ${fus.length>1?'ont été fusionnés':'a été fusionné'} jour par jour — un service l'emporte sur un code, un code sur une case vide :
+      ${fus.slice(0,8).map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(String(a.weekId).replace(/^\d+-/,''))}, ${a.fusion.lignes} lignes)`).join(' · ')}${fus.length>8?' …':''}</div>`:''}
+    ${hc.length?`<div class="note w"><b>${nHC} mission${nHC>1?'s':''} datée${nHC>1?'s':''} hors de leur colonne ${S.rules.horsColonne==='garder'?'comptée'+(nHC>1?'s':''):'non comptée'+(nHC>1?'s':'')}</b> — la date écrite dans la case ne correspond pas au jour de la colonne (ligne d'une autre semaine recopiée) :
+      ${hc.slice(0,8).map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(String(a.weekId).replace(/^\d+-/,''))})`).join(' · ')}${hc.length>8?' …':''}</div>`:''}
+    ${vig.length?`<div class="note w"><b>${vig.length} agent${vig.length>1?'s':''} ne passe${vig.length>1?'nt':''} jamais par la résidence de son agence</b> :
+      ${vig.map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(a.agence)}, résidence ${esc(a.residence)})`).join(' · ')}.
+      Leurs services comptent donc intégralement comme hors résidence — à vérifier dans les Réglages.</div>`:''}
+    ${warn.length?`<div class="note"><b>${warn.length} reprise${warn.length>1?'s':''} de service ailleurs que la fin du service précédent</b> :
+      ${warn.slice(0,8).map(a=>`${esc(a.nom)} (${esc(a.warnings[0])})`).join(' · ')}${warn.length>8?' …':''}</div>`:''}
+  </div></section>`:''}`;
+}
+
+/* ---------- agents : une ligne par personne ---------- */
+const pv=(a,k)=>S.mode==='total'?(a[k]||0):r2((a[k]||0)/(a.nbSemaines||1));
+const numF=(k,fmt)=>a=>{const v=pv(a,k);return v?(fmt?fmt(v):nfa(v)):'<span class="z">'+(fmt?'—':'0')+'</span>';};
+const COLS=[
+  {g:'identite',k:'nom',l:'Agent',cls:'l',st:1,f:a=>`<span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}${a.fusion?' <span class="pill pill-n" title="Lignes en double dans le fichier, fusionnées">fusion</span>':''}`,t:a=>`${a.nom} ${a.prenom}`},
+  {g:'identite',k:'matricule',l:'Matricule',cls:'l mono',f:a=>esc(a.matricule)},
+  {g:'identite',k:'agence',l:'Agence',cls:'l',f:a=>`<span class="dot" style="background:${agenceColor(a.agence)}"></span>${esc(a.agence)}${a.agences.length>1?` <span class="mut" title="${esc(a.agences.join(' → '))}">+${a.agences.length-1}</span>`:''}`,t:a=>a.agence},
+  {g:'identite',k:'metier',l:'Métier',cls:'l',f:a=>esc(a.metier)},
+  {g:'identite',k:'nbSemaines',l:'Semaines',f:a=>nf(a.nbSemaines),t:a=>a.nbSemaines},
+  {g:'identite',k:'residence',l:'Résidence',cls:'l mono',f:a=>a.residence?esc(a.residence):'<span class="z">—</span>'},
+  {g:'activite',k:'joursService',l:'J. service'},
+  {g:'activite',k:'nbMissions',l:'Missions'},
+  {g:'activite',k:'nbTrajetsSeuls',l:'Trajets seuls'},
+  {g:'activite',k:'nbMHIS',l:'MHIS'},
+  {g:'activite',k:'nbDISPO',l:'DISPO'},
+  {g:'activite',k:'nbATCMD',l:'ATCMD'},
+  {g:'activite',k:'weekendTravaille',l:'J. week-end'},
+  {g:'rhr',k:'nbRHR',l:'RHR',f:a=>a.rhrApplicable?(a.nbRHR?`<b>${nfa(pv(a,'nbRHR'))}</b>`+(a.rhrEnCours?' <span class="pill pill-w">en cours</span>':''):'<span class="z">0</span>'):'<span class="z">n/a</span>',t:a=>a.rhrApplicable?pv(a,'nbRHR'):-1},
+  {g:'rhr',k:'rhrNuits',l:'Nuits HR'},
+  {g:'rhr',k:'rhrHeures',l:'Heures HR',f:numF('rhrHeures',fmtH)},
+  {g:'rhr',k:'rhrLieux',l:'Lieux',cls:'l mono',f:a=>a.rhrLieux.length?esc(a.rhrLieux.join(' ')):'<span class="z">—</span>',t:a=>a.rhrLieux.join(' ')},
+  {g:'temps',k:'amplitudeTotale',l:'Amplitude',f:numF('amplitudeTotale',fmtH)},
+  {g:'temps',k:'amplitudeMoyenne',l:'Ampl. moy.',f:a=>a.amplitudeMoyenne?fmtH(a.amplitudeMoyenne):'<span class="z">—</span>',t:a=>a.amplitudeMoyenne},
+  {g:'temps',k:'amplitudeMax',l:'Ampl. max',f:a=>a.amplitudeMax?fmtH(a.amplitudeMax):'<span class="z">—</span>',t:a=>a.amplitudeMax},
+  {g:'temps',k:'heuresPlanifiees',l:'H. planifiées',f:numF('heuresPlanifiees',fmtH)},
+  {g:'temps',k:'heuresSup',l:'H. sup',f:a=>{const v=pv(a,'heuresSup');return v?`<b>${fmtH(v)}</b>`:'<span class="z">—</span>';}},
+  {g:'temps',k:'pauseTotaleMin',l:'Pauses',f:a=>{const v=pv(a,'pauseTotaleMin');return v?nf(v)+' min':'<span class="z">—</span>';}},
+  {g:'temps',k:'heuresNuit',l:'H. nuit',f:numF('heuresNuit',fmtH)},
+  {g:'temps',k:'heuresDimanche',l:'H. dimanche',f:numF('heuresDimanche',fmtH)},
+  {g:'temps',k:'priseServicePlusTot',l:'Prise +tôt',f:a=>fmtHour(a.priseServicePlusTot),t:a=>a.priseServicePlusTot},
+  {g:'temps',k:'finServicePlusTard',l:'Fin +tard',f:a=>fmtHour(a.finServicePlusTard),t:a=>a.finServicePlusTard},
+  {g:'paniers',k:'nbPaniers',l:'Paniers'},
+  {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
+  {g:'absences',k:'journeesBlanches',l:'J. blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
+  {g:'absences',k:'joursRepos',l:'RP'},
+  {g:'absences',k:'joursCP',l:'Congés'},
+  {g:'absences',k:'joursAbsence',l:'Absences'},
+  {g:'absences',k:'joursVides',l:'Cases vides'},
+];
+const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
+const visCols=()=>COLS.filter(c=>S.cols[c.g]);
+function sortAgents(list){
+  const {k,dir}=S.sort, col=COLS.find(c=>c.k===k);
+  const val=a=>col&&col.t?col.t(a):(typeof a[k]==='number'?pv(a,k):a[k]);
+  return [...list].sort((a,b)=>{const x=val(a),y=val(b);
+    const r=(typeof x==='number'&&typeof y==='number')?x-y:String(x??'').localeCompare(String(y??''),'fr');
+    return dir==='asc'?r:-r;});
+}
+function viewAgents(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const list=sortAgents(mergeAcrossWeeks(sc)), cols=visCols(), nW=nbWeeksLoaded();
+  S.rows_agents=list;
+  const spans=[]; let cur=null;
+  for(const c of cols){ if(!cur||cur.g!==c.g){cur={g:c.g,n:0};spans.push(cur);} cur.n++; }
+  return `<section class="card">
+    <div class="card-h"><div><h2>Détail par agent</h2><p class="card-s">${nf(list.length)} agent${list.length>1?'s':''}, une ligne par personne${nW>1?` sur ${nW} semaines`:''} · ${S.mode==='total'?'totaux':'moyennes par semaine'} — cliquez une ligne pour le détail</p></div>
+      <div class="btns">${modeSeg()}</div>
+      <div class="chipset">${Object.entries(GRP).map(([k,l])=>
+        `<button class="chip chip-mini" data-col="${k}" aria-pressed="${!!S.cols[k]}">${l}</button>`).join('')}</div></div>
+    <div class="card-b"><div class="tw tall"><table class="sticky1">
+      <thead>
+        <tr class="grp">${spans.map(s=>`<th colspan="${s.n}" class="l">${GRP[s.g]}</th>`).join('')}</tr>
+        <tr>${cols.map(c=>`<th class="s ${c.cls||''}${c.st?' st':''}" data-sort="${c.k}"${S.sort.k===c.k?` data-dir="${S.sort.dir}"`:''}>${c.l}</th>`).join('')}</tr>
+      </thead>
+      <tbody>${list.map((a,i)=>`<tr class="clk" data-agent="${i}">${cols.map(c=>
+        `<td class="${c.cls||''}${c.st?' st':''}">${c.f?c.f(a):(pv(a,c.k)?nfa(pv(a,c.k)):'<span class="z">0</span>')}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div></div></section>`;
+}
+function rosterBand(a){
+  return `<div class="band">${a.jours.map(j=>{
+    let cls='bd', body='';
+    if(j.kind==='SERVICE'){ cls+=' bd-svc';
+      body=j.missions.map(m=>`<div class="ml">${esc(m.label)}</div><div class="od">${esc(m.from)} → ${esc(m.to)}</div>
+        <div class="hr">${hm(m.start)}–${hm(m.end)} · ${fmtH(m.amplitude)}</div>`).join('<div class="sep"></div>');
+    } else if(j.kind==='CODE'){ cls+=' bd-code'; body=j.family==='HORS'?'<div class="cd">Non compté</div>':`<div class="cd">${esc(j.code)}</div><div class="od mut">${esc(CODEL[j.family]||'')}</div>`; }
+    else if(j.blanche){ cls+=' bd-blanche'; body=`<div class="cd">Journée blanche</div>${j.horsResidence?'<div class="od">hors résidence</div>':''}`; }
+    else { cls+=' bd-vide'; body=`<div class="od mut mt">${j.nuitDebordante?'fin de service de nuit':'—'}</div>`; }
+    if(j.horsResidence) cls+=' bd-hors';
+    if(j.horsColonne) body+=`<div class="hc">${j.horsColonne.map(m=>`<div><s>${esc(m.label)}</s> ${dISO(m.start)}</div>`).join('')}<div>hors colonne, non compté</div></div>`;
+    return `<div class="${cls}"><div class="dn"><span>${JS[j.d]}</span><span>${dISO(j.date)}</span></div>${body}</div>`;
+  }).join('')}</div>`;
+}
+const legendBand=()=>`<div class="legend">
+    <span class="lg"><span class="sw sw-svc"></span>Service</span>
+    <span class="lg"><span class="sw sw-code"></span>Repos / absence</span>
+    <span class="lg"><span class="sw sw-bl"></span>Journée blanche</span>
+    <span class="lg"><span class="sw sw-hr"></span>Hors résidence</span></div>`;
+
+/* ---------- repos hors résidence ---------- */
+function viewRHR(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const cdr=sc.filter(a=>a.rhrApplicable), nW=new Set(sc.map(a=>a.weekId)).size||1;
+  const byAg=[...groupBy(cdr,a=>a.agence)].map(([agence,l])=>({agence,g:agg(l)}));
+  const gT=agg(cdr);
+  const sumCols=[
+    {k:'agence',l:'Agence',cls:'l nm',f:r=>esc(r.agence)},
+    {k:'nbAgents',l:'Agents',v:r=>r.g.nbAgents,f:r=>nf(r.g.nbAgents)},
+    {k:'agentsAvecRHR',l:'Agents avec RHR',v:r=>r.g.agentsAvecRHR,f:r=>nf(r.g.agentsAvecRHR)},
+    {k:'nbRHR',l:'RHR',v:r=>r.g.nbRHR,f:r=>r.g.nbRHR?`<b>${nf(r.g.nbRHR)}</b>`:'<span class="z">0</span>'},
+    {k:'rhrParAgent',l:'RHR / agent',v:r=>r.g.agentsAvecRHR?r.g.nbRHR/r.g.agentsAvecRHR:0,f:r=>r.g.agentsAvecRHR?nf(r.g.nbRHR/r.g.agentsAvecRHR,2):'<span class="z">—</span>'},
+    {k:'rhrHeures',l:'Temps en RHR',v:r=>r.g.rhrHeures,f:r=>r.g.rhrHeures?fmtH(r.g.rhrHeures):'<span class="z">—</span>'},
+    {k:'tpsAgent',l:'Temps RHR / agent',v:r=>r.g.agentsAvecRHR?r.g.rhrHeures/r.g.agentsAvecRHR:0,f:r=>r.g.agentsAvecRHR?fmtH(r.g.rhrHeures/r.g.agentsAvecRHR):'<span class="z">—</span>'},
+    {k:'tpsSem',l:'Temps RHR / semaine',v:r=>r.g.rhrHeures/nW,f:r=>r.g.rhrHeures?fmtH(r.g.rhrHeures/nW):'<span class="z">—</span>'},
+    {k:'rhrNuits',l:'Nuits HR',v:r=>r.g.rhrNuits,f:r=>nf(r.g.rhrNuits)},
+    {k:'nbDISPO',l:'DISPO',v:r=>r.g.nbDISPO,f:r=>nf(r.g.nbDISPO)},
+    {k:'nbATCMD',l:'ATCMD',v:r=>r.g.nbATCMD,f:r=>nf(r.g.nbATCMD)},
+    {k:'heuresSup',l:'Heures sup',v:r=>r.g.heuresSup,f:r=>r.g.heuresSup?fmtH(r.g.heuresSup):'<span class="z">—</span>'},
+  ];
+  const foot=c=>({agence:'Total',nbAgents:nf(gT.nbAgents),agentsAvecRHR:nf(gT.agentsAvecRHR),nbRHR:nf(gT.nbRHR),
+    rhrParAgent:gT.agentsAvecRHR?nf(gT.nbRHR/gT.agentsAvecRHR,2):'—',rhrHeures:fmtH(gT.rhrHeures),
+    tpsAgent:gT.agentsAvecRHR?fmtH(gT.rhrHeures/gT.agentsAvecRHR):'—',tpsSem:fmtH(gT.rhrHeures/nW),rhrNuits:nf(gT.rhrNuits),
+    nbDISPO:nf(gT.nbDISPO),nbATCMD:nf(gT.nbATCMD),heuresSup:fmtH(gT.heuresSup)})[c.k];
+  const persons=mergeAcrossWeeks(cdr).filter(p=>p.nbRHR>0);
+  const perCols=[
+    {k:'nom',l:'Agent',cls:'l',st:1,v:p=>p.nom+' '+p.prenom,f:p=>`<span class="nm">${esc(p.nom)}</span> ${esc(p.prenom)}`},
+    {k:'agence',l:'Agence',cls:'l',f:p=>`<span class="dot" style="background:${agenceColor(p.agence)}"></span>${esc(p.agence)}`},
+    {k:'nbSemaines',l:'Semaines',f:p=>nf(p.nbSemaines)},
+    {k:'nbRHR',l:'RHR',f:p=>`<b>${nf(p.nbRHR)}</b>${p.rhrEnCours?' <span class="pill pill-w">en cours</span>':''}`},
+    {k:'rhrHeures',l:'Temps en RHR',f:p=>fmtH(p.rhrHeures)},
+    {k:'tpsMoy',l:'Temps moyen / RHR',v:p=>p.rhrHeures/p.nbRHR,f:p=>fmtH(p.rhrHeures/p.nbRHR)},
+    {k:'tpsSem',l:'Temps RHR / semaine',v:p=>p.rhrHeures/p.nbSemaines,f:p=>fmtH(p.rhrHeures/p.nbSemaines)},
+    {k:'rhrNuits',l:'Nuits HR'},
+    {k:'rhrLieux',l:'Lieux',cls:'l mono',v:p=>p.rhrLieux.join(' '),f:p=>esc(p.rhrLieux.join(' '))},
+    {k:'nbDISPO',l:'DISPO'},{k:'nbATCMD',l:'ATCMD'},
+    {k:'heuresSup',l:'Heures sup',f:p=>p.heuresSup?`<b>${fmtH(p.heuresSup)}</b>`:'<span class="z">—</span>'},
+  ];
+  return `<section class="card">
+    <div class="card-h"><div><h2>Repos hors résidence par agence</h2>
+      <p class="card-s">conducteurs uniquement · les moyennes par agent ne portent que sur les agents qui ont eu au moins un RHR — cliquez un en-tête pour trier</p></div>
+      <button class="btn btn-sm" data-goto="exports">Exporter</button></div>
+    <div class="card-b">
+      <div class="note mb">Une coupure compte pour un RHR dès que le service se termine ailleurs qu'à la résidence, de jour comme de nuit. Les AFR sont exclus du décompte. Le temps en RHR est la durée entre la fin d'un service et le début du suivant. DISPO et ATCMD sont comptés séparément ; une ATCMD compte pour ${nf(S.rules.heuresATCMD)} h de travail.</div>
+      ${cdr.length?stable('rhrag',sumCols,byAg,{sort:{k:'nbRHR',dir:'desc'},foot}):'<p class="mut">Aucun conducteur sur ce périmètre.</p>'}
+    </div></section>
+  <section class="card">
+    <div class="card-h"><div><h2>Par agent</h2><p class="card-s">${nf(persons.length)} agent${persons.length>1?'s':''} ayant eu au moins un RHR, une ligne par personne — cliquez une ligne pour le détail des coupures</p></div></div>
+    <div class="card-b">${persons.length?stable('rhrag2',perCols,persons,{sort:{k:'nbRHR',dir:'desc'},tall:true,sticky:true,onRow:true}):'<p class="mut">Aucun repos hors résidence sur ce périmètre.</p>'}</div></section>`;
+}
+/* ---------- journées blanches ---------- */
+function viewBlanches(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const rows=[]; sc.forEach(a=>a.blanches.forEach(b=>rows.push({a,b})));
+  const byAg=[...groupBy(rows,x=>x.a.agence+'||'+x.a.metier)].sort((a,b)=>a[0].localeCompare(b[0]));
+  const parJour=JS.map((j,i)=>({l:j,v:rows.filter(x=>x.b.d===i).length}));
+  const persons=mergeAcrossWeeks(sc).filter(p=>p.journeesBlanches>0);
+  const cols=[
+    {k:'nom',l:'Agent',cls:'l',st:1,v:p=>p.nom+' '+p.prenom,f:p=>`<span class="nm">${esc(p.nom)}</span> ${esc(p.prenom)}`},
+    {k:'agence',l:'Agence',cls:'l',f:p=>esc(p.agence)},
+    {k:'metier',l:'Métier',cls:'l',f:p=>esc(p.metier)},
+    {k:'journeesBlanches',l:'Journées blanches',f:p=>`<b>${nf(p.journeesBlanches)}</b>`},
+    {k:'dates',l:'Dates',cls:'l mono',v:p=>p.blanches[0]?.date||'',f:p=>p.blanches.map(b=>`${JS[b.d]} ${dISO(b.date)}`).join(' · ')},
+    {k:'hr',l:'Hors résidence',v:p=>p.blanches.filter(b=>b.horsResidence).length,f:p=>{const n=p.blanches.filter(b=>b.horsResidence).length;return n?`<span class="pill pill-w">${n}</span>`:'<span class="z">0</span>';}},
+  ];
+  return `<section class="card">
+    <div class="card-h"><div><h2>Journées blanches</h2><p class="card-s">${nf(rows.length)} journée${rows.length>1?'s':''} sur le périmètre</p></div>
+      <button class="btn btn-sm" data-goto="exports">Exporter</button></div>
+    <div class="card-b">
+      <div class="note mb">Journée sans mission ni code — ni RP, ni congé — encadrée par deux services dans la semaine. Les lendemains de service de nuit, où l'agent est encore en service jusqu'au matin, sont exclus.</div>
+      ${rows.length?`<div class="cols2 mb">
+        <div class="tw"><table><thead><tr><th class="l">Agence</th><th class="l">Métier</th><th>Journées</th><th>Agents</th></tr></thead>
+          <tbody>${byAg.map(([k,l])=>{const[ag,me]=k.split('||');
+            return `<tr><td class="l nm">${esc(ag)}</td><td class="l">${esc(me)}</td><td>${l.length}</td>
+            <td>${new Set(l.map(x=>personKey(x.a))).size}</td></tr>`;}).join('')}</tbody></table></div>
+        <div>${barChart(parJour,{label:'Journées blanches'})}</div></div>
+      ${stable('jbag',cols,persons,{sort:{k:'journeesBlanches',dir:'desc'},tall:true,sticky:true,onRow:true})}`:'<p class="mut">Aucune journée blanche sur ce périmètre.</p>'}
+    </div></section>`;
+}
+
+/* ---------- graphiques ---------- */
+function viewGraphiques(){
+  if(!S.weeks.length) return emptyScope();
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const c=S.chart, M=METRICS.find(m=>m.k===c.metric)||METRICS[0], k=M.k, mode=S.mode;
+  const isRHR=k==='nbRHR';
+  const base=l=>isRHR?l.filter(a=>a.rhrApplicable):l;     // les AFR n'entrent pas dans les statistiques RHR
+  const fm=v=>M.f(v);
+  const rows=base(sc);
+  const byAg=[...groupBy(rows,a=>a.agence)].map(([l,list])=>{const g=agg(list);return {l,v:modeVal(g,k,mode),c:agenceColor(l),sub:nf(g.nbAgents),sub2:'Agents'};}).sort((a,b)=>b.v-a.v);
+  const byMe=[...groupBy(rows,a=>a.metier)].map(([l,list])=>{const g=agg(list);return {l,v:modeVal(g,k,mode),sub:nf(g.nbAgents),sub2:'Agents'};}).sort((a,b)=>b.v-a.v);
+  // répartition par agent : une ligne par personne (pour le RHR, uniquement ceux qui en ont eu)
+  const persons=mergeAcrossWeeks(rows).filter(p=>!isRHR||p.nbRHR>0);
+  const pers=persons.map(p=>({l:`${p.nom} ${p.prenom.slice(0,1)}.`,v:mode==='total'?p[k]:r2(p[k]/(p.nbSemaines||1)),c:agenceColor(p.agence),sub:p.agence,sub2:'Agence'})).sort((a,b)=>b.v-a.v);
+  const avgP=pers.length?pers.reduce((s,x)=>s+x.v,0)/pers.length:0;
+  // évolution hebdomadaire et moyennes par semaine : toutes les semaines enregistrées
+  const all=base(scopeAgents({allWeeks:true}));
+  const ids=S.weeks.map(w=>w.weekId).sort();
+  const labels=ids.map(id=>`S${String(S.weeks.find(x=>x.weekId===id).week).padStart(2,'0')}`);
+  const shown=scopeAgences().slice(0,8);
+  const series=shown.map(ag=>({name:ag,short:ag.slice(0,3).toUpperCase(),color:agenceColor(ag),
+    values:ids.map(id=>{const l=all.filter(a=>a.weekId===id&&a.agence===ag); return l.length?modeVal(agg(l),k,mode==='agent'?'agent':'total'):null;})}));
+  const legend=shown.map(ag=>`<span class="lg"><span class="cdot" style="background:${agenceColor(ag)}"></span>${esc(ag)}</span>`).join('');
+  // moyennes par semaine : tous métiers du périmètre ; le RHR ne porte que sur les conducteurs
+  const allRows=scopeAgents({allWeeks:true}), nWall=new Set(allRows.map(a=>a.weekId)).size;
+  const wval=(l,mk)=>{ if(mk!=='nbRHR') return agg(l)[mk+'_sem']; const w=new Set(l.map(a=>a.weekId)).size||1;
+    return r2(l.filter(a=>a.rhrApplicable).reduce((s,a)=>s+a.nbRHR,0)/w); };
+  const wk=[...groupBy(allRows,a=>a.agence)].map(([agence,l])=>{const g=agg(l),o={agence,ag:r2(g.nbLignes/g.nbSemaines)}; METRICS.forEach(m=>o[m.k]=wval(l,m.k)); return o;});
+  const gW=(()=>{const g=agg(allRows),o={ag:r2(g.nbLignes/g.nbSemaines)}; METRICS.forEach(m=>o[m.k]=wval(allRows,m.k)); return o;})();
+  const wCols=[{k:'agence',l:'Agence',cls:'l nm',f:r=>esc(r.agence)},
+    {k:'ag',l:'Agents / sem.',f:r=>nf(r.ag,1)},
+    ...METRICS.map(m=>({k:m.k,l:m.c+' / sem.',f:r=>m.f(r[m.k])}))];
+  const tops=[15,25,50,100,0];
+  return `
+  <section class="card"><div class="card-b"><div class="ctrls" style="margin-bottom:0;border-bottom:0;padding-bottom:0">
+    <div class="fld"><span class="flabel">Mesure</span><div class="seg">${METRICS.map(m=>`<button class="sg" data-cm="${m.k}" aria-pressed="${m.k===k}">${m.c}</button>`).join('')}</div></div>
+    <div class="fld"><span class="flabel">Valeur</span>${modeSeg()}</div></div>
+    <p class="hint">${esc(modeHint())} · les filtres de semaine, d'agence et de métier s'appliquent${isRHR?' · RHR : conducteurs uniquement':''}</p></div></section>
+  <div class="charts">
+    <section class="card"><div class="card-h"><div><h2>${esc(M.l)} par agence</h2><p class="card-s">${esc(modeHint())}</p></div></div>
+      <div class="card-b">${barChart(byAg,{fmt:fm,label:M.l})}</div></section>
+    <section class="card"><div class="card-h"><div><h2>${esc(M.l)} par métier</h2><p class="card-s">${esc(modeHint())}</p></div></div>
+      <div class="card-b">${barChart(byMe,{fmt:fm,label:M.l})}</div></section>
+  </div>
+  <section class="card"><div class="card-h"><div><h2>Répartition par agent</h2>
+    <p class="card-s">${esc(M.l)}${mode==='total'?'':' par semaine'} · ${nf(pers.length)} agent${pers.length>1?'s':''}${isRHR?' ayant eu au moins un RHR':''} · moyenne ${fm(avgP)}</p></div>
+    <label class="fld"><span class="flabel">Afficher</span><select id="cTop">${tops.map(n=>`<option value="${n}"${c.top===n?' selected':''}>${n?n+' premiers':'tous'}</option>`).join('')}</select></label></div>
+    <div class="card-b">${barChart(c.top?pers.slice(0,c.top):pers,{fmt:fm,label:M.l})}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Évolution hebdomadaire</h2>
+    <p class="card-s">${esc(M.l)} — une courbe par agence${mode==='agent'?', moyenne par agent':''} · toutes les semaines enregistrées</p></div></div>
+    <div class="card-b">${lineChart(series,labels,fm)}<div class="clg">${legend}</div>
+    ${S.weeks.length<2?'<p class="hint">Une seule semaine enregistrée : la courbe prendra son sens dès la deuxième.</p>':''}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Moyennes par semaine</h2><p class="card-s">sur ${nf(nWall)} semaine${nWall>1?'s':''} enregistrée${nWall>1?'s':''} — cliquez un en-tête pour trier</p></div></div>
+    <div class="card-b">${stable('wk',wCols,wk,{sort:{k:'agence',dir:'asc'},foot:cc=>cc.k==='agence'?'Total':cc.k==='ag'?nf(gW.ag,1):METRICS.find(m=>m.k===cc.k).f(gW[cc.k])})}</div></section>`;
+}
+
+/* ---------- exports ---------- */
+function tables(){
+  const sc=scopeAgents(), persons=mergeAcrossWeeks(sc).sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  const synth=[...groupBy(sc,a=>a.agence+'||'+a.metier)].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,l])=>{
+    const [ag,me]=k.split('||'), x=agg(l);
+    return [ag,me,x.nbAgents,x.joursService,x.joursService_moy,l.some(a=>a.rhrApplicable)?x.nbRHR:'',l.some(a=>a.rhrApplicable)?x.nbRHR_moy:'',x.nbRHR_max,x.rhrNuits,x.rhrHeures,
+      x.journeesBlanches,x.journeesBlanches_moy,x.nbMissions,x.nbTrajetsSeuls,x.nbMHIS,x.nbDISPO,x.nbATCMD,
+      x.amplitudeTotale,x.amplitudeTotale_moy,x.amplitudeParJour,x.heuresPlanifiees,x.heuresSup,x.heuresNuit,x.heuresDimanche,
+      x.nbPaniers,x.ratioPanierJS,x.joursRepos,x.joursCP,x.joursAbsence,x.weekendTravaille];});
+  const g=agg(sc);
+  synth.push(['TOTAL','',g.nbAgents,g.joursService,g.joursService_moy,g.nbRHR,g.nbRHR_moy,g.nbRHR_max,g.rhrNuits,g.rhrHeures,
+    g.journeesBlanches,g.journeesBlanches_moy,g.nbMissions,g.nbTrajetsSeuls,g.nbMHIS,g.nbDISPO,g.nbATCMD,
+    g.amplitudeTotale,g.amplitudeTotale_moy,g.amplitudeParJour,g.heuresPlanifiees,g.heuresSup,g.heuresNuit,g.heuresDimanche,
+    g.nbPaniers,g.ratioPanierJS,g.joursRepos,g.joursCP,g.joursAbsence,g.weekendTravaille]);
+  const agents=persons.map(a=>[a.matricule,a.nom,a.prenom,a.agence,a.metier,a.nbSemaines,a.residence||'',
+    a.joursService,a.nbMissions,a.nbTrajetsSeuls,a.nbMHIS,a.nbDISPO,a.nbATCMD,a.rhrApplicable?a.nbRHR:'',a.rhrEnCours,a.rhrNuits,a.rhrHeures,a.rhrLieux.join(' '),
+    a.journeesBlanches,a.amplitudeTotale,a.amplitudeMoyenne,a.amplitudeMax,a.heuresPlanifiees,a.heuresSup,a.pauseTotaleMin,
+    a.heuresNuit,a.heuresDimanche,a.nbPaniers,a.ratioPanierJS,fmtHour(a.priseServicePlusTot),fmtHour(a.finServicePlusTard),
+    a.weekendTravaille,a.joursRepos,a.joursCP,a.joursAbsence,a.joursVides,a.fusion?'oui':'']);
+  const rhr=persons.filter(a=>a.rhrApplicable&&a.nbRHR>0).map(a=>[a.matricule,a.nom,a.prenom,a.agence,a.residence||'',a.nbSemaines,
+    a.nbRHR,a.rhrHeures,r2(a.rhrHeures/a.nbRHR),r2(a.rhrHeures/a.nbSemaines),a.rhrNuits,a.rhrLieux.join(' '),a.nbDISPO,a.nbATCMD,a.heuresSup,
+    a.rhrEnCours?'oui':'']);
+  const bl=persons.filter(a=>a.journeesBlanches>0).map(a=>[a.matricule,a.nom,a.prenom,a.agence,a.metier,a.journeesBlanches,
+    a.blanches.map(b=>`${JN[b.d]} ${dFull(b.date)}`).join(', '),a.blanches.filter(b=>b.horsResidence).length]);
+  const mets=scopeMetiers(), ags=scopeAgences();
+  const hist=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)).map(w=>{
+    const l=(S.loaded.get(w.weekId)?.agents||[]).filter(a=>ags.includes(a.agence)&&mets.includes(a.metier));
+    if(!l.length) return null;
+    const x=agg(l);
+    return [weekLabel(w),dFull(w.monday),dFull(w.sunday),x.nbAgents,x.joursService,x.nbRHR,x.rhrNuits,x.rhrHeures,
+      x.journeesBlanches,x.nbMissions,x.nbTrajetsSeuls,x.amplitudeTotale,x.heuresPlanifiees,x.heuresSup,x.heuresNuit,x.nbPaniers,x.joursRepos,x.joursCP];
+  }).filter(Boolean);
+  return {
+    synthese:{name:'Synthèse',cols:[
+      {t:'Agence',w:22},{t:'Métier',w:14},{t:'Agents',w:8,fmt:'int'},{t:'Jours de service',w:11,fmt:'int'},
+      {t:'Jours service / agent',w:13,fmt:'dec'},{t:'RHR',w:8,fmt:'int'},{t:'RHR / agent (avec RHR)',w:13,fmt:'dec'},{t:'RHR max',w:9,fmt:'int'},
+      {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},{t:'Journées blanches',w:12,fmt:'int'},
+      {t:'J. blanches / agent',w:12,fmt:'dec'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'MHIS',w:7,fmt:'int'},
+      {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},{t:'Amplitude / agent (h)',w:13,fmt:'dec'},
+      {t:'Amplitude / jour (h)',w:13,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},
+      {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
+      {t:'Panier / JS',w:9,fmt:'dec'},{t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
+      {t:'Jours de week-end',w:11,fmt:'int'}],rows:synth},
+    agents:{name:'Agents',cols:[
+      {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Métier',w:13},{t:'Semaines',w:9,fmt:'int'},{t:'Résidence',w:10},
+      {t:'Jours de service',w:10,fmt:'int'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'MHIS',w:7,fmt:'int'},
+      {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'RHR',w:7,fmt:'int'},{t:'RHR en cours',w:10,fmt:'int'},
+      {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},{t:'Lieux de RHR',w:14},
+      {t:'Journées blanches',w:12,fmt:'int'},{t:'Amplitude (h)',w:11,fmt:'dec'},{t:'Amplitude moyenne (h)',w:13,fmt:'dec'},
+      {t:'Amplitude max (h)',w:12,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Pauses (min)',w:10,fmt:'int'},
+      {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},{t:'Panier / JS',w:9,fmt:'dec'},
+      {t:'Prise la plus tôt',w:11},{t:'Fin la plus tard',w:11},
+      {t:'Jours de week-end',w:11,fmt:'int'},{t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
+      {t:'Cases vides',w:9,fmt:'int'},{t:'Lignes fusionnées',w:11}],rows:agents},
+    rhr:{name:'RHR par agent',cols:[
+      {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Résidence',w:10},{t:'Semaines',w:9,fmt:'int'},
+      {t:'RHR',w:7,fmt:'int'},{t:'Temps en RHR (h)',w:12,fmt:'dec'},{t:'Temps moyen / RHR (h)',w:13,fmt:'dec'},{t:'Temps RHR / semaine (h)',w:13,fmt:'dec'},
+      {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Lieux',w:14},{t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'Heures sup (h)',w:11,fmt:'dec'},
+      {t:'Coupure ouverte sur la semaine suivante',w:14}],rows:rhr},
+    blanches:{name:'Journées blanches',cols:[
+      {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Métier',w:13},
+      {t:'Journées blanches',w:12,fmt:'int'},{t:'Dates',w:40},{t:'Hors résidence',w:12,fmt:'int'}],rows:bl},
+    historique:{name:'Historique',cols:[
+      {t:'Semaine',w:11},{t:'Lundi',w:11},{t:'Dimanche',w:11},{t:'Agents',w:8,fmt:'int'},{t:'Jours de service',w:11,fmt:'int'},
+      {t:'RHR',w:7,fmt:'int'},{t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},
+      {t:'Journées blanches',w:12,fmt:'int'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},
+      {t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Heures de nuit (h)',w:12,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
+      {t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'}],rows:hist},
+  };
+}
+async function dl(name,data,mime){
+  if(backend.mode==='artifact'){
+    const d=await window.claude?.use?.('downloads');
+    if(!d){ S.msg={m:"Le téléchargement n'est pas disponible dans cette vue.",t:'w'}; render(); return; }
+    try{ await d.save({filename:name,data:new Blob([data],{type:mime})}); }
+    catch(e){ if(e&&e.code!=='declined'){ S.msg={m:'Export impossible : '+(e.message||e.code),t:'c'}; render(); } }
+    return;
+  }
+  const u=URL.createObjectURL(new Blob([data],{type:mime})), a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+const scopeTag=()=>{
+  const w=S.selWeek==='__all__'?'toutes-semaines':S.selWeek;
+  const a=S.selAgences&&S.selAgences.length<=2?'-'+S.selAgences.map(x=>slug(x)).join('-'):'';
+  return w+a;
+};
+function exportXlsx(which){
+  const t=tables();
+  const sheets=(which==='tout'?['synthese','agents','rhr','blanches','historique']:[which]).map(k=>t[k]);
+  dl(`recap-corridor-${which}-${scopeTag()}.xlsx`, buildXlsx(sheets),
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+function exportCsv(which){
+  const t=tables()[which];
+  const q=v=>{const s=v==null?'':(typeof v==='number'?String(v).replace('.',','):String(v));
+    return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv='﻿'+[t.cols.map(c=>q(c.t)).join(';'),...t.rows.map(r=>r.map(q).join(';'))].join('\r\n');
+  dl(`recap-corridor-${which}-${scopeTag()}.csv`,csv,'text/csv;charset=utf-8');
+}
+function viewExports(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const t=tables();
+  const items=[
+    {k:'tout',n:'Classeur complet',d:'Les cinq feuilles en un seul fichier Excel : synthèse, agents, RHR, journées blanches, historique.',c:t.agents.rows.length+t.rhr.rows.length},
+    {k:'synthese',n:'Synthèse par agence et métier',d:'Totaux, moyennes par agent et maximums. La feuille à diffuser en réunion.',c:t.synthese.rows.length},
+    {k:'agents',n:'Détail par agent',d:`Une ligne par agent sur le périmètre, ${t.agents.cols.length} colonnes. Pour vos propres tableaux croisés.`,c:t.agents.rows.length},
+    {k:'rhr',n:'RHR par agent',d:'Une ligne par agent ayant eu au moins un RHR : nombre, temps en RHR, temps moyen, temps par semaine, lieux, DISPO, ATCMD, heures sup.',c:t.rhr.rows.length},
+    {k:'blanches',n:'Journées blanches',d:'Une ligne par agent concerné, avec la liste des dates.',c:t.blanches.rows.length},
+    {k:'historique',n:'Historique par semaine',d:'Une ligne par semaine enregistrée, pour suivre la tendance.',c:t.historique.rows.length},
+  ];
+  return `<section class="card"><div class="card-h"><div><h2>Exports</h2>
+    <p class="card-s">le périmètre sélectionné s'applique — ${nf(new Set(sc.map(personKey)).size)} agent${sc.length>1?'s':''}</p></div>
+    <button class="btn btn-sm" id="btnPrint">Version imprimable</button></div>
+    <div class="card-b stack" style="padding-top:0">
+      <div class="row" style="background:var(--accent-soft);border-color:var(--accent-line)">
+        <div class="rl"><div class="rt">Rapport autonome à diffuser</div>
+          <div class="rs">Un seul fichier HTML contenant les chiffres du périmètre : s'ouvre dans n'importe quel navigateur, sans compte, sans connexion, sans installation. À envoyer par mail ou à déposer sur un réseau partagé. Il s'imprime aussi en PDF.</div></div>
+        <div class="ract"><button class="btn btn-sm btn-pri" id="btnReport">Générer le rapport</button></div></div>
+      <div class="note">Les fichiers Excel arrivent mis en forme : en-têtes figés, filtres automatiques, largeurs de colonnes et nombres reconnus comme tels. Les CSV utilisent le point-virgule et la virgule décimale, pour s'ouvrir directement dans Excel en français.</div>
+      <div class="rows">${items.map(i=>`<div class="row">
+        <div class="rl"><div class="rt">${i.n}</div><div class="rs">${i.d} — ${nf(i.c)} ligne${i.c>1?'s':''}</div></div>
+        <div class="ract"><button class="btn btn-sm btn-pri" data-xlsx="${i.k}">Excel</button>
+          ${i.k!=='tout'?`<button class="btn btn-sm" data-csv="${i.k}">CSV</button>`:''}</div></div>`).join('')}</div>
+    </div></section>`;
+}
+
+/* ---------- import multiple ---------- */
+const taille=n=>n==null?'':n>=1e6?nf(n/1e6,1)+' Mo':nf(Math.max(1,Math.round(n/1e3)))+' Ko';
+function viewImport(){
+  return `<section class="card"><div class="card-h"><div><h2>Importer des semaines</h2>
+    <p class="card-s">fichiers « Récap National Corridor » au format .xlsx — plusieurs à la fois, sans limite de taille</p></div></div>
+    <div class="card-b stack" style="padding-top:0">
+      <div class="drop" id="drop">
+        <h3>Déposez un ou plusieurs fichiers Excel</h3>
+        <p>ou <button class="btn btn-sm" id="pick">parcourir</button> — chaque semaine est reconnue d'après la date du lundi en ligne 1, quel que soit le nom du fichier.</p>
+        <input type="file" id="file" accept=".xlsx" multiple hidden>
+      </div>
+      ${S.err?`<div class="note c"><b>Lecture impossible.</b> ${esc(S.err)}</div>`:''}
+      ${S.queue.length?queueView():''}
+    </div></section>
+    <section class="card"><div class="card-h"><div><h2>Semaines enregistrées</h2><p class="card-s">${S.weeks.length} au total — supprimer un fichier retire sa semaine des chiffres</p></div></div>
+      <div class="card-b">${S.weeks.length?`<div class="rows">${S.weeks.map(w=>{const fn=w.fileName||(w.fichier&&w.fichier.nom), ft=w.taille??(w.fichier&&w.fichier.taille);
+        return `<div class="row"><div class="rl"><div class="rt">${weekLabel(w)} <span class="mut nb">· ${weekRange(w)}</span></div>
+          <div class="rs">${fn?`${esc(fn)}${ft?` · ${taille(ft)}`:''} · `:''}${nf(w.nbAgents)} lignes · ${(w.agences||[]).length} agences · extrait ARP du ${w.extractDate?dISO(w.extractDate):'?'} · importé le ${dISO(w.importedAt)}</div></div>
+        <div class="ract">${S.delAsk===w.weekId
+          ?`<span class="mut sm">Supprimer ${weekLabel(w)} ?</span><button class="btn btn-sm dgr" data-delok="${w.weekId}">Confirmer</button><button class="btn btn-sm" data-delno="1">Annuler</button>`
+          :`<button class="btn btn-sm" data-del="${w.weekId}">Supprimer</button>`}</div></div>`;}).join('')}</div>`
+        :'<p class="mut">Aucune semaine enregistrée pour l’instant.</p>'}</div></section>`;
+}
+function queueView(){
+  const ok=S.queue.filter(q=>q.state==='pret').length;
+  return `<div class="stack" style="padding-top:0;gap:11px">
+    <div class="rows">${S.queue.map((q,i)=>{
+      const s=q.state;
+      const pill=s==='lecture'?'<span class="pill pill-n">lecture…</span>'
+        :s==='erreur'?'<span class="pill pill-c">erreur</span>'
+        :s==='enregistre'?'<span class="pill pill-g">enregistrée</span>'
+        :s==='envoi'?'<span class="pill pill-a">envoi…</span>'
+        :q.existe?'<span class="pill pill-w">remplacera l’existante</span>':'<span class="pill pill-a">nouvelle</span>';
+      return `<div class="row"><div class="rl">
+        <div class="rt">${q.view?weekLabel(q.view.meta):esc(q.name)} ${pill}</div>
+        <div class="rs">${q.view
+          ? `${esc(q.name)} · ${taille(q.size)} · ${dFull(q.view.meta.monday)} → ${dFull(q.view.meta.sunday)} · ${nf(q.view.agents.length)} agents${q.view.meta.fusions?` (${q.view.meta.fusions} en double, fusionnés)`:''} · ${nf(q.stats.nbRHR)} RHR · ${nf(q.stats.journeesBlanches)} journées blanches · ${fmtH(q.stats.heuresSup)} d'heures sup${q.anom?` · ${q.anom} cellule${q.anom>1?'s':''} illisible${q.anom>1?'s':''}`:''}`
+          : esc(q.err||q.name)}</div></div>
+        <div class="ract">${s!=='enregistre'?`<button class="btn btn-sm" data-qdel="${i}">Retirer</button>`:''}</div></div>`;}).join('')}</div>
+    ${ok?`<div><button class="btn btn-pri" id="saveAll"${S.busy?' disabled':''}>${S.busy?'Enregistrement…':`Enregistrer ${ok} semaine${ok>1?'s':''}`}</button>
+      <button class="btn" id="clearQ"${S.busy?' disabled':''}>Tout retirer</button></div>`:''}</div>`;
+}
+
+function viewReglages(){
+  const ags=allAgences(), r=S.rules, mets=allMetiers();
+  const any=S.loaded.size>0, first=any?[...S.loaded.values()][0].meta:{residences:{},residenceSource:{},locCounts:{}};
+  const h=x=>`${String(Math.floor(x)).padStart(2,'0')}h${String(Math.round((x-Math.floor(x))*60)).padStart(2,'0')}`;
+  return `<section class="card"><div class="card-h"><div><h2>Règles de calcul</h2>
+    <p class="card-s">appliquées à l'affichage — aucun ré-import nécessaire</p></div></div>
+    <div class="card-b stack" style="padding-top:0">
+      <div class="rules-l">
+        <label class="rule"><input type="checkbox" id="rMet" ${r.rhrMetiers.includes('AFR')?'':'checked'}>
+          <span><span class="rn">Les AFR n'ont pas de repos hors résidence</span>
+          <span class="rd">Le décompte ne porte que sur les conducteurs. Décochez pour l'étendre à tous les métiers (${mets.join(', ')}).</span></span></label>
+        <label class="rule"><input type="checkbox" id="rPend" ${r.rhrCountPending?'checked':''}>
+          <span><span class="rn">Compter la coupure ouverte en fin de semaine</span>
+          <span class="rd">Un agent parti le dimanche et rentrant le lundi suivant compte un RHR sur la semaine de départ ; sa durée se calcule dès l'import de la semaine suivante.</span></span></label>
+        <label class="rule"><input type="checkbox" id="rNight" ${r.jbExcludeNightOverlap?'checked':''}>
+          <span><span class="rn">Exclure les lendemains de service de nuit des journées blanches</span>
+          <span class="rd">Une case vide qui suit un service terminé le matin même n'est pas une journée blanche : l'agent était encore en service.</span></span></label>
+        <label class="rule"><input type="checkbox" id="rFramed" ${r.jbRequireFramed?'checked':''}>
+          <span><span class="rn">Ne compter que les journées blanches encadrées par deux services</span>
+          <span class="rd">Les cases vides avant le premier ou après le dernier service de la semaine sont ignorées.</span></span></label>
+        <label class="rule"><input type="checkbox" id="rPRHR" ${r.panierRHR?'checked':''}>
+          <span><span class="rn">Un RHR qui englobe la plage du midi ou du soir donne un panier</span>
+          <span class="rd">Midi : ${h(r.panierMidi[0])}–${h(r.panierMidi[1])}. Soir : ${h(r.panierSoir[0])}–${h(r.panierSoir[1])}.</span></span></label>
+        <label class="rule"><input type="checkbox" id="rHC" ${r.horsColonne!=='garder'?'checked':''}>
+          <span><span class="rn">Ne pas compter les missions datées hors de leur colonne</span>
+          <span class="rd">Une case de la colonne « lundi 31/08 » qui contient une mission du 29/08 est une ligne d'une autre semaine recopiée dans le fichier. Un service de nuit à cheval sur minuit reste rattaché à son jour.</span></span></label>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Durée minimale d'une coupure pour compter un RHR</span>
+          <span class="rd">À 0 h, toute coupure hors résidence compte, de jour comme de nuit.</span>
+          <span class="inl"><input type="text" id="rMin" value="${r.rhrMinHours}" inputmode="decimal"> <span class="mut">heures</span></span></span></div>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures supplémentaires et ATCMD</span>
+          <span class="rd">Heures sup : heures planifiées hors pauses au-delà du seuil, par agent et par semaine. Une ATCMD compte pour un nombre d'heures fixe.</span>
+          <span class="inl">au-delà de <input type="text" id="rSeuil" value="${r.seuilHebdo}" inputmode="decimal"> <span class="mut">h / semaine</span></span>
+          <span class="inl">une ATCMD = <input type="text" id="rATCMD" value="${r.heuresATCMD}" inputmode="decimal"> <span class="mut">h</span></span></span></div>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures de nuit (hors pauses)</span>
+          <span class="rd">Temps réellement travaillé dans la plage de nuit, pauses déduites.</span>
+          <span class="inl">AFR de <input type="text" id="rNA0" value="${r.nuitAFR[0]}"> h à <input type="text" id="rNA1" value="${r.nuitAFR[1]}"> h</span>
+          <span class="inl">conducteurs de <input type="text" id="rNC0" value="${r.nuitCDR[0]}"> h à <input type="text" id="rNC1" value="${r.nuitCDR[1]}"> h</span></span></div>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Trajet seul</span>
+          <span class="rd">Mission dont l'intitulé se réduit à l'un de ces types, séparés par des virgules.</span>
+          <span class="inl"><input type="text" id="rTraj" value="${esc((r.trajetTypes||[]).join(', '))}" style="width:160px"></span></span></div>
+      </div>
+      <div class="btns"><button class="btn btn-pri" id="saveRules">Appliquer et enregistrer</button></div>
+    </div></section>
+  <section class="card"><div class="card-h"><div><h2>Résidence de chaque agence</h2>
+    <p class="card-s">référence du calcul « hors résidence »</p></div></div>
+    <div class="card-b">
+      <div class="note mb">Déduite du lieu le plus fréquent des conducteurs de l'agence. Corrigez une valeur si elle ne correspond pas au site de rattachement réel, puis enregistrez.</div>
+      <div class="tw"><table><thead><tr><th class="l">Agence</th><th class="l">Résidence retenue</th><th class="l">Origine</th><th class="l">Lieux relevés</th></tr></thead>
+      <tbody>${ags.map(ag=>{const lc=(first.locCounts||{})[ag]||{};
+        const top=Object.entries(lc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,n])=>`${l} <span class="mut">${n}</span>`).join(' · ');
+        return `<tr><td class="l nm">${esc(ag)}</td>
+          <td class="l"><input type="text" data-res="${esc(ag)}" value="${esc(r.residences[ag]||(first.residences||{})[ag]||'')}" placeholder="—" class="mono sm-i"></td>
+          <td class="l">${r.residences[ag]?'<span class="pill pill-a">manuelle</span>'
+            :((first.residenceSource||{})[ag]==='auto'?'<span class="pill pill-n">automatique</span>':'<span class="pill pill-w">indéterminée</span>')}</td>
+          <td class="l">${top||'<span class="z">aucune mission</span>'}</td></tr>`;}).join('')}
+      </tbody></table></div></div></section>
+  <section class="card"><div class="card-h"><h2>Comment les chiffres sont calculés</h2></div>
+    <div class="card-b prose">
+      <p><b>Repos hors résidence.</b> Les services de chaque agent sont remis dans l'ordre chronologique. Dès qu'un service se termine ailleurs qu'à la résidence de son agence, la coupure qui le sépare du service suivant compte pour un RHR, de jour comme de nuit. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
+      <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une.</p>
+      <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
+      <p><b>Heures planifiées et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont les heures planifiées au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
+      <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
+      <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
+      <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui englobe la plage du midi ou du soir':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
+      <p><b>Agents en double.</b> Une personne présente sur plusieurs lignes d'un fichier est fusionnée jour par jour : un service l'emporte sur un code, un code sur une case vide. Sur plusieurs semaines, chaque agent n'apparaît qu'une fois dans les tableaux.</p>
+      <p><b>Semaine.</b> Identifiée par la date du lundi en ligne 1 du fichier, pas par son nom. Réimporter une semaine déjà présente remplace ses données.</p>
+    </div></section>`;
+}
+function emptyScope(){
+  if(!S.weeks.length) return `<section class="card"><div class="empty"><h3>Aucune semaine enregistrée</h3>
+    <p>${S.role==='admin'
+      ? "Déposez un ou plusieurs fichiers « Récap National Corridor » dans l'onglet Import : les RHR, les journées blanches et toutes les données par agent, métier et agence sont calculés automatiquement."
+      : "Aucune donnée n'a encore été importée. Contactez l'administrateur de l'outil."}</p>
+    ${S.role==='admin'?'<p class="mt"><button class="btn btn-pri" data-goto="import">Importer une semaine</button></p>':''}</div></section>`;
+  return `<section class="card"><div class="empty"><h3>Aucun agent sur ce périmètre</h3>
+    <p>Élargissez le filtre agence ou métier, ou changez de semaine.</p></div></section>`;
+}
+
+/* ==========================================================================
+   12. RENDU
+   ========================================================================== */
+function render(){
+  if(!S.role){ renderLogin(); return; }
+  el('shell').hidden=false; el('login').hidden=true;
+  renderFilters(); renderTabs();
+  const v=el('view');
+  v.innerHTML=S.msg?`<div class="note ${S.msg.t||''}">${esc(S.msg.m)}</div>`:'';
+  const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
+    S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
+    S.tab==='import'?viewImport(): viewReglages();
+  v.insertAdjacentHTML('beforeend',body);
+  el('brandsub').textContent=S.weeks.length
+    ? `${S.weeks.length} semaine${S.weeks.length>1?'s':''} · ${allAgences().length} agences`
+    : 'Extraction hebdomadaire ARP';
+  if(S.drawer) renderDrawer();
+}
+function renderLogin(){
+  el('shell').hidden=true; el('login').hidden=false;
+  el('login').innerHTML=`<div class="lg-card">
+    <div class="lg-h"><span class="mark">${MARK}</span><div><h1>Récap Corridor</h1>
+      <p>Extraction hebdomadaire ARP — repos hors résidence, journées blanches et données par agent</p></div></div>
+    <label class="fld"><span class="flabel">Code d'accès</span>
+      <input type="password" id="codeIn" placeholder="XXXX-XXXX-XXXX" autocomplete="current-password" autofocus></label>
+    ${S.err?`<div class="note c">${esc(S.err)}</div>`:''}
+    <button class="btn btn-pri lg-b" id="codeGo"${S.busy?' disabled':''}>${S.busy?'Vérification…':'Entrer'}</button>
+    <p class="lg-n">Cet outil contient des données nominatives d'agents. Le code vous est remis par l'administrateur ; il n'est pas partageable au-delà des personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
+  </div>`;
+  setTimeout(()=>el('codeIn')?.focus(),30);
+}
+/** Détail d'un agent : ses totaux, puis chacune de ses semaines */
+function renderDrawer(){
+  const a=S.drawer; if(!a) return;
+  document.querySelector('.ov')?.remove();
+  const weeks=(a.parSemaine||[a]).slice().sort((x,y)=>String(y.weekId).localeCompare(String(x.weekId)));
+  const d=document.createElement('div'); d.className='ov';
+  d.innerHTML=`<div class="dw" role="dialog" aria-label="Détail agent">
+    <div class="dw-h"><div><h2>${esc(a.nom)} ${esc(a.prenom)}</h2>
+      <div class="s">${esc(a.matricule)} · ${esc((a.agences||[a.agence]).join(' → '))} · ${esc(a.metier)} · ${nf(weeks.length)} semaine${weeks.length>1?'s':''}${a.residence?` · résidence ${esc(a.residence)}`:''}</div></div>
+      <button class="x" id="dwx" aria-label="Fermer">×</button></div>
+    <div class="ml2">
+      <div><div class="k">Jours de service</div><div class="v">${a.joursService}</div></div>
+      <div><div class="k">RHR</div><div class="v">${a.rhrApplicable?a.nbRHR:'n/a'}</div></div>
+      <div><div class="k">Journées blanches</div><div class="v">${a.journeesBlanches}</div></div>
+      <div><div class="k">Amplitude</div><div class="v">${fmtH(a.amplitudeTotale)}</div></div>
+      <div><div class="k">Heures planifiées</div><div class="v">${fmtH(a.heuresPlanifiees)}</div></div>
+      <div><div class="k">Heures sup</div><div class="v">${fmtH(a.heuresSup)}</div></div>
+      <div><div class="k">Heures de nuit</div><div class="v">${fmtH(a.heuresNuit)}</div></div>
+      <div><div class="k">Heures du dimanche</div><div class="v">${fmtH(a.heuresDimanche)}</div></div>
+      <div><div class="k">Paniers</div><div class="v">${nf(a.nbPaniers)} <small class="mut">${nf(a.ratioPanierJS,2)}/JS</small></div></div>
+      <div><div class="k">MHIS · DISPO · ATCMD</div><div class="v">${a.nbMHIS} · ${a.nbDISPO} · ${a.nbATCMD}</div></div>
+      <div><div class="k">Prise la + tôt</div><div class="v">${fmtHour(a.priseServicePlusTot)}</div></div>
+      <div><div class="k">Fin la + tard</div><div class="v">${fmtHour(a.finServicePlusTard)}</div></div>
+    </div>
+    ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
+      return `<section class="card"><div class="card-h"><div><h2>${w?weekLabel(w)+' · '+weekRange(w):esc(String(x.weekId))}</h2>
+        <p class="card-s">${esc(x.agence)} · ${fmtH(x.heuresPlanifiees)} planifiées${x.heuresSup?` · <b>${fmtH(x.heuresSup)} sup</b>`:''} · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.nbPaniers} panier${x.nbPaniers>1?'s':''}${x.fusion?` · <span class="pill pill-n">${x.fusion.lignes} lignes fusionnées</span>`:''}</p></div></div>
+        <div class="card-b">${rosterBand(x)}</div></section>`;}).join('')}
+    <div style="margin-top:-6px">${legendBand()}</div>
+    ${a.rhr.length?`<section class="card"><div class="card-h"><h2>Repos hors résidence</h2></div><div class="card-b"><div class="tw"><table>
+      <thead><tr><th class="l">Semaine</th><th class="l">Jour</th><th class="l">Lieu</th><th class="l">Début</th><th class="l">Fin</th><th>Durée</th><th>Nuits</th><th class="l">Aller</th><th class="l">Retour</th></tr></thead>
+      <tbody>${a.rhr.map(r=>`<tr><td class="l mono">${esc(String(r.weekId||a.weekId).replace(/^\d+-/,''))}</td><td class="l">${JS[r.jourDebut]??'—'}</td><td class="l mono">${esc(r.lieu)}</td>
+        <td class="l mono">${dtISO(r.debut)}</td><td class="l mono">${r.fin?dtISO(r.fin):'<span class="pill pill-w">S+1</span>'}</td>
+        <td>${r.dureeH!=null?fmtH(r.dureeH):'—'}</td><td>${r.nuits??'—'}</td>
+        <td class="l mono">${esc(r.aller)}</td><td class="l mono">${r.retour?esc(r.retour):'—'}</td></tr>`).join('')}
+      </tbody></table></div></div></section>`:''}
+    <section class="card"><div class="card-h"><h2>Répartition des jours</h2></div><div class="card-b"><div class="tw"><table>
+      <thead><tr><th class="l">Nature</th><th>Jours</th></tr></thead><tbody>
+      <tr><td class="l">Service</td><td>${a.joursService}</td></tr>
+      ${Object.entries(a.codeCounts).map(([k,v])=>`<tr><td class="l">${esc(CODEL[k]||k)}</td><td>${v}</td></tr>`).join('')}
+      <tr><td class="l">Journée blanche</td><td>${a.journeesBlanches}</td></tr>
+      <tr><td class="l">Case vide (hors journée blanche)</td><td>${a.joursVides-a.journeesBlanches}</td></tr>
+      </tbody></table></div></div></section>
+    ${Object.keys(a.typesMission||{}).length?`<section class="card"><div class="card-h"><h2>Types de mission</h2></div>
+      <div class="card-b">${barChart(Object.entries(a.typesMission).sort((x,y)=>y[1]-x[1]).map(([l,v])=>({l,v})),{label:'Missions'})}</div></section>`:''}
+  </div>`;
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{ if(e.target===d||e.target.id==='dwx'){S.drawer=null;d.remove();} });
+}
+
+/* ==========================================================================
+   13. IMPORT
+   ========================================================================== */
+async function handleFiles(list){
+  S.err=null; S.msg=null;
+  const files=[...list].filter(Boolean);
+  if(!files.length) return;
+  for(const f of files){
+    const q={name:f.name,size:f.size,state:'lecture'}; S.queue.push(q); render();
+    if(!/\.xlsx$/i.test(f.name)){ q.state='erreur'; q.err=`${f.name} — seuls les .xlsx sont lus.`; render(); continue; }
+    try{
+      const {rows}=await readRecapSheet(await f.arrayBuffer());
+      const parsed=parseWeek(rows);
+      const view=applyRules(parsed,S.rules);
+      view.agents.forEach(a=>a.weekId=parsed.meta.weekId);
+      q.parsed=parsed; q.view=view; q.anom=parsed.anomalies.length;
+      q.stats=agg(view.agents);
+      q.existe=S.weeks.some(w=>w.weekId===parsed.meta.weekId);
+      const dup=S.queue.find(o=>o!==q&&o.view&&o.view.meta.weekId===parsed.meta.weekId);
+      if(dup){ q.state='erreur'; q.err=`${f.name} — ${weekLabel(parsed.meta)} est déjà dans la liste.`; }
+      else q.state='pret';
+    }catch(e){ q.state='erreur'; q.err=`${f.name} — ${e.message||e}`; }
+    render();
+  }
+}
+function weekPayload(parsed,view,fileName,size){
+  const agences=[...new Set(parsed.agents.map(a=>a.agence))].sort();
+  const byAgence={};
+  for(const [k,list] of groupBy(view.agents,a=>a.agence+'||'+a.metier)){
+    const [ag,me]=k.split('||'); byAgence[ag]=byAgence[ag]||{};
+    const g=agg(list), o={nbAgents:g.nbAgents};
+    for(const f of FIELDS) o[f.k]=g[f.k];
+    byAgence[ag][me]=o;
+  }
+  return {
+    resume:{...parsed.meta,agences,byAgence,fileName:fileName||'',taille:size??null,importedAt:new Date().toISOString(),
+      metiers:[...new Set(parsed.agents.map(a=>a.metier))].sort()},
+    details:agences.map(ag=>({weekId:parsed.meta.weekId,agence:ag,agenceSlug:slug(ag),meta:parsed.meta,
+      agents:parsed.agents.filter(a=>a.agence===ag)})),
+  };
+}
+async function saveAll(){
+  if(S.busy) return;
+  S.busy=true; render();
+  let n=0;
+  for(const q of S.queue){
+    if(q.state!=='pret') continue;
+    q.state='envoi'; render();
+    try{
+      const p=weekPayload(q.parsed,q.view,q.name,q.size);
+      await api.saveSemaine(p.resume,p.details);
+      const id=q.parsed.meta.weekId;
+      S.parsedCache.set(id,{meta:q.parsed.meta,agents:q.parsed.agents});
+      const v=applyRules(S.parsedCache.get(id),S.rules); v.agents.forEach(a=>a.weekId=id);
+      S.loaded.set(id,v);
+      q.state='enregistre'; n++;
+    }catch(e){ q.state='erreur'; q.err=`${q.name} — ${e.message||e}`; }
+    render();
+  }
+  S.busy=false;
+  const {weeks}=await api.etat(); S.weeks=weeks;
+  if(!S.selAgences){ const p=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(p.length) S.selAgences=p; }
+  await ensureLoaded(toLoad());
+  S.queue=S.queue.filter(q=>q.state!=='enregistre');
+  S.msg={m:`${n} semaine${n>1?'s':''} enregistrée${n>1?'s':''}.`};
+  if(!S.queue.length&&n) S.tab='synthese';
+  savePrefs(); render();
+  setTimeout(()=>{S.msg=null;render();},5000);
+}
+
+/* ==========================================================================
+   14. ÉVÉNEMENTS
+   ========================================================================== */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
+    '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
+    '#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport');
+  if(!t) return;
+  if(t.id==='codeGo'){ return login(); }
+  if(t.id==='btnOut'){ api.code=''; S.role=null; S.weeks=[]; S.loaded.clear(); S.parsedCache.clear(); savePrefs(); render(); return; }
+  if(t.id==='btnTheme'){ const cur=document.documentElement.dataset.theme
+      ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
+  if(t.dataset.tab){ S.tab=t.dataset.tab; savePrefs(); await ensureLoaded(toLoad()); render(); return; }
+  if(t.dataset.goto){ S.tab=t.dataset.goto; savePrefs(); await ensureLoaded(toLoad()); render(); return; }
+  if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; render(); return; }
+  if(t.id==='btnReport'){
+    const wk=S.selWeek==='__all__'?'toutes-semaines':S.selWeek;
+    dl(`rapport-recap-corridor-${wk}.html`, buildReport(), 'text/html;charset=utf-8'); return; }
+  if(t.dataset.xlsx){ exportXlsx(t.dataset.xlsx); return; }
+  if(t.dataset.csv){ exportCsv(t.dataset.csv); return; }
+  if(t.id==='btnPrint'){ window.print(); return; }
+  if(t.dataset.col){ S.cols[t.dataset.col]=!S.cols[t.dataset.col];
+    if(!Object.values(S.cols).some(Boolean)) S.cols.identite=true; savePrefs(); render(); return; }
+  if(t.dataset.vmode){ S.mode=t.dataset.vmode; savePrefs(); render(); return; }
+  if(t.dataset.cm){ S.chart.metric=t.dataset.cm; savePrefs(); render(); return; }
+  if(t.dataset.sort){ const k=t.dataset.sort;
+    const smp=(S.rows_agents||[])[0]||{};
+    S.sort=S.sort.k===k?{k,dir:S.sort.dir==='asc'?'desc':'asc'}
+      :{k,dir:['nom','matricule','agence','metier','residence','rhrLieux'].includes(k)||typeof smp[k]!=='number'&&!['priseServicePlusTot','finServicePlusTard'].includes(k)?'asc':'desc'};
+    render(); return; }
+  if(t.dataset.tsort){ const [id,k]=t.dataset.tsort.split('|'); const cur=S.sorts[id];
+    const txt=['ag','me','agence','metier','nom','rhrLieux','dates'].includes(k);
+    S.sorts[id]=cur&&cur.k===k?{k,dir:cur.dir==='asc'?'desc':'asc'}:{k,dir:txt?'asc':'desc'}; render(); return; }
+  if(t.dataset.agent!=null){ S.drawer=(S.rows_agents||[])[+t.dataset.agent]; renderDrawer(); return; }
+  if(t.dataset.trow){ const [id,i]=t.dataset.trow.split('|'); const r=(S['rows_'+id]||[])[+i]; if(r&&r.jours){ S.drawer=r; renderDrawer(); } return; }
+  if(t.dataset.ag!=null){ const ags=allAgences(); let c=S.selAgences||ags.slice();
+    c=c.includes(t.dataset.ag)?c.filter(x=>x!==t.dataset.ag):[...c,t.dataset.ag];
+    S.selAgences=c.length?c:null; savePrefs(); render(); return; }
+  if(t.id==='agAll'){ S.selAgences=null; savePrefs(); render(); return; }
+  if(t.id==='agHeBx'){ S.selAgences=['Hendaye','Bordeaux-St-Jean']; savePrefs(); render(); return; }
+  if(t.dataset.me!=null){ const ms=allMetiers(); let c=S.selMetiers||ms.slice();
+    c=c.includes(t.dataset.me)?c.filter(x=>x!==t.dataset.me):[...c,t.dataset.me];
+    S.selMetiers=c.length?c:null; savePrefs(); render(); return; }
+  if(t.id==='meAll'){ S.selMetiers=null; savePrefs(); render(); return; }
+  if(t.id==='pick'){ el('file').click(); return; }
+  if(t.dataset.qdel!=null){ S.queue.splice(+t.dataset.qdel,1); render(); return; }
+  if(t.id==='clearQ'){ S.queue=[]; S.err=null; render(); return; }
+  if(t.id==='saveAll'){ saveAll(); return; }
+  if(t.dataset.del){ S.delAsk=t.dataset.del; render(); return; }
+  if(t.dataset.delno){ S.delAsk=null; render(); return; }
+  if(t.dataset.delok){ const id=t.dataset.delok; S.delAsk=null;
+    try{ await api.delSemaine(id); S.msg={m:`${id.replace('-',' ')} supprimée.`}; }catch(err){ S.msg={m:err.message,t:'c'}; }
+    S.loaded.delete(id); S.parsedCache.delete(id);
+    const {weeks}=await api.etat(); S.weeks=weeks;
+    if(S.selWeek===id) S.selWeek=S.weeks[0]?S.weeks[0].weekId:'__all__';
+    await ensureLoaded(toLoad()); render(); setTimeout(()=>{S.msg=null;render();},4000); return; }
+  if(t.id==='saveRules'){
+    const num=(id,d)=>{const v=parseFloat(String(el(id)?.value??'').replace(',','.'));return isFinite(v)?v:d;};
+    S.rules={...S.rules,
+      rhrMetiers: el('rMet').checked?['CONDUCTEUR']:allMetiers(),
+      rhrCountPending: el('rPend').checked,
+      jbExcludeNightOverlap: el('rNight').checked,
+      jbRequireFramed: el('rFramed').checked,
+      panierRHR: el('rPRHR').checked,
+      horsColonne: el('rHC').checked?'ecarter':'garder',
+      rhrMinHours: Math.max(0,num('rMin',0)),
+      seuilHebdo: num('rSeuil',35), heuresATCMD: num('rATCMD',5),
+      nuitAFR:[num('rNA0',22),num('rNA1',7)], nuitCDR:[num('rNC0',22),num('rNC1',5)],
+      trajetTypes: String(el('rTraj').value).split(/[,;]/).map(x=>x.trim().toUpperCase()).filter(Boolean),
+      residences: Object.fromEntries([...document.querySelectorAll('[data-res]')]
+        .map(i=>[i.dataset.res,i.value.trim()]).filter(([,v])=>v))};
+    recomputeLoaded();
+    try{ await api.saveRegles(S.rules); S.msg={m:'Règles enregistrées — elles s’appliquent à tous les utilisateurs.'}; }
+    catch(err){ S.msg={m:err.message,t:'c'}; }
+    render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
+});
+document.addEventListener('change',async e=>{
+  if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
+  if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
+  if(e.target.id==='cTop'){ S.chart.top=+e.target.value; savePrefs(); render(); return; }
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='fSearch'){ S.search=e.target.value; const p=e.target.selectionStart; render();
+    const n=el('fSearch'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&S.drawer){ S.drawer=null; document.querySelector('.ov')?.remove(); }
+  if(e.key==='Enter'&&el('codeIn')&&document.activeElement===el('codeIn')) login();
+});
+document.addEventListener('dragover',e=>{ if(S.role!=='admin')return; e.preventDefault(); el('drop')?.classList.add('on'); });
+document.addEventListener('dragleave',e=>{ const d=el('drop'); if(d&&!d.contains(e.relatedTarget)) d.classList.remove('on'); });
+document.addEventListener('drop',e=>{
+  if(S.role!=='admin') return;
+  if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return;
+  e.preventDefault(); el('drop')?.classList.remove('on');
+  if(S.tab!=='import'){ S.tab='import'; savePrefs(); render(); }
+  handleFiles(e.dataTransfer.files);
+});
+document.addEventListener('mouseover',e=>{ const t=e.target.closest('[data-tip]'); if(t) tipShow(t.dataset.tip,e.clientX,e.clientY); });
+document.addEventListener('mousemove',e=>{ const t=e.target.closest('[data-tip]'); if(t) tipShow(t.dataset.tip,e.clientX,e.clientY); else tipHide(); });
+document.addEventListener('mouseleave',tipHide);
+/* ==========================================================================
+   15. DÉMARRAGE
+   ========================================================================== */
+async function login(code){
+  const v=code||el('codeIn')?.value||'';
+  if(!v.trim()) return;
+  S.busy=true; S.err=null; render();
+  api.code=v.trim();
+  try{
+    const {role}=await api.session();
+    S.role=role; S.busy=false; S.err=null;
+    savePrefs(); await boot();
+  }catch(e){
+    S.busy=false; api.code=''; S.role=null;
+    S.err=e.status===401?"Code d'accès non reconnu.":('Connexion impossible : '+e.message);
+    render();
+  }
+}
+async function boot(){
+  try{
+    const {weeks,regles}=await api.etat();
+    S.weeks=weeks||[];
+    if(regles) S.rules={...DEFAULT_RULES,...regles};
+    const p=prefs();
+    if(p.selAgences) S.selAgences=p.selAgences.filter(a=>allAgences().includes(a));
+    if(S.selAgences&&!S.selAgences.length) S.selAgences=null;
+    if(p.selMetiers) S.selMetiers=p.selMetiers.filter(m=>allMetiers().includes(m));
+    if(S.selMetiers&&!S.selMetiers.length) S.selMetiers=null;
+    if(!S.selAgences){ const pr=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
+    if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
+    if(S.role!=='admin'&&['import','reglages'].includes(S.tab)) S.tab='synthese';
+    await ensureLoaded(toLoad());
+  }catch(e){ S.msg={m:'Chargement impossible : '+e.message,t:'c'}; }
+  render();
+}
+(async function start(){
+  const p=prefs();
+  if(p.theme) document.documentElement.dataset.theme=p.theme;
+  if(p.cols) S.cols={...S.cols,...p.cols};
+  if(p.chart) S.chart={...S.chart,...p.chart};
+  if(p.mode) S.mode=p.mode;
+  if(p.tab) S.tab=p.tab;
+  render();
+  await backend.detect();
+  if(backend.mode==='artifact'){
+    document.getElementById('btnOut')?.remove();
+    S.role='admin'; await boot(); return;
+  }
+  if(p.code) login(p.code); else render();
+})();
+
+/* ==========================================================================
+   16. RAPPORT AUTONOME — un seul fichier HTML, sans serveur ni compte
+   ========================================================================== */
+function buildReport(){
+  const sc=scopeAgents(), t=tables(), g=agg(sc);
+  const ags=scopeAgences(), mets=scopeMetiers();
+  const wk=activeWeeks().map(id=>S.weeks.find(w=>w.weekId===id)).filter(Boolean)
+    .sort((a,b)=>a.weekId.localeCompare(b.weekId));
+  const periode = wk.length===1 ? `${weekLabel(wk[0])} — du ${dFull(wk[0].monday)} au ${dFull(wk[0].sunday)}`
+    : wk.length ? `${wk.length} semaines — de ${dFull(wk[0].monday)} au ${dFull(wk[wk.length-1].sunday)}` : '—';
+  const now=new Date();
+  const genere=`${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} à ${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const kpis=[
+    ['Agents',nf(g.nbAgents),`${nf(g.joursService)} jours de service`],
+    ['Repos hors résidence',nf(g.nbRHR),`${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} en cours`:''}`,g.nbRHR>0],
+    ['Nuits hors résidence',nf(g.rhrNuits),`${fmtH(g.rhrHeures)} cumulées`],
+    ['Journées blanches',nf(g.journeesBlanches),`${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}`,g.journeesBlanches>0],
+    ['Heures sup',fmtH(g.heuresSup),`${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''} au-delà de ${nf(S.rules.seuilHebdo)} h / semaine`,g.heuresSup>0],
+    ['Amplitude / jour',fmtH(g.amplitudeParJour),`${fmtH(g.heuresPlanifiees)} planifiées`],
+    ['Heures de nuit',fmtH(g.heuresNuit),`hors pauses`],
+    ['Missions',nf(g.nbMissions),`${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls`],
+    ['Repos & congés',nf(g.joursRepos)+' RP',`${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences`],
+  ];
+  const SH=[['synthese','Synthèse'],['rhr','RHR par agent'],['blanches','Journées blanches'],['agents','Détail par agent'],['historique','Historique']];
+  const tbl=k=>{
+    const x=t[k];
+    if(!x.rows.length) return '<p class="mut">Aucune ligne sur ce périmètre.</p>';
+    const num=x.cols.map(c=>c.fmt&&c.fmt!=='txt');
+    return `<div class="tw"><table><thead><tr>${x.cols.map((c,i)=>
+      `<th class="${num[i]?'':'l'}">${esc(c.t)}</th>`).join('')}</tr></thead><tbody>${
+      x.rows.map(r=>`<tr${String(r[0])==='TOTAL'?' class="tot"':''}>${r.map((v,i)=>
+        `<td class="${num[i]?'':'l'}">${v===''||v==null?'<span class="z">—</span>':esc(typeof v==='number'?nf(v,Number.isInteger(v)?0:2):v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  };
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Récap Corridor — ${esc(periode)}</title>
+<style>
+:root{--g:#EBEEF2;--s:#fff;--s2:#F5F7FA;--s3:#EAEEF3;--l:#D5DCE5;--l2:#BAC5D2;--i:#0E1620;--i2:#46546A;--i3:#74859A;
+--a:#175E82;--asoft:#E0EDF4;--w:#9C6209;--wsoft:#FBEEDA;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--g:#0F141A;--s:#19202A;--s2:#202834;--s3:#28323F;--l:#2D3846;--l2:#3D4B5C;
+--i:#E9EEF4;--i2:#A4B3C4;--i3:#74859A;--a:#6FB6D9;--asoft:#12303E;--w:#E0A53E;--wsoft:#31240F;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--g);color:var(--i);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1500px;margin:0 auto;padding:22px 18px 60px}
+h1{font-size:19px;margin:0;letter-spacing:-.015em}h2{font-size:14.5px;margin:0}
+.hd{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+  padding-bottom:15px;margin-bottom:18px;border-bottom:1px solid var(--l)}
+.hd .sub{font-size:12.5px;color:var(--i3);margin-top:4px}
+.mk{width:32px;height:32px;border-radius:7px;background:var(--a);flex:none}
+.bd{display:flex;gap:11px;align-items:center}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--l);
+  border:1px solid var(--l);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.kpi{background:var(--s);padding:13px 15px}
+.kpi .k{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--i3)}
+.kpi .v{font-size:25px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums;margin-top:3px}
+.kpi.h .v{color:var(--w)}
+.kpi .n{font-size:11.5px;color:var(--i3);margin-top:2px}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--l);margin-bottom:14px}
+.tb{border:0;background:none;padding:9px 13px 10px;font:inherit;font-size:13.5px;font-weight:500;color:var(--i2);
+  border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px;cursor:pointer}
+.tb[aria-selected=true]{color:var(--a);border-bottom-color:var(--a);font-weight:600}
+.card{background:var(--s);border:1px solid var(--l);border-radius:10px;padding:15px 17px 17px}
+.tw{overflow:auto;border:1px solid var(--l);border-radius:8px;max-height:74vh}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums;background:var(--s)}
+th,td{text-align:right;padding:6px 10px;border-bottom:1px solid var(--l);white-space:nowrap}
+th{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--i3);background:var(--s2);
+  position:sticky;top:0;z-index:2;border-bottom:1px solid var(--l2);text-align:right}
+th.l,td.l{text-align:left}
+tbody tr:nth-child(even) td{background:var(--s2)}
+tbody tr:hover td{background:var(--asoft)}
+.tot td{font-weight:700;background:var(--s3)!important}
+.z{color:var(--i3);opacity:.5}.mut{color:var(--i3)}
+.srch{font:inherit;font-size:13px;background:var(--s);color:var(--i);border:1px solid var(--l2);border-radius:7px;padding:6px 10px;width:220px;margin-bottom:11px}
+.ft{margin-top:20px;font-size:11.5px;color:var(--i3);line-height:1.6;max-width:90ch}
+.note{background:var(--s2);border:1px solid var(--l);border-left:3px solid var(--a);border-radius:7px;padding:10px 14px;font-size:12.5px;color:var(--i2);margin-bottom:16px}
+@media print{.tabs,.srch{display:none}.tw{max-height:none;overflow:visible}th{position:static}
+ .card{break-inside:auto;border:0;padding:0}.sec{display:block!important;break-before:page}body{background:#fff}}
+</style></head><body><div class="wrap">
+<div class="hd"><div class="bd"><span class="mk"></span><div><h1>Récap Corridor</h1>
+  <div class="sub">${esc(periode)}</div></div></div>
+  <div class="sub" style="text-align:right">${esc(ags.length===allAgences().length?'Toutes les agences':ags.join(' · '))}<br>${esc(mets.join(' · '))}<br>Édité le ${genere}</div></div>
+<div class="note">Rapport figé, extrait de l'outil Récap Corridor. Les chiffres sont ceux du périmètre indiqué ci-dessus. Un repos hors résidence est compté à chaque coupure passée ailleurs qu'à la résidence de l'agence, de jour comme de nuit ; les AFR en sont exclus. Une journée blanche est une journée sans mission ni code, encadrée par deux services.</div>
+<div class="kpis">${kpis.map(k=>`<div class="kpi${k[3]?' h':''}"><div class="k">${esc(k[0])}</div><div class="v">${esc(k[1])}</div><div class="n">${esc(k[2])}</div></div>`).join('')}</div>
+<div class="tabs" role="tablist">${SH.map(([k,l],i)=>`<button class="tb" role="tab" data-s="${k}" aria-selected="${i===0}">${l}<span class="mut" style="font-size:11px;margin-left:5px">${t[k].rows.length}</span></button>`).join('')}</div>
+<div class="card">${SH.map(([k],i)=>`<div class="sec" data-s="${k}"${i?' style="display:none"':''}>
+  ${k==='agents'?'<input class="srch" type="search" placeholder="Filtrer par nom ou matricule" data-f="agents">':''}
+  ${tbl(k)}</div>`).join('')}</div>
+<p class="ft">Document de travail contenant des données nominatives d'agents. À diffuser uniquement aux personnes habilitées.<br>
+Produit automatiquement à partir de l'extraction ARP « Récap National Corridor ».</p>
+</div><script>
+document.addEventListener('click',e=>{const b=e.target.closest('.tb');if(!b)return;
+ document.querySelectorAll('.tb').forEach(x=>x.setAttribute('aria-selected',x===b));
+ document.querySelectorAll('.sec').forEach(s=>s.style.display=s.dataset.s===b.dataset.s?'':'none');});
+document.addEventListener('input',e=>{const f=e.target.closest('[data-f]');if(!f)return;
+ const q=f.value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+ f.closest('.sec').querySelectorAll('tbody tr').forEach(tr=>{
+  tr.style.display=!q||tr.textContent.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').includes(q)?'':'none';});});
+<\/script></body></html>`;
+}
+
+</script>
 </body>
 </html>
