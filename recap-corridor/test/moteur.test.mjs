@@ -151,7 +151,7 @@ test('lieux comparés sans majuscules ni accents', () => {
 });
 
 test('corrections mémorisées : coupure écartée, coupure forcée, missions liées, lieu appris', () => {
-  const j = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'DAX', 8, '06:00', 8, '10:00']), svc(['T3', 'DAX', 'HE', 9, '06:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'];
+  const j = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'DAX', 8, '06:00', 8, '10:00']), svc(['T3', 'DAX', 'HE', 9, '06:00', 9, '10:00']), null, null, null, null];
   const base = one(j, {}, RES);
   assert.equal(base.nbRHR, 3);                            // BORDEAUX, DAX, et HE (écriture inconnue de la résidence)
   const k = base.coupures.find((c) => c.lieu === 'BORDEAUX').key;
@@ -217,4 +217,36 @@ test('RHR ouvert en fin de semaine : écarté à la clôture s’il dure moins q
   assert.equal(w1.agents[0].nbRHR, 0);
   assert.equal(w1.agents[0].rhrEnCours, 0);
   assert.equal(w1.agents[0].coupures[0].statut, 'court');
+});
+
+/* ---- accord d'entreprise ECR 2018 (art. 8, 18, 19, annexe 1) ---- */
+test('accord : un arrêt de moins de 8 h n’est pas un RHR, un arrêt de 9 h en journée en est un', () => {
+  const a = one([svc(['VS', 'HENDAYE', 'BORDEAUX', 7, '06:20', 7, '10:00'], ['KVG', 'BORDEAUX', 'HENDAYE', 7, '19:00', 8, '01:01']),
+    svc(['VS', 'HENDAYE', 'DAX', 8, '12:00', 8, '14:00'], ['KVG', 'DAX', 'HENDAYE', 8, '19:00', 8, '23:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.nbRHR, 1);
+  assert.equal(a.rhr[0].lieu, 'BORDEAUX');
+  assert.equal(a.coupures.find((c) => c.lieu === 'DAX').statut, 'court');
+});
+
+test('accord : un arrêt qui contient un jour de repos n’est pas un RHR (repos périodique = repos à résidence)', () => {
+  const a = one(['RP', svc(['T', 'LILLE', 'LILLE', 8, '15:00', 8, '23:49']), svc(['T', 'LILLE', 'LILLE', 9, '15:00', 9, '23:49']), 'JF', 'RP',
+    svc(['V', 'LILLE', 'PARIS', 12, '19:40', 12, '23:10']), svc(['N', 'PARIS', 'LILLE', 13, '17:44', 13, '23:10'])], {}, RES);
+  const st = a.coupures.map((c) => c.statut).join(',');
+  assert.equal(st, 'rhr,repos,rhr,ouvert');
+  assert.equal(a.nbRHR, 3);
+});
+
+test('accord : tranches de prime et RHR successifs', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00'], ['T2', 'BORDEAUX', 'DAX', 7, '20:00', 7, '23:00']), null,
+    svc(['T3', 'DAX', 'HENDAYE', 9, '06:00', 9, '10:00']), null, null, 'RP', 'RP'], {}, RES);
+  // BORDEAUX 10 h (8–12 h), puis DAX 31 h (24 h et plus), sans retour à résidence entre les deux
+  assert.equal(a.rhr8_12, 1);
+  assert.equal(a.rhr24, 1);
+  assert.equal(a.rhrSuccessifs, 1);
+});
+
+test('accord : rattachement temporaire à une autre résidence pour une semaine (art. 8)', () => {
+  const j = ['RP', svc(['T', 'LILLE', 'LILLE', 8, '15:00', 8, '23:49']), svc(['T', 'LILLE', 'LILLE', 9, '15:00', 9, '23:49']), null, null, null, null];
+  assert.equal(one(j, {}, RES).nbRHR, 2);
+  assert.equal(one(j, {}, { ...RES, corrections: { residenceSemaine: { 'm:1|2026-S37': 'LILLE' } } }).nbRHR, 0);
 });

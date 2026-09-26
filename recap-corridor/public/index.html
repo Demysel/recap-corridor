@@ -689,9 +689,11 @@ const JS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 const CODEF=[
   {k:'RP',t:c=>/^RP(-|\b)/i.test(c)}, {k:'CP',t:c=>/^CP$/i.test(c)}, {k:'CPAT',t:c=>/^CPAT/i.test(c)},
   {k:'RCL',t:c=>/^RCL/i.test(c)}, {k:'RCC',t:c=>/^RCC/i.test(c)}, {k:'MAL',t:c=>/^MAL/i.test(c)},
-  {k:'JF',t:c=>/^JF$/i.test(c)},
+  {k:'JF',t:c=>/^JF$/i.test(c)}, {k:'RF',t:c=>/^RF$/i.test(c)}, {k:'AT',t:c=>/^AT$/i.test(c)},
+  {k:'CSS',t:c=>/^(CSS|CPAR)$/i.test(c)}, {k:'CFAM',t:c=>/^CFAM$/i.test(c)}, {k:'CPRCL',t:c=>/^CPRCL$/i.test(c)},
 ];
-const CODEL={RP:'Repos périodique',CP:'Congé payé',CPAT:'Congé CPAT',RCL:'RCL',RCC:'RCC',MAL:'Maladie',JF:'Jour férié',AUTRE:'Autre code',HORS:'Mission datée hors de sa colonne'};
+const CODEL={RP:'Repos périodique',CP:'Congé payé',CPAT:'Congé CPAT',RCL:'Repos compensatoire légal',RCC:'Repos compensateur conventionnel',MAL:'Maladie',JF:'Jour férié',
+  RF:'Repos férié',AT:'Accident du travail',CSS:'Congé sans solde',CFAM:'Congé familial',CPRCL:'CPRCL (non défini)',AUTRE:'Autre code',HORS:'Mission datée hors de sa colonne'};
 /** Anciens fichiers : « CP/CP », « MAL/MAL » — la famille se lit sur la première partie */
 const codeFam=c=>{const s=String(c).trim().split('/')[0].trim();for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
 const codeTxt=c=>{const p=String(c).trim().split('/').map(x=>x.trim());return p.length===2&&p[0]===p[1]?p[0]:String(c).trim();};
@@ -869,11 +871,13 @@ function parseWeek(rows){
    ========================================================================== */
 const DEFAULT_RULES={
   rhrMetiers:['CONDUCTEUR'],
-  rhrMinHours:4,               // un arrêt hors résidence compte pour un RHR à partir de 4 h
+  rhrMinHours:8,               // RHR = repos journalier hors résidence : primes dès 8 h, minimum 9 h (accord ECR art. 18, annexe 1)
+  rhrCoupeParRepos:true,       // un arrêt qui contient un jour de repos ou d'absence n'est pas un RHR (RP = 24 h + repos à résidence, art. 19)
+  rhrMaxAbsence:44,            // au-delà, l'arrêt est signalé : 44 h d'absence du domicile au plus (art. 18)
   lieuxResidence:{},          // par agence : autres écritures de la résidence (HE, HENDAYE…) apprises à la correction
   agencesAlias:{},            // nom d'agence du fichier -> nom retenu (anciens fichiers : « Agence Bordeaux »)
   corrections:{rhr:{},jb:{},liens:[]},   // corrections manuelles, mémorisées et rejouées à chaque affichage
-  rulesVersion:2,
+  rulesVersion:3,
   rhrCountPending:true,
   jbExcludeNightOverlap:true,
   jbRequireFramed:true,
@@ -973,7 +977,7 @@ function applyRules(parsed, rulesIn){
   const hc=rules.horsColonne==='garder'?{agents:src,liste:[]}:splitHorsColonne(src,days.map(d=>d.getTime()),rules);
   const merged=mergeDuplicates(hc.agents);
   const {residences,residenceSource,locCounts}=deduceResidences(merged,rules);
-  const agents=merged.map(a=>computeAgent(a,days,rules,residences[a.agence]));
+  const agents=merged.map(a=>computeAgent(a,days,rules,residences[a.agence],parsed.meta.weekId));
   return {meta:{...parsed.meta,residences,residenceSource,locCounts,rules,horsColonne:hc.liste,
     fusions:merged.filter(a=>a.fusion).length}, agents, anomalies:parsed.anomalies||[]};
 }
@@ -1003,9 +1007,19 @@ function hoursInDailyWindow(segs,de,a,fromDay,toDay){
 /** Clés des corrections : une personne + l'heure de début des missions concernées (stables d'un réimport à l'autre) */
 const kCoupure=(pk,m,nx)=>pk+'|'+m.start+'|'+(nx?nx.start:'');
 const kJour=(pk,date)=>pk+'|'+date;
-function computeAgent(a,days,rules,residence){
+/** Tranches de l'annexe 1 de l'accord : 8–12 h, 12–24 h, 24 h et plus ; et RHR successifs (sans retour à résidence entre deux) */
+function setBands(a){
+  const d=a.rhr.filter(x=>x.dureeH!=null);
+  a.rhr8_12=d.filter(x=>x.dureeH<12).length; a.rhr12_24=d.filter(x=>x.dureeH>=12&&x.dureeH<24).length; a.rhr24=d.filter(x=>x.dureeH>=24).length;
+  let n=0, prev=false; for(const c of a.coupures||[]){ if(c.compte){ if(prev) n++; prev=true; } else if(c.statut!=='court') prev=false; }
+  a.rhrSuccessifs=n;
+}
+function computeAgent(a,days,rules,residence,weekId){
   const pk=personKey(a), corr=rules.corrections||{}, cR=corr.rhr||{}, cJ=corr.jb||{};
-  const resSet=new Set([residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
+  // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
+  const ratt=(corr.residenceSemaine||{})[pk+'|'+weekId]||null;
+  if(ratt) residence=normLieu(ratt);
+  const resSet=new Set(ratt?[residence]:[residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
   const isRes=l=>resSet.has(normLieu(l));
   const rhrOk=rules.rhrMetiers.includes(a.metier);
   const nuitW=isAFR(a.metier)?rules.nuitAFR:rules.nuitCDR;
@@ -1055,6 +1069,9 @@ function computeAgent(a,days,rules,residence){
     const liens=(corr.liens||[]).filter(l=>l.p===pk).map(l=>({l,ia:all.findIndex(m=>m.start===l.a),ib:all.findIndex(m=>m.start===l.b)}))
       .filter(x=>x.ia>=0&&x.ib>x.ia);
     const inLien=i=>liens.find(x=>i>=x.ia&&i<x.ib);
+    const wEnd=days[6].getTime()+DAY;
+    // un jour de repos ou d'absence pendant l'arrêt : l'agent est rentré à sa résidence
+    const reposDans=(t0,t1)=>rules.rhrCoupeParRepos&&jours.some(j=>j.kind==='CODE'&&j.family!=='HORS'&&ovl(days[j.d].getTime(),days[j.d].getTime()+DAY,t0,t1)>0);
     for(let i=0;i<all.length;i++){
       const m=all[i], nx=all[i+1], key=kCoupure(pk,m,nx), man=cR[key];
       const lk=inLien(i);
@@ -1067,16 +1084,18 @@ function computeAgent(a,days,rules,residence){
       if(!m.to&&!man) continue;
       const atRes=isRes(m.to);
       if(nx){
-        const dur=(nx.S-m.E)/H, court=dur<rules.rhrMinHours;
-        let compte=!atRes&&!court, statut=atRes?'residence':court?'court':'rhr';
+        const dur=(nx.S-m.E)/H, court=dur<rules.rhrMinHours, repos=!atRes&&!court&&reposDans(m.E.getTime(),nx.S.getTime());
+        let compte=!atRes&&!court&&!repos, statut=atRes?'residence':court?'court':repos?'repos':'rhr';
         if(man==='oui'){compte=true;statut='force';} else if(man==='non'){compte=false;statut='ecarte';}
-        coupures.push({key,debut:m.end,fin:nx.start,lieu:m.to,dureeH:r2(dur),aller:m.label,retour:nx.label,statut,compte,manuel:man||null});
+        const long=compte&&dur>(rules.rhrMaxAbsence||44);
+        coupures.push({key,debut:m.end,fin:nx.start,lieu:m.to,dureeH:r2(dur),aller:m.label,retour:nx.label,statut,compte,manuel:man||null,long});
         if(!compte) continue;
         if(nx.from&&normLieu(nx.from)!==normLieu(m.to)) warn.push(`reprise à ${nx.from} après une fin de service à ${m.to}`);
         rhr.push({lieu:m.to,debut:m.end,fin:nx.start,dureeH:r2(dur),nuits:nights(m.E,nx.S),
           jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:nx.label,enCours:false,manuel:man||null});
       }else{
-        let compte=!atRes&&rules.rhrCountPending, statut=atRes?'residence':'ouvert';
+        const repos=!atRes&&reposDans(m.E.getTime(),wEnd);
+        let compte=!atRes&&!repos&&rules.rhrCountPending, statut=atRes?'residence':repos?'repos':'ouvert';
         if(man==='oui'){compte=true;statut='force';} else if(man==='non'){compte=false;statut='ecarte';}
         coupures.push({key,debut:m.end,fin:null,lieu:m.to,dureeH:null,aller:m.label,retour:null,statut,compte,manuel:man||null});
         if(!compte) continue;
@@ -1129,7 +1148,7 @@ function computeAgent(a,days,rules,residence){
   const lc={}; for(const m of all) for(const x of [m.from,m.to]) if(x){const k=normLieu(x); lc[k]=(lc[k]||0)+1;}
   const lieuHabituel=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
   const heuresPlanifiees=r2(plan);
-  return {
+  const out={
     matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
     residence:residence||null, rhrApplicable:rhrOk, jours, fusion:a.fusion||null,
     joursService, nbMissions,
@@ -1148,7 +1167,7 @@ function computeAgent(a,days,rules,residence){
     paniersMidi:paniers.filter(p=>p.plage==='midi').length, paniersSoir:paniers.filter(p=>p.plage==='soir').length,
     paniersNuit:paniers.filter(p=>p.plage==='nuit').length, paniersRHR:paniers.filter(p=>p.source==='RHR').length,
     priseServicePlusTot:priseMin===null?null:r2(priseMin), finServicePlusTard:finMax===null?null:r2(finMax),
-    nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
+    rattachement:ratt, nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
     rhrNuits:rhr.reduce((s,x)=>s+(x.nuits||0),0), rhrLieux:[...new Set(rhr.map(x=>x.lieu))], rhr,
     warnings:warn, typesMission:types, destinations:dests, pausesInconnues, coupures, casesVides,
     nbHorsColonne:jours.reduce((s,j)=>s+(j.horsColonne?j.horsColonne.length:0),0),
@@ -1157,6 +1176,8 @@ function computeAgent(a,days,rules,residence){
     premiereMission: all.length?{label:all[0].label,from:all[0].from,start:all[0].start}:null,
     missions: all.map(m=>({label:m.label,from:m.from,to:m.to,start:m.start,end:m.end,d:m.d}))
   };
+  setBands(out);
+  return out;
 }
 /** Paniers : 1 h travaillée entre 11h30 et 13h30, 1 h entre 18h30 et 20h30, 3 h entre 22h et 5h,
     ou un RHR qui englobe la plage du midi ou du soir. Un panier au plus par plage et par jour. */
@@ -1200,11 +1221,16 @@ function reconcile(weeks,rulesIn){
       const cp=(a.coupures||[]).find(x=>x.fin==null&&x.debut===p.debut);
       if(cp){ cp.fin=pm.start; cp.dureeH=p.dureeH; cp.retour=pm.label; if(cp.statut==='ouvert') cp.statut='rhr'; }
       // la durée n'est connue qu'ici : un arrêt plus court que le minimum n'est pas un RHR
+      const na=idx.get(personKey(a));
+      const reposApres=rules.rhrCoupeParRepos&&(na.jours||[]).some((j,d)=>j.kind==='CODE'&&j.family!=='HORS'&&new Date(n.meta.monday+'T00:00:00Z').getTime()+d*DAY<fin.getTime());
       const court=p.dureeH<rules.rhrMinHours&&p.manuel!=='oui';
-      if(court){ a.rhr.splice(a.rhr.indexOf(p),1); a.nbRHR=a.rhr.length; a.rhrLieux=[...new Set(a.rhr.map(x=>x.lieu))]; if(cp){cp.statut='court';cp.compte=false;} }
+      const repos=!court&&reposApres&&p.manuel!=='oui';
+      if(court||repos){ a.rhr.splice(a.rhr.indexOf(p),1); a.nbRHR=a.rhr.length; a.rhrLieux=[...new Set(a.rhr.map(x=>x.lieu))]; if(cp){cp.statut=court?'court':'repos';cp.compte=false;} }
+      else if(cp) cp.long=p.dureeH>(rules.rhrMaxAbsence||44);
+      setBands(a);
       a.rhrHeures=r2(a.rhr.reduce((s,x)=>s+(x.dureeH||0),0));
       a.rhrNuits=a.rhr.reduce((s,x)=>s+(x.nuits||0),0);
-      if(court) continue;
+      if(court||repos) continue;
       if(rules.panierRHR){   // paniers pris pendant la partie du RHR qui déborde sur la semaine suivante
         const seen=new Set(a.paniers.map(q=>q.date+'|'+q.plage));
         const sun1=new Date(c.meta.sunday+'T00:00:00Z').getTime()+DAY, e=fin.getTime(), s=deb.getTime();
@@ -1232,6 +1258,10 @@ const FIELDS=[
   {k:'nbRHR',l:'RHR',u:''},
   {k:'rhrNuits',l:'Nuits hors résidence',u:''},
   {k:'rhrHeures',l:'Heures hors résidence',u:'h'},
+  {k:'rhr8_12',l:'RHR 8–12 h',u:''},
+  {k:'rhr12_24',l:'RHR 12–24 h',u:''},
+  {k:'rhr24',l:'RHR 24 h et plus',u:''},
+  {k:'rhrSuccessifs',l:'RHR successifs',u:''},
   {k:'journeesBlanches',l:'Journées blanches',u:''},
   {k:'joursRepos',l:'Repos (RP)',u:''},
   {k:'joursCP',l:'Congés',u:''},
@@ -1492,7 +1522,8 @@ const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMe
 function loadRules(r){
   const o={...structuredClone(DEFAULT_RULES),...(r||{})};
   o.corrections={rhr:{},jb:{},liens:[],...(r&&r.corrections||{})};
-  if(!r||!(r.rulesVersion>=2)){ o.rhrMinHours=4; o.rulesVersion=2; }
+  // version 3 (accord d'entreprise, art. 18 et annexe 1) : un RHR dure au moins 8 h
+  if(!r||!(r.rulesVersion>=3)){ o.rhrMinHours=8; o.rulesVersion=3; }
   return o;
 }
 const activeWeeks=()=>S.selWeek==='__all__'?S.weeks.map(w=>w.weekId):[S.selWeek];
@@ -1933,6 +1964,10 @@ function viewRHR(){
     {k:'tpsAgent',l:'Temps RHR / agent',v:r=>r.g.agentsAvecRHR?r.g.rhrHeures/r.g.agentsAvecRHR:0,f:r=>r.g.agentsAvecRHR?fmtH(r.g.rhrHeures/r.g.agentsAvecRHR):'<span class="z">—</span>'},
     {k:'tpsSem',l:'Temps RHR / semaine',v:r=>r.g.rhrHeures/nW,f:r=>r.g.rhrHeures?fmtH(r.g.rhrHeures/nW):'<span class="z">—</span>'},
     {k:'rhrNuits',l:'Nuits HR',v:r=>r.g.rhrNuits,f:r=>nf(r.g.rhrNuits)},
+    {k:'rhr8_12',l:'8–12 h',v:r=>r.g.rhr8_12,f:r=>nf(r.g.rhr8_12)},
+    {k:'rhr12_24',l:'12–24 h',v:r=>r.g.rhr12_24,f:r=>nf(r.g.rhr12_24)},
+    {k:'rhr24',l:'24 h et +',v:r=>r.g.rhr24,f:r=>nf(r.g.rhr24)},
+    {k:'rhrSuccessifs',l:'Successifs',v:r=>r.g.rhrSuccessifs,f:r=>nf(r.g.rhrSuccessifs)},
     {k:'nbDISPO',l:'DISPO',v:r=>r.g.nbDISPO,f:r=>nf(r.g.nbDISPO)},
     {k:'nbATCMD',l:'ATCMD',v:r=>r.g.nbATCMD,f:r=>nf(r.g.nbATCMD)},
     {k:'heuresSup',l:'Heures sup',v:r=>r.g.heuresSup,f:r=>r.g.heuresSup?fmtH(r.g.heuresSup):'<span class="z">—</span>'},
@@ -1940,7 +1975,8 @@ function viewRHR(){
   const foot=c=>({agence:'Total',nbAgents:nf(gT.nbAgents),agentsAvecRHR:nf(gT.agentsAvecRHR),nbRHR:nf(gT.nbRHR),
     rhrParAgent:gT.agentsAvecRHR?nf(gT.nbRHR/gT.agentsAvecRHR,2):'—',rhrHeures:fmtH(gT.rhrHeures),
     tpsAgent:gT.agentsAvecRHR?fmtH(gT.rhrHeures/gT.agentsAvecRHR):'—',tpsSem:fmtH(gT.rhrHeures/nW),rhrNuits:nf(gT.rhrNuits),
-    nbDISPO:nf(gT.nbDISPO),nbATCMD:nf(gT.nbATCMD),heuresSup:fmtH(gT.heuresSup)})[c.k];
+    nbDISPO:nf(gT.nbDISPO),nbATCMD:nf(gT.nbATCMD),heuresSup:fmtH(gT.heuresSup),
+    rhr8_12:nf(gT.rhr8_12),rhr12_24:nf(gT.rhr12_24),rhr24:nf(gT.rhr24),rhrSuccessifs:nf(gT.rhrSuccessifs)})[c.k];
   const persons=mergeAcrossWeeks(cdr).filter(p=>p.nbRHR>0);
   const perCols=[
     {k:'nom',l:'Agent',cls:'l',st:1,v:p=>p.nom+' '+p.prenom,f:p=>`<span class="nm">${esc(p.nom)}</span> ${esc(p.prenom)}`},
@@ -1951,6 +1987,7 @@ function viewRHR(){
     {k:'tpsMoy',l:'Temps moyen / RHR',v:p=>p.rhrHeures/p.nbRHR,f:p=>fmtH(p.rhrHeures/p.nbRHR)},
     {k:'tpsSem',l:'Temps RHR / semaine',v:p=>p.rhrHeures/p.nbSemaines,f:p=>fmtH(p.rhrHeures/p.nbSemaines)},
     {k:'rhrNuits',l:'Nuits HR'},
+    {k:'rhr8_12',l:'8–12 h'},{k:'rhr12_24',l:'12–24 h'},{k:'rhr24',l:'24 h et +'},{k:'rhrSuccessifs',l:'Successifs'},
     {k:'rhrLieux',l:'Lieux',cls:'l mono',v:p=>p.rhrLieux.join(' '),f:p=>esc(p.rhrLieux.join(' '))},
     {k:'nbDISPO',l:'DISPO'},{k:'nbATCMD',l:'ATCMD'},
     {k:'heuresSup',l:'Heures sup',f:p=>p.heuresSup?`<b>${fmtH(p.heuresSup)}</b>`:'<span class="z">—</span>'},
@@ -1960,7 +1997,7 @@ function viewRHR(){
       <p class="card-s">conducteurs uniquement · les moyennes par agent ne portent que sur les agents qui ont eu au moins un RHR — cliquez un en-tête pour trier</p></div>
       <button class="btn btn-sm" data-goto="exports">Exporter</button></div>
     <div class="card-b">
-      <div class="note mb">Un arrêt compte pour un RHR quand une mission se termine ailleurs qu'à la résidence et que la mission suivante commence au moins ${nfa(S.rules.rhrMinHours)} h plus tard, de jour comme de nuit. Chaque coupure peut être corrigée depuis la fiche de l'agent. Les AFR sont exclus du décompte. Le temps en RHR est la durée entre la fin d'un service et le début du suivant. DISPO et ATCMD sont comptés séparément ; une ATCMD compte pour ${nf(S.rules.heuresATCMD)} h de travail.</div>
+      <div class="note mb">Un RHR est un repos journalier pris hors résidence (accord d'entreprise, art. 18) : une mission se termine ailleurs qu'à la résidence et la suivante commence au moins ${nfa(S.rules.rhrMinHours)} h plus tard, de jour comme de nuit${S.rules.rhrCoupeParRepos?', sans jour de repos ni d’absence entre les deux':''}. Tranches de l'annexe 1 : 8–12 h, 12–24 h, 24 h et plus ; « successifs » : deux RHR sans retour à résidence entre eux. Chaque coupure peut être corrigée depuis la fiche de l'agent. Les AFR sont exclus du décompte. Le temps en RHR est la durée entre la fin d'un service et le début du suivant. DISPO et ATCMD sont comptés séparément ; une ATCMD compte pour ${nf(S.rules.heuresATCMD)} h de travail.</div>
       ${cdr.length?stable('rhrag',sumCols,byAg,{sort:{k:'nbRHR',dir:'desc'},foot}):'<p class="mut">Aucun conducteur sur ce périmètre.</p>'}
     </div></section>
   <section class="card">
@@ -2066,7 +2103,7 @@ function viewGraphiques(){
 
 /* ---------- corrections : coupures entre missions, cases vides, missions liées ---------- */
 const ST_COUP={rhr:['RHR','pill-w'],force:['RHR (à la main)','pill-w'],lien:['RHR (missions liées)','pill-w'],ouvert:['RHR ouvert','pill-w'],
-  residence:['à la résidence','pill-n'],court:['arrêt court','pill-n'],ecarte:['écarté à la main','pill-c']};
+  residence:['à la résidence','pill-n'],court:['arrêt trop court','pill-n'],repos:['repos pendant l’arrêt','pill-n'],ecarte:['écarté à la main','pill-c']};
 const admin=()=>S.role==='admin';
 const hmD=s=>{const d=new Date(s);return `${JS[(d.getUTCDay()+6)%7]} ${hm(s)}`;};
 /** Tableau des coupures d'une semaine d'agent, avec les boutons de correction */
@@ -2074,6 +2111,13 @@ function coupuresView(x){
   const pk=personKey(x), cs=x.coupures||[];
   if(!x.rhrApplicable) return '<p class="hint">Métier sans repos hors résidence (règle des Réglages).</p>';
   if(!x.residence) return '<p class="hint">Résidence de l’agence inconnue : à renseigner dans les Réglages.</p>';
+  const lieux=[...new Set((x.missions||[]).flatMap(m=>[m.from,m.to]).filter(Boolean).map(normLieu))];
+  const ratt=admin()?`<div class="lienf" style="margin:0 0 10px"><span class="flabel">Résidence retenue cette semaine : ${esc(x.residence)}${x.rattachement?' (rattachement temporaire, accord art. 8)':''}</span>
+    <div class="btns" style="align-items:center">${x.rattachement
+      ?`<button class="btn btn-sm" data-ratt="${esc(pk+'|'+x.weekId)}" data-lieu="">Annuler le rattachement temporaire</button>`
+      :`<select id="rt-${esc(x.weekId)}">${lieux.filter(l=>l!==normLieu(x.residence)).map(l=>`<option${l===x.lieuHabituel?' selected':''}>${esc(l)}</option>`).join('')}</select>
+        <button class="btn btn-sm" data-ratt="${esc(pk+'|'+x.weekId)}" data-sel="rt-${esc(x.weekId)}">Rattacher temporairement cette semaine</button>`}</div></div>`
+    :(x.rattachement?`<p class="hint">Rattachement temporaire à ${esc(x.rattachement)} cette semaine.</p>`:'');
   const btn=(c)=>{ if(!admin()) return '';
     if(c.statut==='lien') return `<button class="btn btn-sm" data-lien-del="${esc(JSON.stringify(c.lien))}">Supprimer le lien</button>`;
     if(c.manuel) return `<button class="btn btn-sm" data-crhr="${esc(c.key)}" data-v="">Annuler la correction</button>`;
@@ -2082,11 +2126,11 @@ function coupuresView(x){
       : `<button class="btn btn-sm" data-crhr="${esc(c.key)}" data-v="oui">Compter en RHR</button>`; };
   const ms=x.missions||[];
   const opt=(m,i)=>`<option value="${i}">${JS[m.d]??''} ${hm(m.start)}–${hm(m.end)} · ${esc(m.label)} (${esc(m.from||'?')} → ${esc(m.to||'?')})</option>`;
-  return `${cs.length?`<div class="tw"><table><thead><tr><th class="l">Fin de mission</th><th class="l">Lieu</th><th class="l">Reprise</th><th>Arrêt</th><th class="l">Statut</th>${admin()?'<th class="l">Correction</th>':''}</tr></thead><tbody>
+  return `${ratt}${cs.length?`<div class="tw"><table><thead><tr><th class="l">Fin de mission</th><th class="l">Lieu</th><th class="l">Reprise</th><th>Arrêt</th><th class="l">Statut</th>${admin()?'<th class="l">Correction</th>':''}</tr></thead><tbody>
     ${cs.map(c=>{const [l,cl]=ST_COUP[c.statut]||[c.statut,'pill-n'];
       return `<tr><td class="l mono">${hmD(c.debut)} <span class="mut">${esc(c.aller)}</span></td><td class="l mono">${esc(c.lieu||'?')}</td>
       <td class="l mono">${c.fin?`${hmD(c.fin)} <span class="mut">${esc(c.retour)}</span>`:'<span class="mut">semaine suivante</span>'}</td>
-      <td>${c.dureeH!=null?fmtH(c.dureeH):'—'}</td><td class="l"><span class="pill ${cl}">${l}</span></td>
+      <td>${c.dureeH!=null?fmtH(c.dureeH):'—'}</td><td class="l"><span class="pill ${cl}">${l}</span>${c.long?` <span class="pill pill-c" title="L'accord limite l'absence du domicile à ${nfa(S.rules.rhrMaxAbsence)} h (art. 18)">plus de ${nfa(S.rules.rhrMaxAbsence)} h : à vérifier</span>`:''}</td>
       ${admin()?`<td class="l"><span class="btns" style="gap:5px">${btn(c)}</span></td>`:''}</tr>`;}).join('')}</tbody></table></div>`
     :'<p class="hint">Aucune coupure cette semaine.</p>'}
     ${admin()&&ms.length>1?`<div class="lienf"><span class="flabel">Lier deux missions (un seul RHR de la fin de la première au début de la seconde)</span>
@@ -2212,7 +2256,8 @@ function qualite(){
   const sc=scopeAgents(), hc=sc.reduce((s,a)=>s+a.nbHorsColonne,0), jr=mergeAcrossWeeks(sc).filter(a=>a.jamaisEnResidence).length;
   const open=sc.reduce((s,a)=>s+a.rhr.filter(x=>x.enCours&&!x.fin).length,0);
   out.push({lvl:hc?'mid':'ok',t:`Missions hors colonne : ${nf(hc)}`,d:hc?'Missions dont la date ne correspond pas au jour de la colonne : écartées du calcul, à vérifier dans le fichier source.':'Aucune ligne d’une autre semaine recopiée.'});
-  const ail=sc.filter(a=>a.basAilleurs).length;
+  const ail=sc.filter(a=>a.basAilleurs).length, lg=sc.reduce((n,a)=>n+(a.coupures||[]).filter(c=>c.long).length,0);
+  out.push({lvl:lg?'lo':'ok',t:`RHR de plus de ${nfa(S.rules.rhrMaxAbsence)} h : ${nf(lg)}`,d:lg?'L’accord limite l’absence du domicile à 44 h : ces arrêts cachent sans doute un retour à la résidence. À vérifier dans la fiche de l’agent.':'Aucun repos hors résidence ne dépasse la limite de l’accord.'});
   out.push({lvl:ail?'mid':'ok',t:`Semaines passées surtout hors résidence : ${nf(ail)}`,d:ail?'Le lieu le plus fréquent de l’agent n’est pas la résidence de son agence : détachement ou résidence mal réglée. Voir les Points de vigilance de la Synthèse.':'Chaque conducteur passe surtout par sa résidence.'});
   out.push({lvl:jr?'lo':'ok',t:`Agents jamais en résidence : ${nf(jr)}`,d:jr?'Tous leurs services comptent comme hors résidence : le signe le plus fréquent d’une résidence mal réglée.':'Tous les conducteurs passent au moins une fois par leur résidence.'});
   out.push({lvl:open?'mid':'ok',t:`Coupures sans fin connue : ${nf(open)}`,d:open?'Départs en fin de semaine dont le retour est dans une semaine non importée : comptés, mais sans durée.':'Toutes les coupures ont une durée.'});
@@ -2229,7 +2274,7 @@ function viewGuide(){
     <div class="card-b"><div class="dg">${dgFlux()}</div><p class="cap">Le fichier Excel est lu dans votre navigateur : <b>seules les données extraites</b> sont enregistrées. Les règles sont appliquées à chaque affichage — modifier un réglage ne demande jamais de réimporter.</p></div></section>
   <div class="gd">
     ${card('Lire une case de service','ce que l’outil repère dans chaque ligne',dgCase(),'Une case vide n’a ni mission ni code. Une mission dont l’horaire est illisible est signalée à l’import.')}
-    ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case. Un changement de train de 30 min n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
+    ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR (repos journalier hors résidence) s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case${r.rhrCoupeParRepos?', et s’il ne contient aucun jour de repos':''}. Un changement de train n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
     ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}${r.jbExcludeHorsResidence?'Une journée passée hors résidence non plus. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
     ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui englobe la plage du midi ou du soir donne aussi un panier':''}.`)}
     ${card('Heures planifiées et heures sup','par agent et par semaine',dgHeures(r),`Heures planifiées = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
@@ -2257,7 +2302,7 @@ function tables(){
     a.weekendTravaille,a.joursRepos,a.joursCP,a.joursAbsence,a.joursVides,a.fusion?'oui':'']);
   const rhr=persons.filter(a=>a.rhrApplicable&&a.nbRHR>0).map(a=>[a.matricule,a.nom,a.prenom,a.agence,a.residence||'',a.nbSemaines,
     a.nbRHR,a.rhrHeures,r2(a.rhrHeures/a.nbRHR),r2(a.rhrHeures/a.nbSemaines),a.rhrNuits,a.rhrLieux.join(' '),a.nbDISPO,a.nbATCMD,a.heuresSup,
-    a.rhrEnCours?'oui':'']);
+    a.rhrEnCours?'oui':'',a.rhr8_12,a.rhr12_24,a.rhr24,a.rhrSuccessifs]);
   const bl=persons.filter(a=>a.journeesBlanches>0).map(a=>[a.matricule,a.nom,a.prenom,a.agence,a.metier,a.journeesBlanches,
     a.blanches.map(b=>`${JN[b.d]} ${dFull(b.date)}`).join(', '),a.blanches.filter(b=>b.horsResidence).length]);
   const mets=scopeMetiers(), ags=scopeAgences();
@@ -2294,7 +2339,8 @@ function tables(){
       {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Résidence',w:10},{t:'Semaines',w:9,fmt:'int'},
       {t:'RHR',w:7,fmt:'int'},{t:'Temps en RHR (h)',w:12,fmt:'dec'},{t:'Temps moyen / RHR (h)',w:13,fmt:'dec'},{t:'Temps RHR / semaine (h)',w:13,fmt:'dec'},
       {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Lieux',w:14},{t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'Heures sup (h)',w:11,fmt:'dec'},
-      {t:'Coupure ouverte sur la semaine suivante',w:14}],rows:rhr},
+      {t:'Coupure ouverte sur la semaine suivante',w:14},{t:'RHR 8–12 h',w:10,fmt:'int'},{t:'RHR 12–24 h',w:10,fmt:'int'},
+      {t:'RHR 24 h et plus',w:10,fmt:'int'},{t:'RHR successifs',w:10,fmt:'int'}],rows:rhr},
     blanches:{name:'Journées blanches',cols:[
       {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Métier',w:13},
       {t:'Journées blanches',w:12,fmt:'int'},{t:'Dates',w:40},{t:'Hors résidence',w:12,fmt:'int'}],rows:bl},
@@ -2445,7 +2491,8 @@ function correctionsCard(){
   const when=s=>s?dtISO(s):'fin de semaine';
   const rows=[...rh.map(([k,v])=>{const [pk,a,b]=k.split('|');return {t:v==='oui'?'Coupure comptée en RHR':'Coupure écartée',q:nm(pk),d:`${when(a)} → ${when(b)}`,del:['rhr',k]};}),
     ...li.map((l,i)=>({t:'Missions liées',q:nm(l.p),d:`${dtISO(l.a)} → ${dtISO(l.b)}`,del:['liens',i]})),
-    ...jb.map(([k,v])=>{const [pk,d]=k.split('|');return {t:v==='oui'?'Journée blanche ajoutée':'Journée blanche écartée',q:nm(pk),d:dFull(d),del:['jb',k]};})];
+    ...jb.map(([k,v])=>{const [pk,d]=k.split('|');return {t:v==='oui'?'Journée blanche ajoutée':'Journée blanche écartée',q:nm(pk),d:dFull(d),del:['jb',k]};}),
+    ...Object.entries(c.residenceSemaine||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Rattachement temporaire à ${v}`,q:nm(pk),d:w,del:['residenceSemaine',k]};})];
   return `<section class="card"><div class="card-h"><div><h2>Corrections mémorisées</h2>
     <p class="card-s">${nf(rows.length)} correction${rows.length>1?'s':''} — rejouées à chaque affichage, même après un réimport</p></div></div>
     <div class="card-b">${rows.length?`<div class="tw"><table><thead><tr><th class="l">Correction</th><th class="l">Agent</th><th class="l">Quand</th>${admin()?'<th></th>':''}</tr></thead><tbody>
@@ -2485,8 +2532,12 @@ function viewReglages(){
           <span><span class="rn">Ne pas compter les missions datées hors de leur colonne</span>
           <span class="rd">Une case de la colonne « lundi 31/08 » qui contient une mission du 29/08 est une ligne d'une autre semaine recopiée dans le fichier. Un service de nuit à cheval sur minuit reste rattaché à son jour.</span></span></label>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Durée minimale d'une coupure pour compter un RHR</span>
-          <span class="rd">Un arrêt hors résidence entre deux missions compte pour un RHR à partir de cette durée, de jour comme de nuit. Un arrêt plus court (changement de train, attente) n'en est pas un.</span>
-          <span class="inl"><input type="text" id="rMin" value="${r.rhrMinHours}" inputmode="decimal"> <span class="mut">heures</span></span></span></div>
+          <span class="rd">Un RHR est un repos journalier pris hors résidence (accord d'entreprise, art. 18) : minimum 9 h, primes dès 8 h (annexe 1). Un arrêt hors résidence plus court (changement de train, attente) n'en est pas un.</span>
+          <span class="inl"><input type="text" id="rMin" value="${r.rhrMinHours}" inputmode="decimal"> <span class="mut">heures</span></span>
+          <span class="inl">signaler au-delà de <input type="text" id="rMax" value="${r.rhrMaxAbsence}" inputmode="decimal"> <span class="mut">h d'absence (44 h maximum, art. 18)</span></span></span></div>
+        <label class="rule"><input type="checkbox" id="rCRP" ${r.rhrCoupeParRepos?'checked':''}>
+          <span><span class="rn">Un jour de repos ou d'absence interrompt le repos hors résidence</span>
+          <span class="rd">Un arrêt qui contient un RP, RF, JF, congé ou tout autre code n'est pas un RHR : le repos périodique comprend le repos journalier à résidence (art. 19).</span></span></label>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures supplémentaires et ATCMD</span>
           <span class="rd">Heures sup : heures planifiées hors pauses au-delà du seuil, par agent et par semaine. Une ATCMD compte pour un nombre d'heures fixe.</span>
           <span class="inl">au-delà de <input type="text" id="rSeuil" value="${r.seuilHebdo}" inputmode="decimal"> <span class="mut">h / semaine</span></span>
@@ -2520,7 +2571,7 @@ function viewReglages(){
   ${correctionsCard()}
   <section class="card"><div class="card-h"><h2>Comment les chiffres sont calculés</h2></div>
     <div class="card-b prose">
-      <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR, de jour comme de nuit — même si les deux missions sont dans la même case. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
+      <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR (repos journalier hors résidence, accord d'entreprise art. 18), de jour comme de nuit — même si les deux missions sont dans la même case${r.rhrCoupeParRepos?'. Un arrêt qui contient un jour de repos ou d’absence n’en est pas un : le repos périodique se prend à résidence (art. 19)':''}. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
       <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
       <p><b>Heures planifiées et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont les heures planifiées au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
@@ -2754,7 +2805,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel]');
+    '[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.dataset.act==='theme'){ el('btnTheme').click(); return; }
@@ -2775,6 +2826,10 @@ document.addEventListener('click',async e=>{
     if(!(ib>ia)){ S.msg={m:'Choisissez une seconde mission postérieure à la première.',t:'w'}; render(); return; }
     S.rules.corrections.liens=[...(S.rules.corrections.liens||[]).filter(l=>!(l.p===pk&&l.a===ms[ia].start)),{p:pk,a:ms[ia].start,b:ms[ib].start}];
     return saveCorrection(`Missions liées : ${ms[ia].label} → ${ms[ib].label}`); }
+  if(t.dataset.ratt!=null&&admin()){ const k=t.dataset.ratt, c=S.rules.corrections; c.residenceSemaine=c.residenceSemaine||{};
+    const v=t.dataset.sel?el(t.dataset.sel)?.value:'';
+    if(v) c.residenceSemaine[k]=v; else delete c.residenceSemaine[k];
+    return saveCorrection(v?`Rattachement temporaire à ${v} pour la semaine`:'Rattachement temporaire annulé'); }
   if(t.dataset.lienDel!=null&&admin()){ const L=JSON.parse(t.dataset.lienDel);
     S.rules.corrections.liens=(S.rules.corrections.liens||[]).filter(l=>!(l.p===L.p&&l.a===L.a&&l.b===L.b));
     return saveCorrection('Lien supprimé'); }
@@ -2844,7 +2899,7 @@ document.addEventListener('click',async e=>{
       jbExcludeHorsResidence: el('rJBHR').checked,
       panierRHR: el('rPRHR').checked,
       horsColonne: el('rHC').checked?'ecarter':'garder',
-      rhrMinHours: Math.max(0,num('rMin',0)),
+      rhrMinHours: Math.max(0,num('rMin',8)), rhrMaxAbsence: Math.max(1,num('rMax',44)), rhrCoupeParRepos: el('rCRP').checked,
       seuilHebdo: num('rSeuil',35), heuresATCMD: num('rATCMD',5),
       nuitAFR:[num('rNA0',22),num('rNA1',7)], nuitCDR:[num('rNC0',22),num('rNC1',5)],
       trajetTypes: String(el('rTraj').value).split(/[,;]/).map(x=>x.trim().toUpperCase()).filter(Boolean),

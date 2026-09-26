@@ -30,10 +30,15 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 
-- RHR : arrêt entre deux missions quand la première ne finit pas à la résidence de l'agence, et
-  d'au moins 4 h (réglable) — un arrêt de 30 min n'est pas un RHR ; deux missions d'une même case
-  séparées d'un long arrêt hors résidence en donnent un. De jour comme de nuit. AFR exclus.
-  Moyennes RHR calculées uniquement sur les agents qui ont eu au moins un RHR.
+- RHR = repos journalier hors résidence (accord d'entreprise ECR 2018, art. 18 ; PDF fourni par
+  l'utilisateur, non versé au dépôt) : arrêt entre deux missions quand la première ne finit pas à la
+  résidence, d'au moins 8 h (primes dès 8 h en annexe 1 ; minimum légal 9 h ; réglable), de jour comme
+  de nuit, même dans une seule case. Un arrêt qui contient un jour de code (RP, RF, JF, congé…) n'est
+  pas un RHR : le repos périodique = 24 h + repos journalier à résidence (art. 19). Arrêt de plus de
+  44 h signalé (absence maximale du domicile, art. 18). Un arrêt de plusieurs nuits sans service = 1 RHR.
+  Tranches de l'annexe 1 comptées : 8–12 h, 12–24 h, 24 h et plus ; RHR successifs (sans retour à
+  résidence entre deux). Rattachement temporaire à une autre résidence pour une semaine (art. 8),
+  saisi dans la fiche agent. AFR exclus. Moyennes RHR calculées uniquement sur les agents qui en ont eu.
 - Lieux comparés sans majuscules, accents ni ponctuation (fautes de frappe des fichiers).
 - Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
@@ -44,6 +49,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   minuit compte si l'agent est à sa résidence.
   Chaque case vide non comptée affiche sa raison (avant le premier / après le dernier service, fin
   de service de nuit à hh:mm).
+- Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
+  RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
+  CPAR et CSS congés sans solde ; SUPP (dans un intitulé de mission) = supplémentaire.
 - Formats de fichier : récent (ligne 1 dates, ligne 2 Matricule… Lundi…) et ancien (ligne 1
   Lundi…Dimanche, ligne 2 Matricule, Prenom, Nom, Region, Residence, Commentaires, dates ; feuille
   « Corridor … » à côté d'une feuille « Extract » ignorée). Métiers : CDR et « CDR + AFR » =
