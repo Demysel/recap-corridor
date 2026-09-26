@@ -314,3 +314,17 @@ test('résidence propre à l’agent à partir d’une semaine (mouvement d’ag
   assert.equal(a.residence, 'LILLE');
   assert.equal(one(j, {}, { ...RES, corrections: { residenceAgent: { 'm:1|2026-S38': 'LILLE' } } }).nbRHR, 2);   // à partir de la semaine suivante seulement
 });
+
+test('paniers en RHR : un par plage touchée, midi et soir (règle précisée par l’utilisateur)', () => {
+  // RHR à BORDEAUX de 12h00 à 20h00 : touche la plage du midi et celle du soir → 2 paniers
+  const a = one([svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '04:00', 7, '12:00'], ['T2', 'BORDEAUX', 'HENDAYE', 7, '20:00', 7, '23:30']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.nbRHR, 1);
+  assert.equal(a.paniersRHR, 2);
+  // RHR de 13h15 à 19h00 : midi et soir déjà obtenus par le travail (1 h dans chaque plage) → pas de doublon
+  const b = one([svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '04:00', 7, '13:15'], ['T2', 'BORDEAUX', 'HENDAYE', 7, '19:00', 7, '23:30']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, { ...RES, rhrMinHours: 5 });
+  assert.equal(b.paniersMidi + b.paniersSoir, 2);
+  assert.equal(b.paniersRHR, 0);
+  // RHR de 14h00 à 22h30 : touche seulement la plage du soir (le midi vient du travail)
+  const c = one([svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '04:00', 7, '14:00'], ['T2', 'BORDEAUX', 'HENDAYE', 7, '22:30', 7, '23:30']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(c.paniers.filter((p) => p.source === 'RHR').map((p) => p.plage).join(','), 'soir');
+});

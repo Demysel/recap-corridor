@@ -974,7 +974,7 @@ const DEFAULT_RULES={
   panierMidi:[11.5,13.5,1],   // plage horaire, heures travaillées minimum
   panierSoir:[18.5,20.5,1],
   panierNuit:[22,5,3],
-  panierRHR:true,             // un RHR qui englobe la plage midi ou soir donne un panier
+  panierRHR:true,             // un RHR qui touche la plage du midi et/ou du soir donne un panier par plage
   horsColonne:'ecarter',      // mission datée hors de sa colonne : 'ecarter' ou 'garder'
   horsColonneTolerance:6,     // un service qui démarre le lendemain avant cette heure reste rattaché à sa colonne
 };
@@ -1271,7 +1271,7 @@ function computeAgent(a,days,rules,residence,weekId){
   return out;
 }
 /** Paniers : 1 h travaillée entre 11h30 et 13h30, 1 h entre 18h30 et 20h30, 3 h entre 22h et 5h,
-    ou un RHR qui englobe la plage du midi ou du soir. Un panier au plus par plage et par jour. */
+    ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage). Un panier au plus par plage et par jour. */
 function computePaniers(all,rhr,days,rules){
   const got=new Map();
   const add=(dayMs,plage,source)=>{const k=isoD(new Date(dayMs))+'|'+plage; if(!got.has(k)) got.set(k,{date:isoD(new Date(dayMs)),plage,source});};
@@ -1286,7 +1286,7 @@ function computePaniers(all,rhr,days,rules){
   if(rules.panierRHR) for(const x of rhr){
     const s=Date.parse(x.debut), e=x.fin?Date.parse(x.fin):days[6].getTime()+DAY;
     for(let d=Math.floor(s/DAY)*DAY;d<=e;d+=DAY) for(const [nom,[de,a]] of [['midi',rules.panierMidi],['soir',rules.panierSoir]]){
-      const [w0,w1]=windowOf(d,de,a); if(s<=w0&&e>=w1) add(d,nom,'RHR');
+      const [w0,w1]=windowOf(d,de,a); if(s<w1&&e>w0) add(d,nom,'RHR');   // le RHR touche la plage
     }
   }
   return [...got.values()].sort((x,y)=>(x.date+x.plage).localeCompare(y.date+y.plage));
@@ -1327,7 +1327,7 @@ function reconcile(weeks,rulesIn){
         const sun1=new Date(c.meta.sunday+'T00:00:00Z').getTime()+DAY, e=fin.getTime(), s=deb.getTime();
         for(let d=sun1;d<=e;d+=DAY) for(const [nom,[de,aa]] of [['midi',rules.panierMidi],['soir',rules.panierSoir]]){
           const [w0,w1]=windowOf(d,de,aa), k=isoD(new Date(d))+'|'+nom;
-          if(s<=w0&&e>=w1&&!seen.has(k)){ a.paniers.push({date:isoD(new Date(d)),plage:nom,source:'RHR'}); seen.add(k); }
+          if(s<w1&&e>w0&&!seen.has(k)){ a.paniers.push({date:isoD(new Date(d)),plage:nom,source:'RHR'}); seen.add(k); }
         }
         a.nbPaniers=a.paniers.length; a.paniersMidi=a.paniers.filter(q=>q.plage==='midi').length;
         a.paniersSoir=a.paniers.filter(q=>q.plage==='soir').length; a.paniersRHR=a.paniers.filter(q=>q.source==='RHR').length;
@@ -2776,7 +2776,7 @@ function viewGuide(){
     ${card('Lire une case de service','ce que l’outil repère dans chaque ligne',dgCase(),'Une case vide n’a ni mission ni code. Une mission dont l’horaire est illisible est signalée à l’import.')}
     ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR (repos journalier hors résidence) s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case${r.rhrCoupeParRepos?', et s’il ne contient aucun jour de repos':''}. Un changement de train n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
     ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}${r.jbExcludeHorsResidence?'Une journée passée hors résidence non plus. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
-    ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui englobe la plage du midi ou du soir donne aussi un panier':''}.`)}
+    ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui touche la plage du midi et/ou du soir donne un panier par plage touchée':''}.`)}
     ${card('TTE et heures sup','par agent et par semaine',dgHeures(r),`TTE (temps de travail effectif) = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
   </div>`;
 }
@@ -3536,7 +3536,7 @@ function viewReglages(){
           <span><span class="rn">Ne compter que les journées blanches encadrées par deux services</span>
           <span class="rd">Les cases vides avant le premier ou après le dernier service de la semaine sont ignorées.</span></span></label>
         <label class="rule"><input type="checkbox" id="rPRHR" ${r.panierRHR?'checked':''}>
-          <span><span class="rn">Un RHR qui englobe la plage du midi ou du soir donne un panier</span>
+          <span><span class="rn">Pendant un RHR, un panier par plage touchée (midi et/ou soir)</span>
           <span class="rd">Midi : ${h(r.panierMidi[0])}–${h(r.panierMidi[1])}. Soir : ${h(r.panierSoir[0])}–${h(r.panierSoir[1])}.</span></span></label>
         <label class="rule"><input type="checkbox" id="rHC" ${r.horsColonne!=='garder'?'checked':''}>
           <span><span class="rn">Ne pas compter les missions datées hors de leur colonne</span>
@@ -3589,7 +3589,7 @@ function viewReglages(){
       <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
       <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
-      <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui englobe la plage du midi ou du soir':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
+      <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage)':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
       <p><b>Agents en double.</b> Une personne présente sur plusieurs lignes d'un fichier est fusionnée jour par jour : un service l'emporte sur un code, un code sur une case vide. Sur plusieurs semaines, chaque agent n'apparaît qu'une fois dans les tableaux.</p>
       <p><b>Semaine.</b> Identifiée par la date du lundi en ligne 1 du fichier, pas par son nom. Réimporter une semaine déjà présente remplace ses données.</p>
     </div></section>`;
