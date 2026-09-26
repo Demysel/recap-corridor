@@ -88,6 +88,14 @@ test('ATCMD : 5 h de TTE, mais l’amplitude reste l’horaire réel de la case'
   assert.equal(a.amplitudeTotale, 8);
 });
 
+test('ATCMD : les paniers se lisent sur la plage horaire réelle, pas sur les 5 h de TTE', () => {
+  const a = one([svc(['ATCMD', 'HENDAYE', 'HENDAYE', 7, '10:00', 7, '20:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.heuresPlanifiees, 5);
+  assert.equal(a.paniersMidi, 1);
+  assert.equal(a.paniersSoir, 1);
+  assert.equal(a.nbPaniers, 2);
+});
+
 test('mission sans horaire : signalée, puis comptée une fois l’horaire saisi', () => {
   const cell = 'TRAIN X\nHENDAYE - BORDEAUX';
   const rows = week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]);
