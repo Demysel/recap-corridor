@@ -250,3 +250,22 @@ test('accord : rattachement temporaire à une autre résidence pour une semaine 
   assert.equal(one(j, {}, RES).nbRHR, 2);
   assert.equal(one(j, {}, { ...RES, corrections: { residenceSemaine: { 'm:1|2026-S37': 'LILLE' } } }).nbRHR, 0);
 });
+
+test('journée blanche en début ou fin de semaine : encadrée par la semaine voisine', () => {
+  const w1 = run(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: ['RP', svc(['T', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '12:00']), 'RP', 'RP', 'RP', svc(['T', 'HENDAYE', 'HENDAYE', 12, '06:00', 12, '12:00']), null] }]), RES);
+  const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'A', j: [null, svc(['T', 'HENDAYE', 'HENDAYE', 15, '06:00', 15, '12:00']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]), RES);
+  E.reconcile(new Map([['2026-S37', w1]]), RES);
+  assert.equal(w1.agents[0].journeesBlanches, 0);
+  assert.match(w1.agents[0].casesVides[0].raison, /semaine suivante non importée/);
+  E.reconcile(new Map([['2026-S37', w1], ['2026-S38', w2]]), RES);
+  assert.equal(w1.agents[0].journeesBlanches, 1);          // dimanche 13/09
+  assert.equal(w2.agents[0].journeesBlanches, 1);          // lundi 14/09
+  assert.equal(w2.agents[0].casesVides[0].avant.end, '2026-09-12T12:00:00.000Z');
+});
+
+test('codes classés : repos (RP, RF, JF, RCL, RCC), congés (CP, CPAT, CFAM, CSS/CPAR), absences (le reste)', () => {
+  const a = one(['RP-1', 'RF/RF', 'JF', 'CPAR/CPAR', 'CFAM', 'AT/AT', 'CPRCL'], {}, RES);
+  assert.equal(a.joursRepos, 3);
+  assert.equal(a.joursCP, 2);
+  assert.equal(a.joursAbsence, 2);
+});

@@ -353,6 +353,29 @@ tbody tr.clk:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .qd{width:100%;font-size:12.5px;color:var(--ink-2)}
 .lienf{margin-top:12px;display:flex;flex-direction:column;gap:6px}
 .lienf select{max-width:320px;font-size:12.5px}
+.hm{display:flex;flex-direction:column;gap:2px;overflow-x:auto;padding-bottom:4px}
+.hm-r{display:grid;grid-template-columns:150px repeat(24,minmax(18px,1fr));gap:2px;align-items:center;min-width:640px}
+.hm-l{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+.hm-x{font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}
+.hm-c{height:22px;border-radius:3px;transition:transform .12s}
+.hm-c:hover{transform:scale(1.18);position:relative;z-index:1;box-shadow:0 0 0 1px var(--ink)}
+.hm-c.pk{box-shadow:inset 0 0 0 2px var(--signal)}
+.hm-lg{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--ink-2);margin-top:8px;flex-wrap:wrap}
+.hm-sc{width:120px;height:9px;border-radius:99px;background:linear-gradient(90deg,var(--surface-2),var(--accent))}
+.hg{display:flex;gap:6px;align-items:flex-end;height:190px;padding-top:6px}
+.hg-b{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;cursor:default}
+.hg-t{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--surface-2);border-radius:5px 5px 0 0}
+.hg-t i{display:block;width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:1px;transform-origin:bottom;animation:growy .6s var(--ease) both}
+@keyframes growy{from{transform:scaleY(0)}}
+.hg-b:hover .hg-t i{filter:brightness(1.1)}
+.hg-v{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);min-height:14px}
+.hg.dense .hg-v{visibility:hidden}.hg.dense{gap:3px}
+.hg-l{font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+table.cmp td.hi{background:color-mix(in srgb,var(--signal) 22%,var(--surface))!important;font-weight:700}
+table.cmp td.lo{background:color-mix(in srgb,var(--accent) 14%,var(--surface))!important}
+table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
+.hi-k,.lo-k{padding:0 6px;border-radius:4px}.hi-k{background:color-mix(in srgb,var(--signal) 22%,var(--surface))}.lo-k{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.up{color:var(--signal-ink);font-weight:600}.dn{color:var(--accent);font-weight:600}
 .lnk{border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit}
 .lnk:hover .nm{color:var(--accent);text-decoration:underline}
 .sub-h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 8px}
@@ -694,6 +717,8 @@ const CODEF=[
 ];
 const CODEL={RP:'Repos périodique',CP:'Congé payé',CPAT:'Congé CPAT',RCL:'Repos compensatoire légal',RCC:'Repos compensateur conventionnel',MAL:'Maladie',JF:'Jour férié',
   RF:'Repos férié',AT:'Accident du travail',CSS:'Congé sans solde',CFAM:'Congé familial',CPRCL:'CPRCL (non défini)',AUTRE:'Autre code',HORS:'Mission datée hors de sa colonne'};
+/** Classement validé par l'utilisateur : repos, congés ; tout le reste (MAL, AT, CPRCL, autres) = absences */
+const FAM_REPOS=['RP','RF','JF','RCL','RCC'], FAM_CONGES=['CP','CPAT','CFAM','CSS'];
 /** Anciens fichiers : « CP/CP », « MAL/MAL » — la famille se lit sur la première partie */
 const codeFam=c=>{const s=String(c).trim().split('/')[0].trim();for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
 const codeTxt=c=>{const p=String(c).trim().split('/').map(x=>x.trim());return p.length===2&&p[0]===p[1]?p[0]:String(c).trim();};
@@ -1118,7 +1143,9 @@ function computeAgent(a,days,rules,residence,weekId){
     const deb=all.find(m=>m.S.getTime()<de&&m.E.getTime()>ds);
     if(deb) j.nuitDebordante=hm(deb.end);
     let compte=true, raison='';
-    if(rules.jbRequireFramed && !(f>=0 && j.d>f && j.d<l)){ compte=false; raison=f<0?'aucun service dans la semaine':j.d<f?'avant le premier service de la semaine':'après le dernier service de la semaine'; }
+    let horsCadre=null;
+    if(rules.jbRequireFramed && !(f>=0 && j.d>f && j.d<l)){ compte=false; horsCadre=f<0?'aucun':j.d<f?'avant':'apres';
+      raison=f<0?'aucun service dans la semaine':j.d<f?'avant le premier service de la semaine':'après le dernier service de la semaine'; }
     else if(deb&&rules.jbExcludeNightOverlap){ compte=false; raison=`fin du service de nuit à ${hm(deb.end)}`; }
     const hors=rhr.some(x=>{const s=new Date(x.debut).getTime(), e=x.fin?new Date(x.fin).getTime():Infinity;return s<de&&e>ds;});
     if(compte&&hors&&rules.jbExcludeHorsResidence){ compte=false; raison='agent hors résidence ce jour-là (RHR)'; }
@@ -1126,7 +1153,7 @@ function computeAgent(a,days,rules,residence,weekId){
     if(man==='oui'){ compte=true; raison='comptée à la main'; }
     else if(man==='non'){ compte=false; raison='écartée à la main'; }
     const lastP=prev?prev.missions[prev.missions.length-1]:null, firstN=next?next.missions[0]:null;
-    const cv={d:j.d,date:j.date,compte,raison,manuel:man||null,horsResidence:hors,
+    const cv={d:j.d,date:j.date,compte,raison,raisonBase:raison,horsCadre:man?null:horsCadre,manuel:man||null,horsResidence:hors,
       finPrec:lastP?lastP.end:null,debutSuiv:firstN?firstN.start:null,
       avant:lastP?{label:lastP.label,from:lastP.from,to:lastP.to,start:lastP.start,end:lastP.end}:null,
       apres:firstN?{label:firstN.label,from:firstN.from,to:firstN.to,start:firstN.start,end:firstN.end}:null};
@@ -1152,9 +1179,9 @@ function computeAgent(a,days,rules,residence,weekId){
     matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
     residence:residence||null, rhrApplicable:rhrOk, jours, fusion:a.fusion||null,
     joursService, nbMissions,
-    joursRepos:codeCounts.RP||0,
-    joursCP:(codeCounts.CP||0)+(codeCounts.CPAT||0),
-    joursAbsence:Object.entries(codeCounts).reduce((s,[k,v])=>s+(k==='RP'||k==='HORS'?0:v),0),
+    joursRepos:FAM_REPOS.reduce((s,k)=>s+(codeCounts[k]||0),0),
+    joursCP:FAM_CONGES.reduce((s,k)=>s+(codeCounts[k]||0),0),
+    joursAbsence:Object.entries(codeCounts).reduce((s,[k,v])=>s+(FAM_REPOS.includes(k)||FAM_CONGES.includes(k)||k==='HORS'?0:v),0),
     codeCounts, joursVides:jours.filter(j=>j.kind==='VIDE').length,
     journeesBlanches:blanches.length, blanches,
     weekendTravaille:wk,
@@ -1243,6 +1270,43 @@ function reconcile(weeks,rulesIn){
       }
     }
   }
+  reconcileJB(weeks,rules);
+}
+
+function reconcileJB(weeks,rules){
+  if(!rules.jbRequireFramed) return;
+  const ids=[...weeks.keys()].sort(), mon=w=>Date.parse(w.meta.monday+'T00:00:00Z');
+  for(let i=0;i<ids.length;i++){
+    const c=weeks.get(ids[i]), p=i>0?weeks.get(ids[i-1]):null, n=i<ids.length-1?weeks.get(ids[i+1]):null;
+    const P=p&&mon(c)-mon(p)===7*DAY?new Map(p.agents.map(a=>[personKey(a),a])):null;
+    const N=n&&mon(n)-mon(c)===7*DAY?new Map(n.agents.map(a=>[personKey(a),a])):null;
+    for(const a of c.agents){
+      const cvs=(a.casesVides||[]).filter(cv=>cv.horsCadre&&!cv.compte);
+      if(!cvs.length) continue;
+      const pa=P&&P.get(personKey(a)), na=N&&N.get(personKey(a));
+      const lastP=pa&&pa.missions&&pa.missions.length?pa.missions[pa.missions.length-1]:null, firstN=na&&na.missions&&na.missions.length?na.missions[0]:null;
+      for(const cv of cvs){
+        const ds=Date.parse(cv.date+'T00:00:00Z'), de=ds+DAY;
+        const avant=cv.horsCadre==='apres'?true:!!lastP, apres=cv.horsCadre==='avant'?true:!!firstN;
+        if(!avant||!apres){
+          const manque=[!avant&&(P?'aucun service la semaine précédente':'semaine précédente non importée'),!apres&&(N?'aucun service la semaine suivante':'semaine suivante non importée')].filter(Boolean).join(', ');
+          cv.raison=`${cv.raisonBase} — ${manque}`; a.jours[cv.d].jbRaison=cv.raison; continue;
+        }
+        if(cv.horsCadre!=='apres'&&lastP) cv.avant={label:lastP.label,from:lastP.from,to:lastP.to,start:lastP.start,end:lastP.end};
+        if(cv.horsCadre!=='avant'&&firstN) cv.apres={label:firstN.label,from:firstN.from,to:firstN.to,start:firstN.start,end:firstN.end};
+        let raison='';
+        if(rules.jbExcludeNightOverlap&&lastP&&Date.parse(lastP.end)>ds) raison=`fin du service de nuit à ${hm(lastP.end)}`;
+        const span=x=>{const s0=Date.parse(x.debut), e0=x.fin?Date.parse(x.fin):Infinity; return s0<de&&e0>ds;};
+        const hors=a.rhr.some(span)||(pa?pa.rhr.some(span):false);
+        cv.horsResidence=hors;
+        if(!raison&&hors&&rules.jbExcludeHorsResidence) raison='agent hors résidence ce jour-là (RHR)';
+        cv.raison=raison||'encadrée par la semaine voisine'; a.jours[cv.d].jbRaison=cv.raison;
+        if(raison) continue;
+        cv.compte=true; a.blanches.push(cv); a.blanches.sort((x,y)=>x.d-y.d); a.journeesBlanches=a.blanches.length;
+        a.jours[cv.d].blanche=true; if(hors) a.jours[cv.d].horsResidence=true;
+      }
+    }
+  }
 }
 
 /* ==========================================================================
@@ -1263,7 +1327,7 @@ const FIELDS=[
   {k:'rhr24',l:'RHR 24 h et plus',u:''},
   {k:'rhrSuccessifs',l:'RHR successifs',u:''},
   {k:'journeesBlanches',l:'Journées blanches',u:''},
-  {k:'joursRepos',l:'Repos (RP)',u:''},
+  {k:'joursRepos',l:'Jours de repos',u:''},
   {k:'joursCP',l:'Congés',u:''},
   {k:'joursAbsence',l:'Jours d’absence',u:''},
   {k:'weekendTravaille',l:'Jours de week-end',u:''},
@@ -1494,11 +1558,12 @@ const S={
   cols:{identite:true,activite:true,rhr:true,temps:true,paniers:true,absences:true},
   mode:'total',
   chart:{metric:'nbRHR',top:25},
+  st:{metric:'nbRHR',mode:'total',echelle:'semaine',groupe:'agence',heat:'presence'},
 };
 function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
 function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
   code:api.code, selAgences:S.selAgences, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
-  theme:document.documentElement.dataset.theme||'', cols:S.cols, chart:S.chart}));}catch(e){} }
+  theme:document.documentElement.dataset.theme||'', cols:S.cols, chart:S.chart, st:S.st}));}catch(e){} }
 
 /** Anciens fichiers : « Agence Bordeaux » est rattachée automatiquement à « Bordeaux-St-Jean » quand un seul nom
     connu commence pareil (sans majuscules, accents, ponctuation ; « Saint » = « St »). Sinon « Agence » est retiré.
@@ -1569,7 +1634,7 @@ function recomputeLoaded(){
   reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
 }
 /** L'évolution hebdomadaire et l'historique portent sur toutes les semaines enregistrées */
-const needsAll=()=>['graphiques','exports'].includes(S.tab);
+const needsAll=()=>['graphiques','exports','stats'].includes(S.tab);
 /** Semaines à charger : celles affichées, plus leurs voisines — un RHR ouvert le dimanche se referme avec la
     semaine suivante, quel que soit l'affichage, pour que les chiffres d'une semaine ne dépendent pas de la vue */
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
@@ -1643,12 +1708,12 @@ const el=id=>document.getElementById(id);
 const TABS=[
   {k:'synthese',l:'Synthèse'},{k:'agents',l:'Agents'},{k:'rhr',l:'RHR'},
   {k:'blanches',l:'Journées blanches'},{k:'graphiques',l:'Graphiques'},
-  {k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
+  {k:'stats',l:'Statistiques'},{k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
-  lecture:'comment l’outil lit le fichier et calcule chaque chiffre',exports:'Excel, CSV et rapport autonome',
+  lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
   import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
@@ -1735,7 +1800,7 @@ function kpiRow(g){
     <div class="kpi"><div class="k">Amplitude / jour</div><div class="v">${fmtH(g.amplitudeParJour)}</div><div class="n">${fmtH(g.heuresPlanifiees)} planifiées</div></div>
     <div class="kpi"><div class="k">Heures de nuit</div><div class="v">${fmtH(g.heuresNuit)}</div><div class="n">hors pauses · AFR ${nW[0]}h–${nW[1]}h, CDR ${nC[0]}h–${nC[1]}h</div></div>
     <div class="kpi"><div class="k">Missions</div><div class="v" data-count="${g.nbMissions}">${nf(g.nbMissions)}</div><div class="n">${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls</div></div>
-    <div class="kpi"><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> RP</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
+    <div class="kpi"><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> repos</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
   </div>`;
 }
 function viewSynthese(){
@@ -1762,7 +1827,7 @@ function viewSynthese(){
     {...hrs('heuresPlanifiees'),l:'H. planifiées'},
     {...hrs('heuresSup'),l:'H. sup'},
     {...hrs('heuresNuit'),l:'H. nuit'},
-    {...cnt('joursRepos'),l:'RP'},{...cnt('joursCP'),l:'Congés'},{...cnt('joursAbsence'),l:'Absences'},
+    {...cnt('joursRepos'),l:'Repos'},{...cnt('joursCP'),l:'Congés'},{...cnt('joursAbsence'),l:'Absences'},
   ];
   const foot=c=>({ag:'Total',me:'',nbAgents:nf(g.nbAgents),amplitudeParJour:fmtH(g.amplitudeParJour),amplitudeTotale_moy:fmtH(g.amplitudeTotale_moy),
     joursService:nfa(modeVal(g,'joursService',m)),nbRHR:nfa(modeVal(g,'nbRHR',m))})[c.k]
@@ -1839,7 +1904,7 @@ const COLS=[
   {g:'paniers',k:'nbPaniers',l:'Paniers'},
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
   {g:'absences',k:'journeesBlanches',l:'J. blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
-  {g:'absences',k:'joursRepos',l:'RP'},
+  {g:'absences',k:'joursRepos',l:'Repos'},
   {g:'absences',k:'joursCP',l:'Congés'},
   {g:'absences',k:'joursAbsence',l:'Absences'},
   {g:'absences',k:'joursVides',l:'Cases vides'},
@@ -2281,6 +2346,156 @@ function viewGuide(){
   </div>`;
 }
 
+/* ---------- statistiques : comparer tout ce qui est comparable ---------- */
+const MED=v=>{const a=[...v].sort((x,y)=>x-y), n=a.length; return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):0;};
+const RHR_ALL=new Set(['nbRHR','rhrNuits','rhrHeures','rhr8_12','rhr12_24','rhr24','rhrSuccessifs']);
+const ST_MODES=[['total','Total'],['agent','Moyenne par agent'],['semaine','Moyenne par semaine'],['jour','Par jour de service'],['mediane','Médiane par agent']];
+const ST_ECH=[['semaine','Semaine'],['mois','Mois'],['trimestre','Trimestre'],['annee','Année']];
+const ST_GRP=[['agence','Agence'],['metier','Métier'],['agmet','Agence et métier']];
+const MOISL=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const stF=k=>FIELDS.find(f=>f.k===k)||FIELDS[0];
+const stFmt=k=>v=>v==null?'—':stF(k).u==='h'?fmtH(v):nfa(v);
+/** Valeur d'une mesure sur une liste de lignes agent-semaine.
+    Les mesures RHR ne portent que sur les métiers concernés ; leurs moyennes par agent, sur les agents qui en ont eu. */
+function statVal(list,k,mode){
+  if(!list.length) return null;
+  const rh=RHR_ALL.has(k), base=rh?list.filter(a=>a.rhrApplicable):list;
+  if(rh&&!base.length) return null;
+  const t=base.reduce((s,a)=>s+(a[k]||0),0);
+  if(mode==='total') return r2(t);
+  if(mode==='semaine') return r2(t/(new Set(list.map(a=>a.weekId)).size||1));
+  if(mode==='jour'){ const js=base.reduce((s,a)=>s+a.joursService,0); return js?r2(t/js):0; }
+  const pop=rh?base.filter(a=>a.nbRHR>0):base, v=pop.map(a=>a[k]||0);
+  if(mode==='agent') return v.length?r2(v.reduce((s,x)=>s+x,0)/v.length):0;
+  return r2(MED(v));
+}
+const stGroup=g=>g==='metier'?a=>a.metier:g==='agmet'?a=>a.agence+' · '+a.metier:a=>a.agence;
+function perKey(weekId,e){
+  const w=S.weeks.find(x=>x.weekId===weekId), m=w?w.monday:String(weekId);
+  return e==='semaine'?weekId:e==='mois'?m.slice(0,7):e==='trimestre'?`${m.slice(0,4)}-T${Math.floor((+m.slice(5,7)-1)/3)+1}`:m.slice(0,4);
+}
+function perLabel(k,e){
+  if(e==='semaine'){ const w=S.weeks.find(x=>x.weekId===k); return w?`S${String(w.week).padStart(2,'0')} ${String(w.year).slice(2)}`:k; }
+  if(e==='mois') return `${MOISL[+k.slice(5,7)-1]} ${k.slice(2,4)}`;
+  if(e==='trimestre') return `${k.slice(5)} ${k.slice(2,4)}`;
+  return k;
+}
+/** Carte de chaleur : lignes × 24 heures, cellules colorées sur une seule teinte */
+function heatmap(rows,unit,fmt){
+  const max=Math.max(1e-9,...rows.flatMap(r=>r.v));
+  return `<div class="hm" style="--hmc:${24}">
+    <div class="hm-r hm-h"><span class="hm-l"></span>${Array.from({length:24},(_,h)=>`<span class="hm-x">${h%3===0?String(h).padStart(2,'0'):''}</span>`).join('')}</div>
+    ${rows.map(r=>{ const pk=r.v.indexOf(Math.max(...r.v));
+      return `<div class="hm-r"><span class="hm-l" title="${esc(r.l)}">${esc(r.l)}</span>${r.v.map((v,h)=>{const q=v/max;
+        return `<span class="hm-c${h===pk&&v>0?' pk':''}" style="background:color-mix(in srgb,var(--accent) ${Math.round(q*100)}%,var(--surface-2))" data-tip="${esc(`<b>${esc(r.l)}</b><span class="tr"><span>${String(h).padStart(2,'0')}h–${String(h+1).padStart(2,'0')}h</span><b>${fmt(v)}</b></span><span class="tr"><span>${unit}</span></span>`)}"></span>`;}).join('')}</div>`;}).join('')}
+    <div class="hm-lg"><span>0</span><span class="hm-sc"></span><span>${fmt(max)}</span><span class="mut">· ${unit} · cadre = heure de pointe</span></div></div>`;
+}
+/** Histogramme vertical */
+function histo(bins,label,fmt=nf){
+  const max=Math.max(1,...bins.map(b=>b.v)), tot=bins.reduce((s,b)=>s+b.v,0);
+  return `<div class="hg${bins.length>12?' dense':''}">${bins.map(b=>`<div class="hg-b" data-tip="${esc(`<b>${esc(b.l)}</b><span class="tr"><span>${label}</span><b>${fmt(b.v)}</b></span><span class="tr"><span>Part</span><b>${tot?nf(100*b.v/tot,1):0} %</b></span>`)}">
+    <span class="hg-v">${b.v?fmt(b.v):''}</span><span class="hg-t"><i style="height:${(b.v/max*100).toFixed(1)}%${b.c?';background:'+b.c:''}"></i></span><span class="hg-l">${esc(b.l)}</span></div>`).join('')}</div>`;
+}
+function viewStats(){
+  const sc=scopeAgents(); if(!sc.length) return emptyScope();
+  const st=S.st, K=st.metric, M=stF(K), mode=st.mode, fmt=stFmt(K), gf=stGroup(st.groupe);
+  const seg=(attr,opts,cur)=>`<div class="seg">${opts.map(([k,l])=>`<button class="sg" data-${attr}="${k}" aria-pressed="${cur===k}">${l}</button>`).join('')}</div>`;
+  const nW=new Set(sc.map(a=>a.weekId)).size;
+  /* comparatif : toutes les mesures × groupes */
+  const groups=[...groupBy(sc,gf)].sort((a,b)=>a[0].localeCompare(b[0],'fr'));
+  const cmpRows=FIELDS.map(f=>{ const vals=groups.map(([,l])=>statVal(l,f.k,mode)), ok=vals.filter(v=>v!=null);
+    return {f,vals,tot:statVal(sc,f.k,mode),mx:ok.length>1?Math.max(...ok):null,mn:ok.length>1?Math.min(...ok):null}; });
+  const cmp=`<div class="tw tall"><table class="sticky1 cmp"><thead><tr><th class="l st">Mesure</th>${groups.map(([g])=>`<th>${esc(g)}</th>`).join('')}<th>Périmètre</th></tr></thead><tbody>
+    ${cmpRows.map(r=>`<tr${r.f.k===K?' class="rsel"':''}><td class="l st"><button class="lnk" data-stm="${r.f.k}">${esc(r.f.l)}</button></td>${r.vals.map(v=>{
+      const c=v==null?'':r.mx!==r.mn&&v===r.mx?' hi':r.mx!==r.mn&&v===r.mn?' lo':'';
+      return `<td class="${c.trim()}">${v==null?'<span class="z">n/a</span>':stFmt(r.f.k)(v)}</td>`;}).join('')}<td><b>${r.tot==null?'—':stFmt(r.f.k)(r.tot)}</b></td></tr>`).join('')}
+  </tbody></table></div>`;
+  /* évolution par période, sur toutes les semaines enregistrées */
+  const all=scopeAgents({allWeeks:true});
+  const pers=[...new Set(all.map(a=>perKey(a.weekId,st.echelle)))].sort();
+  const byP=groupBy(all,a=>perKey(a.weekId,st.echelle));
+  const topG=[...groupBy(all,gf)].map(([g,l])=>[g,statVal(l,K,'total')||0]).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+  const series=topG.map((g,i)=>({name:g,short:g.length>10?g.slice(0,9)+'…':g,color:`var(${SER[i%8]})`,
+    values:pers.map(p=>{const l=(byP.get(p)||[]).filter(a=>gf(a)===g);return l.length?statVal(l,K,mode):null;})}));
+  const perVals=pers.map(p=>statVal(byP.get(p)||[],K,mode));
+  const perTable=`<div class="tw"><table><thead><tr><th class="l">Période</th><th>Semaines</th><th>${esc(M.l)}</th><th>Écart</th><th>Écart / moyenne</th></tr></thead><tbody>
+    ${(()=>{const moy=perVals.filter(v=>v!=null).reduce((s,v,_,a)=>s+v/a.length,0);
+      return pers.map((p,i)=>{const v=perVals[i], pv=i?perVals[i-1]:null, d=v!=null&&pv!=null?v-pv:null, dm=v!=null&&moy?100*(v-moy)/moy:null;
+        return `<tr><td class="l nm">${esc(perLabel(p,st.echelle))}</td><td>${nf(new Set((byP.get(p)||[]).map(a=>a.weekId)).size)}</td><td>${fmt(v)}</td>
+          <td>${d==null?'<span class="z">—</span>':`<span class="${d>0?'up':d<0?'dn':''}">${d>0?'+':''}${stF(K).u==='h'?fmtH(Math.abs(d)).replace(/^/,d<0?'−':''):nfa(r2(d))}</span>`}</td>
+          <td>${dm==null?'<span class="z">—</span>':`<span class="${dm>0?'up':dm<0?'dn':''}">${dm>0?'+':''}${nf(dm,1)} %</span>`}</td></tr>`;}).join('');})()}
+  </tbody></table></div>`;
+  /* comparaison des deux dernières périodes, toutes mesures */
+  const last=pers[pers.length-1], prev=pers[pers.length-2];
+  const lastL=byP.get(last)||[], prevL=byP.get(prev)||[];
+  const pp=pers.length>1?`<div class="tw tall"><table class="sticky1"><thead><tr><th class="l st">Mesure</th><th>${esc(perLabel(prev,st.echelle))}</th><th>${esc(perLabel(last,st.echelle))}</th><th>Évolution</th><th>Moyenne</th><th>Min.</th><th>Max.</th></tr></thead><tbody>
+    ${FIELDS.map(f=>{ const a=statVal(prevL,f.k,mode), b=statVal(lastL,f.k,mode), vs=pers.map(p=>statVal(byP.get(p)||[],f.k,mode)).filter(v=>v!=null);
+      const ev=a!=null&&b!=null&&a!==0?100*(b-a)/a:null, F=stFmt(f.k);
+      return `<tr><td class="l st">${esc(f.l)}</td><td>${F(a)}</td><td><b>${F(b)}</b></td>
+        <td>${ev==null?'<span class="z">—</span>':`<span class="${ev>0?'up':ev<0?'dn':''}">${ev>0?'▲ +':ev<0?'▼ ':''}${nf(ev,1)} %</span>`}</td>
+        <td>${vs.length?F(r2(vs.reduce((s,v)=>s+v,0)/vs.length)):'—'}</td><td>${vs.length?F(Math.min(...vs)):'—'}</td><td>${vs.length?F(Math.max(...vs)):'—'}</td></tr>`;}).join('')}
+  </tbody></table></div>`:'<p class="mut">Une seule période enregistrée à cette échelle : la comparaison apparaîtra avec la suivante.</p>';
+  /* heures chaudes */
+  const H24=()=>Array(24).fill(0), hg=new Map(), hd=Array.from({length:7},H24);
+  const addSeg=(g,a0,a1)=>{ if(!hg.has(g)) hg.set(g,H24()); const row=hg.get(g);
+    for(let t=Math.floor(a0/H)*H;t<a1;t+=H){ const o=ovl(t,t+H,a0,a1)/H; if(o<=0) continue; const d=new Date(t), h=d.getUTCHours(); row[h]+=o; hd[(d.getUTCDay()+6)%7][h]+=o; } };
+  const addPt=(g,t)=>{ if(!hg.has(g)) hg.set(g,H24()); const d=new Date(t), h=d.getUTCHours(); hg.get(g)[h]++; hd[(d.getUTCDay()+6)%7][h]++; };
+  for(const a of sc){ const g=gf(a);
+    if(st.heat==='rhr'){ for(const x of a.rhr) addPt(g,Date.parse(x.debut)); continue; }
+    for(const j of a.jours){ if(j.kind!=='SERVICE') continue;
+      if(st.heat==='presence') for(const m of j.missions) for(const [s0,s1] of workSegments(m)) addSeg(g,s0,s1);
+      else if(st.heat==='prise') addPt(g,Date.parse(j.missions[0].start));
+      else addPt(g,Date.parse(j.missions[j.missions.length-1].end)); } }
+  const dvs=st.heat==='presence'?nW*7:nW;
+  const HU={presence:'agents en service en moyenne (jour moyen)',prise:'prises de service par semaine',fin:'fins de service par semaine',rhr:'débuts de RHR par semaine'}[st.heat];
+  const hf=v=>nf(v,v<10?1:0);
+  const hRows=[...hg].sort((a,b)=>a[0].localeCompare(b[0],'fr')).map(([l,v])=>({l,v:v.map(x=>r2(x/dvs))}));
+  const dRows=JS.map((l,i)=>({l,v:hd[i].map(x=>r2(x/(st.heat==='presence'?nW:nW)))}));
+  const HEAT=[['presence','Agents en service'],['prise','Prises de service'],['fin','Fins de service'],['rhr','Départs en RHR']];
+  /* distributions */
+  const cdr=sc.filter(a=>a.rhrApplicable), rh=cdr.flatMap(a=>a.rhr.filter(x=>x.dureeH!=null));
+  const bands=[['8–12 h',x=>x<12],['12–24 h',x=>x>=12&&x<24],['24 h et plus',x=>x>=24]].map(([l,t])=>({l,v:rh.filter(x=>t(x.dureeH)).length}));
+  const days=sc.flatMap(a=>a.jours.filter(j=>j.kind==='SERVICE'));
+  const prises=Array.from({length:24},(_,h)=>({l:String(h).padStart(2,'0'),v:days.filter(j=>new Date(j.missions[0].start).getUTCHours()===h).length}));
+  const ampB=[['< 6 h',0,6],['6–8 h',6,8],['8–9 h',8,9],['9–10 h',9,10],['10–11 h',10,11],['> 11 h',11,99]].map(([l,a,b])=>({l,v:days.filter(j=>j.amplitude>=a&&j.amplitude<b).length,c:a>=11?'var(--signal)':null}));
+  const hpB=[['< 20 h',0,20],['20–30 h',20,30],['30–35 h',30,35],['35–40 h',35,40],['40–45 h',40,45],['≥ 45 h',45,999]].map(([l,a,b])=>({l,v:sc.filter(x=>x.joursService&&x.heuresPlanifiees>=a&&x.heuresPlanifiees<b).length,c:a>=35?'var(--signal)':null}));
+  const rhB=[0,1,2,3,4].map(n=>({l:n<4?String(n):'4 et +',v:cdr.filter(a=>n<4?a.nbRHR===n:a.nbRHR>=4).length}));
+  const jbB=[0,1,2,3].map(n=>({l:n<3?String(n):'3 et +',v:sc.filter(a=>n<3?a.journeesBlanches===n:a.journeesBlanches>=3).length}));
+  /* classement */
+  const persons=mergeAcrossWeeks(RHR_ALL.has(K)?sc.filter(a=>a.rhrApplicable):sc);
+  const pv=p=>mode==='total'?p[K]||0:r2((p[K]||0)/(p.nbSemaines||1));
+  const ranked=persons.map(p=>({p,v:pv(p)})).sort((a,b)=>b.v-a.v);
+  const moyP=ranked.length?ranked.reduce((s,x)=>s+x.v,0)/ranked.length:0;
+  const topN=ranked.slice(0,15).map(x=>({l:`${x.p.nom} ${x.p.prenom.slice(0,1)}.`,v:x.v,c:agenceColor(x.p.agence),sub:`${x.v>=moyP?'+':''}${nf(x.v-moyP,1)} vs moyenne`,sub2:x.p.agence}));
+  return `
+  <section class="card"><div class="card-b"><div class="ctrls" style="margin-bottom:0;border-bottom:0;padding-bottom:0">
+    <label class="fld"><span class="flabel">Mesure</span><select id="stMetric">${FIELDS.map(f=>`<option value="${f.k}"${f.k===K?' selected':''}>${esc(f.l)}</option>`).join('')}</select></label>
+    <div class="fld"><span class="flabel">Valeur</span>${seg('stmode',ST_MODES,mode)}</div>
+    <div class="fld"><span class="flabel">Comparer par</span>${seg('stgrp',ST_GRP,st.groupe)}</div>
+    <div class="fld"><span class="flabel">Échelle de temps</span>${seg('stech',ST_ECH,st.echelle)}</div></div>
+    <p class="hint">Périmètre : ${nf(new Set(sc.map(personKey)).size)} agents, ${nf(nW)} semaine${nW>1?'s':''} sélectionnée${nW>1?'s':''} · l'évolution et la comparaison de périodes portent sur toutes les semaines enregistrées · RHR : conducteurs uniquement ; moyennes et médianes RHR sur les agents qui en ont eu.</p></div></section>
+  <section class="card"><div class="card-h"><div><h2>Tableau comparatif</h2><p class="card-s">toutes les mesures, par ${esc(ST_GRP.find(g=>g[0]===st.groupe)[1].toLowerCase())} · ${esc(ST_MODES.find(m=>m[0]===mode)[1].toLowerCase())} · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span> · cliquez une mesure pour la détailler</p></div></div>
+    <div class="card-b">${cmp}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Heures chaudes</h2><p class="card-s">${esc(HU)} · ${nf(nW)} semaine${nW>1?'s':''}</p></div>${seg('stheat',HEAT,st.heat)}</div>
+    <div class="card-b"><div class="ch">Par heure et par ${esc(ST_GRP.find(g=>g[0]===st.groupe)[1].toLowerCase())}</div>${hRows.length?heatmap(hRows,HU,hf):'<p class="mut">Aucune donnée.</p>'}
+      <div class="ch" style="margin-top:18px">Par heure et par jour de la semaine</div>${heatmap(dRows,st.heat==='presence'?'agents en service en moyenne (ce jour-là)':HU,hf)}</div></section>
+  <section class="card"><div class="card-h"><div><h2>${esc(M.l)} — évolution par ${esc(ST_ECH.find(e=>e[0]===st.echelle)[1].toLowerCase())}</h2><p class="card-s">${esc(ST_MODES.find(m=>m[0]===mode)[1].toLowerCase())} · une courbe par ${esc(ST_GRP.find(g=>g[0]===st.groupe)[1].toLowerCase())} (8 plus importants)</p></div></div>
+    <div class="card-b">${lineChart(series,pers.map(p=>perLabel(p,st.echelle)),fmt)}<div class="clg">${series.map(s=>`<span class="lg"><span class="cdot" style="background:${s.color}"></span>${esc(s.name)}</span>`).join('')}</div>
+      <div class="ch" style="margin-top:16px">Périmètre, période par période</div>${perTable}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Dernière période comparée à la précédente</h2><p class="card-s">toutes les mesures · ${esc(ST_MODES.find(m=>m[0]===mode)[1].toLowerCase())} · moyenne, minimum et maximum sur toutes les périodes</p></div></div>
+    <div class="card-b">${pp}</div></section>
+  <div class="charts">
+    <section class="card"><div class="card-h"><div><h2>Durée des RHR</h2><p class="card-s">tranches de prime de l'accord (annexe 1) · ${nf(rh.length)} RHR de durée connue</p></div></div><div class="card-b">${histo(bands,'RHR')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>RHR par agent et par semaine</h2><p class="card-s">conducteurs · nombre de semaines d'agent</p></div></div><div class="card-b">${histo(rhB,'Semaines d’agent')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Amplitude des journées de service</h2><p class="card-s">${nf(days.length)} journées · en ambre : au-delà de 11 h (maximum de l'accord, art. 12)</p></div></div><div class="card-b">${histo(ampB,'Journées')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Heures planifiées par semaine</h2><p class="card-s">par agent · en ambre : au-delà de ${nf(S.rules.seuilHebdo)} h</p></div></div><div class="card-b">${histo(hpB,'Semaines d’agent')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Heure de prise de service</h2><p class="card-s">première mission de chaque journée</p></div></div><div class="card-b">${histo(prises,'Journées')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Journées blanches par agent et par semaine</h2><p class="card-s">nombre de semaines d'agent</p></div></div><div class="card-b">${histo(jbB,'Semaines d’agent')}</div></section>
+  </div>
+  <section class="card"><div class="card-h"><div><h2>Classement — ${esc(M.l)}</h2><p class="card-s">${mode==='total'?'total':'par semaine'} · 15 premiers sur ${nf(ranked.length)} · moyenne ${fmt(r2(moyP))} · médiane ${fmt(r2(MED(ranked.map(x=>x.v))))}</p></div></div>
+    <div class="card-b">${barChart(topN,{fmt,label:M.l})}</div></section>`;
+}
+
 /* ---------- exports ---------- */
 function tables(){
   const sc=scopeAgents(), persons=mergeAcrossWeeks(sc).sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
@@ -2322,7 +2537,7 @@ function tables(){
       {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},{t:'Amplitude / agent (h)',w:13,fmt:'dec'},
       {t:'Amplitude / jour (h)',w:13,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},
       {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
-      {t:'Panier / JS',w:9,fmt:'dec'},{t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
+      {t:'Panier / JS',w:9,fmt:'dec'},{t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
       {t:'Jours de week-end',w:11,fmt:'int'}],rows:synth},
     agents:{name:'Agents',cols:[
       {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Métier',w:13},{t:'Semaines',w:9,fmt:'int'},{t:'Résidence',w:10},
@@ -2333,7 +2548,7 @@ function tables(){
       {t:'Amplitude max (h)',w:12,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Pauses (min)',w:10,fmt:'int'},
       {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},{t:'Panier / JS',w:9,fmt:'dec'},
       {t:'Prise la plus tôt',w:11},{t:'Fin la plus tard',w:11},
-      {t:'Jours de week-end',w:11,fmt:'int'},{t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
+      {t:'Jours de week-end',w:11,fmt:'int'},{t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
       {t:'Cases vides',w:9,fmt:'int'},{t:'Lignes fusionnées',w:11}],rows:agents},
     rhr:{name:'RHR par agent',cols:[
       {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Résidence',w:10},{t:'Semaines',w:9,fmt:'int'},
@@ -2349,7 +2564,7 @@ function tables(){
       {t:'RHR',w:7,fmt:'int'},{t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},
       {t:'Journées blanches',w:12,fmt:'int'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},
       {t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Heures de nuit (h)',w:12,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
-      {t:'RP',w:7,fmt:'int'},{t:'Congés',w:8,fmt:'int'}],rows:hist},
+      {t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'}],rows:hist},
   };
 }
 async function dl(name,data,mime){
@@ -2606,7 +2821,7 @@ function render(){
   const v=el('view');
   const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
-    S.tab==='lecture'?viewGuide(): S.tab==='import'?viewImport(): viewReglages();
+    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
@@ -2805,11 +3020,13 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
+    '[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.dataset.act==='theme'){ el('btnTheme').click(); return; }
   if(t.dataset.jbf){ S.jbFiltre=t.dataset.jbf; render(); return; }
+  for(const [a,k] of [['stmode','mode'],['stgrp','groupe'],['stech','echelle'],['stheat','heat'],['stm','metric']])
+    if(t.dataset[a]!=null){ S.st[k]=t.dataset[a]; savePrefs(); render(); return; }
   if(t.dataset.jbl!=null){ const r=(S.rows_jbl||[])[+t.dataset.jbl]; if(r){ S.drawer=r.a; renderDrawer(); } return; }
   if(t.dataset.crhr!=null&&admin()){ const c=S.rules.corrections, v=t.dataset.v;
     if(v) c.rhr[t.dataset.crhr]=v; else delete c.rhr[t.dataset.crhr];
@@ -2916,6 +3133,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
+  if(e.target.id==='stMetric'){ S.st.metric=e.target.value; savePrefs(); render(); return; }
   if(e.target.id==='cTop'){ S.chart.top=+e.target.value; savePrefs(); render(); return; }
 });
 document.addEventListener('input',e=>{
@@ -2983,6 +3201,7 @@ async function boot(){
   if(p.theme) document.documentElement.dataset.theme=p.theme;
   if(p.cols) S.cols={...S.cols,...p.cols};
   if(p.chart) S.chart={...S.chart,...p.chart};
+  if(p.st) S.st={...S.st,...p.st};
   if(p.mode) S.mode=p.mode;
   if(p.tab) S.tab=p.tab;
   render();
@@ -3016,7 +3235,7 @@ function buildReport(){
     ['Amplitude / jour',fmtH(g.amplitudeParJour),`${fmtH(g.heuresPlanifiees)} planifiées`],
     ['Heures de nuit',fmtH(g.heuresNuit),`hors pauses`],
     ['Missions',nf(g.nbMissions),`${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls`],
-    ['Repos & congés',nf(g.joursRepos)+' RP',`${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences`],
+    ['Repos & congés',nf(g.joursRepos)+' repos',`${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences`],
   ];
   const SH=[['synthese','Synthèse'],['rhr','RHR par agent'],['blanches','Journées blanches'],['agents','Détail par agent'],['historique','Historique']];
   const tbl=k=>{

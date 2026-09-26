@@ -16,7 +16,7 @@ Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean**. Métiers : A
 L'application reprend la structure du zip d'origine : **une seule page** qui contient tout.
 
 - `recap-corridor/public/index.html` — toute l'application : lecture des .xlsx dans le navigateur,
-  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Guide de lecture, Exports,
+  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Statistiques, Guide de lecture, Exports,
   Import, Réglages), graphiques, exports Excel/CSV, rapport autonome. Le fichier Excel n'est jamais envoyé au serveur.
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
@@ -47,8 +47,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit, et
   pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
   minuit compte si l'agent est à sa résidence.
+  En début ou fin de semaine, la case est encadrée par la semaine voisine si elle est importée
+  (validé par l'utilisateur). Un repos entre la case vide et le service ne l'empêche pas.
   Chaque case vide non comptée affiche sa raison (avant le premier / après le dernier service, fin
   de service de nuit à hh:mm).
+- Classement des codes (validé) : Repos = RP, RF, JF, RCL, RCC ; Congés = CP, CPAT, CFAM, CSS/CPAR ;
+  Absences = tout le reste (MAL, AT, CPRCL…).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
   CPAR et CSS congés sans solde ; SUPP (dans un intitulé de mission) = supplémentaire.
