@@ -98,6 +98,13 @@ semaine enregistrée (2 et 4 dernières semaines, dernier mois, 3, 6 et 12 derni
 années, mois, semaines. Une semaine appartient au mois et à l'année de son jeudi (règle ISO), y compris
 pour les regroupements par mois / trimestre / année de l'onglet Statistiques.
 
+## Interface
+
+Couleurs DB Cargo : rouge (#EC0016) sur blanc en mode clair, rouge sur noir en mode sombre, sans dégradé ;
+ambre pour ce qui demande attention. Menu latéral groupé (Pilotage, Détail, Analyse, Diffusion, Administration)
+avec icônes, réductible en icônes seules (mémorisé), en tiroir sous une barre fixe sur téléphone. Synthèse :
+quatre indicateurs principaux puis un bandeau compact pour les autres.
+
 ## Hébergement
 
 - **Render**, service `recap-corridor` (gratuit, Francfort), déployé automatiquement à chaque
