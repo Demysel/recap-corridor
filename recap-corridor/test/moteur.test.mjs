@@ -197,3 +197,14 @@ test('ancien format : jours en ligne 1, dates en ligne 2, métier dans « Commen
   assert.equal(a.jours[1].missions[0].label, 'VS-251-BX');
   assert.equal(a.jours[1].missions[0].note, 'ENTRETIEN');
 });
+
+test('journée blanche : comptée la veille d’une reprise après minuit, sauf si l’agent est hors résidence', () => {
+  // à la résidence : mardi vide, reprise mercredi 01h28 -> journée blanche
+  const a = one([svc(['T', 'HENDAYE', 'HENDAYE', 7, '14:00', 7, '22:20']), null, svc(['T', 'HENDAYE', 'HENDAYE', 9, '01:28', 9, '08:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.journeesBlanches, 1);
+  // hors résidence : fin lundi à BORDEAUX, mardi vide, reprise mercredi de BORDEAUX -> pas de journée blanche
+  const b = one([svc(['T', 'HENDAYE', 'BORDEAUX', 7, '14:00', 7, '22:20']), null, svc(['T', 'BORDEAUX', 'HENDAYE', 9, '01:28', 9, '08:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(b.nbRHR, 1);
+  assert.equal(b.journeesBlanches, 0);
+  assert.equal(b.casesVides[0].raison, 'agent hors résidence ce jour-là (RHR)');
+});

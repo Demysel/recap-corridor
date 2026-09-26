@@ -39,7 +39,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
   résidence d'une agence. Mémorisées dans `recap.config` (clé `regles`, champs `corrections`,
   `lieuxResidence`) et rejouées à chaque affichage, même après réimport.
-- Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit.
+- Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit, et
+  pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
+  minuit compte si l'agent est à sa résidence.
   Chaque case vide non comptée affiche sa raison (avant le premier / après le dernier service, fin
   de service de nuit à hh:mm).
 - Formats de fichier : récent (ligne 1 dates, ligne 2 Matricule… Lundi…) et ancien (ligne 1

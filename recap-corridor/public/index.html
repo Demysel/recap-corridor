@@ -877,6 +877,7 @@ const DEFAULT_RULES={
   rhrCountPending:true,
   jbExcludeNightOverlap:true,
   jbRequireFramed:true,
+  jbExcludeHorsResidence:true, // une case vide passée hors résidence (pendant un RHR) n'est pas une journée blanche
   residences:{},
   seuilHebdo:35,              // heures sup au-delà, par agent et par semaine
   heuresATCMD:5,              // une ATCMD compte pour 5 h de travail
@@ -1100,10 +1101,11 @@ function computeAgent(a,days,rules,residence){
     let compte=true, raison='';
     if(rules.jbRequireFramed && !(f>=0 && j.d>f && j.d<l)){ compte=false; raison=f<0?'aucun service dans la semaine':j.d<f?'avant le premier service de la semaine':'après le dernier service de la semaine'; }
     else if(deb&&rules.jbExcludeNightOverlap){ compte=false; raison=`fin du service de nuit à ${hm(deb.end)}`; }
+    const hors=rhr.some(x=>{const s=new Date(x.debut).getTime(), e=x.fin?new Date(x.fin).getTime():Infinity;return s<de&&e>ds;});
+    if(compte&&hors&&rules.jbExcludeHorsResidence){ compte=false; raison='agent hors résidence ce jour-là (RHR)'; }
     const man=cJ[kJour(pk,j.date)];
     if(man==='oui'){ compte=true; raison='comptée à la main'; }
     else if(man==='non'){ compte=false; raison='écartée à la main'; }
-    const hors=rhr.some(x=>{const s=new Date(x.debut).getTime(), e=x.fin?new Date(x.fin).getTime():Infinity;return s<de&&e>ds;});
     const lastP=prev?prev.missions[prev.missions.length-1]:null, firstN=next?next.missions[0]:null;
     const cv={d:j.d,date:j.date,compte,raison,manuel:man||null,horsResidence:hors,
       finPrec:lastP?lastP.end:null,debutSuiv:firstN?firstN.start:null,
@@ -2207,7 +2209,7 @@ function viewGuide(){
   <div class="gd">
     ${card('Lire une case de service','ce que l’outil repère dans chaque ligne',dgCase(),'Une case vide n’a ni mission ni code. Une mission dont l’horaire est illisible est signalée à l’import.')}
     ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case. Un changement de train de 30 min n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
-    ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
+    ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}${r.jbExcludeHorsResidence?'Une journée passée hors résidence non plus. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
     ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui englobe la plage du midi ou du soir donne aussi un panier':''}.`)}
     ${card('Heures planifiées et heures sup','par agent et par semaine',dgHeures(r),`Heures planifiées = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
   </div>`;
@@ -2449,6 +2451,9 @@ function viewReglages(){
         <label class="rule"><input type="checkbox" id="rNight" ${r.jbExcludeNightOverlap?'checked':''}>
           <span><span class="rn">Exclure les lendemains de service de nuit des journées blanches</span>
           <span class="rd">Une case vide qui suit un service terminé le matin même n'est pas une journée blanche : l'agent était encore en service.</span></span></label>
+        <label class="rule"><input type="checkbox" id="rJBHR" ${r.jbExcludeHorsResidence?'checked':''}>
+          <span><span class="rn">Pas de journée blanche quand l'agent est hors résidence</span>
+          <span class="rd">Une case vide passée pendant un repos hors résidence n'est pas une journée blanche. Une case vide suivie d'une reprise juste après minuit reste une journée blanche si l'agent est à sa résidence.</span></span></label>
         <label class="rule"><input type="checkbox" id="rFramed" ${r.jbRequireFramed?'checked':''}>
           <span><span class="rn">Ne compter que les journées blanches encadrées par deux services</span>
           <span class="rd">Les cases vides avant le premier ou après le dernier service de la semaine sont ignorées.</span></span></label>
@@ -2495,7 +2500,7 @@ function viewReglages(){
   <section class="card"><div class="card-h"><h2>Comment les chiffres sont calculés</h2></div>
     <div class="card-b prose">
       <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR, de jour comme de nuit — même si les deux missions sont dans la même case. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
-      <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une.</p>
+      <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
       <p><b>Heures planifiées et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont les heures planifiées au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
@@ -2815,6 +2820,7 @@ document.addEventListener('click',async e=>{
       rhrCountPending: el('rPend').checked,
       jbExcludeNightOverlap: el('rNight').checked,
       jbRequireFramed: el('rFramed').checked,
+      jbExcludeHorsResidence: el('rJBHR').checked,
       panierRHR: el('rPRHR').checked,
       horsColonne: el('rHC').checked?'ecarter':'garder',
       rhrMinHours: Math.max(0,num('rMin',0)),
