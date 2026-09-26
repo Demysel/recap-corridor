@@ -93,7 +93,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Heures du dimanche : temps travaillé hors pauses le dimanche.
 - MHIS, DISPO, ATCMD : intitulé qui contient ces lettres (non exclusif). DISPO et ATCMD comptés à part.
 - Trajet seul : intitulé réduit à VOY ou VS (hypothèse à confirmer par l'utilisateur).
-- Paniers : 1 h travaillée entre 11h30 et 13h30 ; 1 h entre 18h30 et 20h30 ; 3 h entre 22h et 5h ;
+- Paniers : 1 h en service entre 11h30 et 13h30 ; 1 h entre 18h30 et 20h30 ; 3 h entre 22h et 5h, lus sur
+  l'horaire de la mission, pauses comprises (12:30–19:30 avec pause vers 18h45 = midi + soir ; précisé par l'utilisateur) ;
   ou RHR qui touche la plage (validé : dès que le RHR chevauche la plage, même brièvement) — un panier
   par plage touchée, donc midi ET soir si le RHR touche les deux. Un panier au plus par plage et par
   jour. Ratio = paniers / jours de service.

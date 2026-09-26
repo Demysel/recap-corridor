@@ -157,6 +157,14 @@ test('paniers : midi, soir, nuit', () => {
   assert.equal(a.paniersNuit, 1);
 });
 
+test('paniers : plage lue sur l’horaire de la mission, pauses comprises (12:30–19:30 = midi + soir)', () => {
+  // pause de 18:15 à 19:05 : il ne reste que 25 min travaillées dans 18h30–20h30, mais l'horaire couvre 1 h de la plage
+  const a = one([svc(['DELEG', 'BX', 'BX', 7, '12:30', 7, '19:30', [[7, '18:15', 7, '19:05']]]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, { residences: { Hendaye: 'BX' } });
+  assert.equal(a.paniersMidi, 1);
+  assert.equal(a.paniersSoir, 1);
+  assert.equal(a.nbPaniers, 2);
+});
+
 test('comptages MHIS / DISPO / trajets seuls', () => {
   const a = one([svc(['VS+MHIS', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '08:00'], ['DISPO', 'HENDAYE', 'HENDAYE', 7, '09:00', 7, '10:00'], ['VOY', 'HENDAYE', 'HENDAYE', 7, '11:00', 7, '12:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
   assert.equal(a.nbMHIS, 1);
