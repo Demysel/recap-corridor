@@ -2235,14 +2235,15 @@ const COLS=[
   {g:'temps',k:'heuresDimanche',l:'H. dimanche',f:numF('heuresDimanche',fmtH)},
   {g:'paniers',k:'nbPaniers',l:'Paniers'},
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
-  {g:'absences',k:'journeesBlanches',l:'J. blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
+  // une seule colonne : journées blanches, avec en petit les cases vides (qui les contiennent) — demandé par l'utilisateur
+  {g:'absences',k:'journeesBlanches',l:'Journées blanches',f:a=>{const j=pv(a,'journeesBlanches'), v=pv(a,'joursVides');
+    return `${j?`<b>${nfa(j)}</b>`:'<span class="z">0</span>'}${v?` <span class="mut sm" title="cases vides, journées blanches comprises">/ ${nfa(v)} vide${v>1?'s':''}</span>`:''}`;}},
   {g:'absences',k:'joursRepos',l:'Repos'},
   ...FAM_REPOS.map(c=>({g:'absences',k:'c_'+c,l:c,cls:'sub'})),
   {g:'absences',k:'joursCP',l:'Congés'},
   {g:'absences',k:'c_CP',l:'CP',cls:'sub'},
   {g:'absences',k:'cpAnnee',l:'CP année',f:a=>a.cpAnnee?`<b>${nf(a.cpAnnee)}</b>`:'<span class="z">0</span>',t:a=>a.cpAnnee},
   {g:'absences',k:'joursAbsence',l:'Absences'},
-  {g:'absences',k:'joursVides',l:'Cases vides'},
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
