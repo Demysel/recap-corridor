@@ -32,6 +32,9 @@ règle dans l'onglet Réglages ne demande jamais de réimporter.
 - **Supabase** : schéma `recap`, accessible uniquement par le rôle `recap_app`
   qu'utilise le serveur.
 
+Le code visiteur (`CODE_LECTURE`) n'ouvre que la **Vitrine** : statistiques anonymes calculées par le
+serveur, groupes d'au moins 5 agents, aucun nom ni matricule transmis au navigateur.
+
 Variables d'environnement Render : `DATABASE_URL`, `CODE_ADMIN`, `CODE_LECTURE`,
 `NODE_VERSION=22`. Changer un code : Render → service → Environment.
 

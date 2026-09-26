@@ -16,11 +16,17 @@ Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean**. Métiers : A
 L'application reprend la structure du zip d'origine : **une seule page** qui contient tout.
 
 - `recap-corridor/public/index.html` — toute l'application : lecture des .xlsx dans le navigateur,
-  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Statistiques, Guide de lecture, Exports,
+  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Statistiques, Vitrine, Guide de lecture, Exports,
   Import, Réglages), graphiques, exports Excel/CSV, rapport autonome. Le fichier Excel n'est jamais envoyé au serveur.
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
-  `GET|PUT|DELETE /api/semaine`, `PUT /api/regles`, `GET /api/ping`.
+  `GET|PUT|DELETE /api/semaine`, `PUT /api/regles`, `GET /api/ping`, `GET /api/vitrine`.
+- **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
+  nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
+  `/api/vitrine` renvoie des agrégats calculés sur le serveur par le moteur de la page
+  (`vitrineData`) : chaque cellule semaine × agence × métier réunit au moins 5 agents ; les petits
+  groupes sont fusionnés (« Autres métiers », « Tous métiers », « Autres agences ») ou écartés.
+  Ne jamais ajouter de donnée individuelle à cette réponse.
 - `recap-corridor/db/schema.sql` — schéma Postgres.
 - `recap-corridor/test/moteur.test.mjs` — tests du moteur de calcul, lus directement dans `index.html`
   (`cd recap-corridor && npm test`, sans dépendance, données fictives). À lancer avant chaque envoi.

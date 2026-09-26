@@ -7,7 +7,7 @@
    Variables d'environnement :
      DATABASE_URL   chaîne de connexion Postgres
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
-     CODE_LECTURE   code de consultation
+     CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
      PORT           fourni par Render
    ========================================================================== */
 import http from 'node:http';
@@ -16,6 +16,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url));
@@ -91,6 +93,37 @@ async function readBody(req) {
   try { return JSON.parse(txt || '{}'); } catch (e) { throw Object.assign(new Error('Contenu JSON invalide.'), { status: 400 }); }
 }
 
+/* ------------------------------------------------------------ moteur de calcul
+   Le même code que la page : lu dans index.html, pour que les statistiques visiteur soient
+   calculées ici et que seules des données agrégées et anonymes quittent le serveur. */
+let moteur = null;
+function engine() {
+  if (moteur) return moteur;
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
+  const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
+  const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
+  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules};', ctx);
+  moteur = ctx.__E;
+  return moteur;
+}
+let vitrineCache = null;       // recalculée après chaque import, suppression ou changement de règles
+async function vitrine(p) {
+  if (vitrineCache) return vitrineCache;
+  const d = await p.query('select week_id, data from recap.details order by week_id, agence_slug');
+  const c = await p.query("select valeur from recap.config where cle = 'regles'");
+  const weeks = new Map();
+  for (const r of d.rows) {
+    if (!weeks.has(r.week_id)) weeks.set(r.week_id, { meta: r.data.meta, agents: [] });
+    weeks.get(r.week_id).agents.push(...(r.data.agents || []));
+  }
+  const E = engine();
+  vitrineCache = JSON.parse(JSON.stringify(E.vitrineData([...weeks.values()], E.loadRules(c.rows[0]?.valeur || null))));
+  return vitrineCache;
+}
+/** Résumé d'une semaine sans rien de nominatif (le résumé complet contient le nom du fichier et les anomalies de lecture) */
+const resumePublic = (x) => ({ weekId: x.weekId, year: x.year, week: x.week, monday: x.monday, sunday: x.sunday });
+
 /* ------------------------------------------------------------ API */
 const ID = /^\d{4}-S\d{2}$/;
 async function api(req, res, url) {
@@ -106,10 +139,13 @@ async function api(req, res, url) {
 
   if (route === 'etat' && req.method === 'GET') {
     const w = await p.query('select resume from recap.semaines order by week_id desc');
+    if (!admin) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
     const c = await p.query("select valeur from recap.config where cle = 'regles'");
     return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: c.rows[0]?.valeur || null });
   }
+  if (route === 'vitrine' && req.method === 'GET') return json(req, res, 200, await vitrine(p));
   if (route === 'semaine' && req.method === 'GET') {
+    if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     const d = await p.query('select data from recap.details where week_id = $1 order by agence_slug', [id]);
@@ -132,6 +168,7 @@ async function api(req, res, url) {
       }
       await c.query('commit');
     } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }
+    vitrineCache = null;
     return json(req, res, 200, { ok: true, weekId: resume.weekId });
   }
   if (route === 'semaine' && req.method === 'DELETE') {
@@ -139,12 +176,14 @@ async function api(req, res, url) {
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     await p.query('delete from recap.semaines where week_id = $1', [id]);   // les détails suivent (cascade)
+    vitrineCache = null;
     return json(req, res, 200, { ok: true });
   }
   if (route === 'regles' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de modifier les règles.' });
     const body = await readBody(req);
     await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ ...body, majLe: new Date().toISOString() }]);
+    vitrineCache = null;
     return json(req, res, 200, { ok: true });
   }
   return json(req, res, 404, { error: 'Adresse inconnue.' });

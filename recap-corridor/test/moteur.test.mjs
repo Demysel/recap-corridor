@@ -8,8 +8,8 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
-const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet};', ctx);
+const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -268,4 +268,21 @@ test('codes classés : repos (RP, RF, JF, RCL, RCC), congés (CP, CPAT, CFAM, CS
   assert.equal(a.joursRepos, 3);
   assert.equal(a.joursCP, 2);
   assert.equal(a.joursAbsence, 2);
+});
+
+/* ---- vitrine anonyme (code visiteur) ---- */
+test('vitrine : aucune donnée nominative, groupes d’au moins 5 agents, petits groupes fusionnés ou écartés', () => {
+  const ag = (mat, nom, agence, met) => ({ mat, nom, ag: agence, met, j: [svc(['T', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), null, 'RP', 'RP', 'RP', 'RP'] });
+  const agents = [...[1, 2, 3, 4, 5, 6].map((i) => ag('10' + i, 'NOMSECRET' + i, 'Hendaye', 'CONDUCTEUR')),
+    ...[1, 2].map((i) => ag('20' + i, 'NOMSECRET' + i, 'Hendaye', 'AFR')),
+    ...[1, 2, 3].map((i) => ag('30' + i, 'NOMSECRET' + i, 'Dax', 'CONDUCTEUR'))];
+  const v = E.vitrineData([E.parseWeek(week([2026, 9, 7], agents))], E.loadRules({ residences: { Hendaye: 'HENDAYE', Dax: 'DAX' } }));
+  const txt = JSON.stringify(v);
+  assert.ok(!/NOMSECRET|"10[1-6]"|matricule|"nom"/.test(txt), 'aucun nom ni matricule');
+  assert.ok(v.cells.every((c) => c.n >= 5));
+  assert.equal(v.cells.length, 1);                       // Hendaye tous métiers (6 + 2), Dax (3) écarté
+  assert.equal(v.cells[0].me, 'Tous métiers');
+  assert.equal(v.cells[0].n, 8);
+  assert.equal(v.ecartes, 3);
+  assert.equal(v.cells[0].s.nbRHR, 6);
 });

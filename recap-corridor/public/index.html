@@ -376,6 +376,19 @@ table.cmp td.lo{background:color-mix(in srgb,var(--accent) 14%,var(--surface))!i
 table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
 .hi-k,.lo-k{padding:0 6px;border-radius:4px}.hi-k{background:color-mix(in srgb,var(--signal) 22%,var(--surface))}.lo-k{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
 .up{color:var(--signal-ink);font-weight:600}.dn{color:var(--accent);font-weight:600}
+.vhero{position:relative;overflow:hidden;border-radius:18px;padding:26px 26px 22px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-end;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);color:var(--on-accent);box-shadow:var(--shadow)}
+.vhero::after{content:"";position:absolute;right:-40px;top:22px;width:420px;height:2px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.45) 0 14px,transparent 14px 26px);transform:rotate(-8deg)}
+.vh-t{position:relative;z-index:1;max-width:62ch}
+.vh-e{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.vhero h2{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:6px}
+.vhero p{margin-top:8px;font-size:13.5px;opacity:.9}
+.vh-p{position:relative;z-index:1;display:inline-flex;gap:8px;align-items:center;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:7px 13px;max-width:440px}
+.vfil{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.vkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.vk-r{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.spk{width:110px;height:30px;flex:none;overflow:visible}
+.vfoot{font-size:12px;color:var(--ink-3);line-height:1.6;max-width:110ch;padding:4px 2px 0}
 .lnk{border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit}
 .lnk:hover .nm{color:var(--accent);text-decoration:underline}
 .sub-h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 8px}
@@ -1309,6 +1322,26 @@ function reconcileJB(weeks,rules){
   }
 }
 
+/** Noms d'agence des anciens fichiers (« Agence Bordeaux ») rattachés au nom récent qui commence pareil
+    (sans majuscules, accents, ponctuation ; « Saint » = « St ») ; sinon « Agence » est retiré */
+const normAg=s=>deacc(String(s)).toUpperCase().replace(/\bSAINTE?\b/g,'ST').replace(/[^A-Z0-9]/g,'');
+function autoAliasFrom(names){
+  const raw=[...new Set(names)], known=raw.filter(a=>!/^agence\s/i.test(a)), out={};
+  for(const a of raw){ if(!/^agence\s/i.test(a)) continue;
+    const base=a.replace(/^agence\s+/i,'').trim(), k=normAg(base);
+    const c=known.filter(x=>normAg(x).startsWith(k));
+    out[a]=c.length===1?c[0]:base; }
+  return out;
+}
+/** Règles lues sur le serveur : complète les champs récents (même fonction côté page et côté serveur) */
+function loadRules(r){
+  const o={...structuredClone(DEFAULT_RULES),...(r||{})};
+  o.corrections={rhr:{},jb:{},liens:[],...(r&&r.corrections||{})};
+  // version 3 (accord d'entreprise, art. 18 et annexe 1) : un RHR dure au moins 8 h
+  if(!r||!(r.rulesVersion>=3)){ o.rhrMinHours=8; o.rulesVersion=3; }
+  return o;
+}
+
 /* ==========================================================================
    4. AGRÉGATIONS
    ========================================================================== */
@@ -1392,6 +1425,64 @@ function mergeAcrossWeeks(rows){
     out.push(p);
   }
   return out;
+}
+
+/* ==========================================================================
+   5. VITRINE — statistiques anonymes du code visiteur (calculées sur le serveur)
+   Aucun nom, matricule ni ligne individuelle ne sort : chaque cellule publiée réunit au moins
+   VITRINE_K agents d'une même semaine. Les petits groupes sont fusionnés (« Autres métiers »,
+   « Tous métiers », « Autres agences ») ou écartés s'ils restent trop petits.
+   ========================================================================== */
+const VITRINE_K=5;
+const V_AMP=[6,8,9,10,11], V_HP=[20,30,35,40,45];
+const binOf=(v,b)=>{let i=0; while(i<b.length&&v>=b[i]) i++; return i;};
+const H24=()=>Array(24).fill(0), D7=()=>Array.from({length:7},H24);
+function cellStats(list,w,ag,me){
+  const c={w,ag,me,n:list.length,rhrApp:0,avecRHR:0,avecJB:0,avecSup:0,s:{},
+    heat:{presence:H24(),prise:H24(),fin:H24(),rhr:H24()}, dow:{presence:D7(),prise:D7()},
+    dist:{amp:Array(6).fill(0),hp:Array(6).fill(0),rhrB:[0,0,0],rhrN:Array(5).fill(0),jbN:Array(4).fill(0)}};
+  for(const f of FIELDS) c.s[f.k]=0;
+  for(const a of list){
+    for(const f of FIELDS) c.s[f.k]+=a[f.k]||0;
+    if(a.rhrApplicable){ c.rhrApp++; if(a.nbRHR>0) c.avecRHR++; c.dist.rhrN[Math.min(4,a.nbRHR)]++;
+      for(const x of a.rhr){ if(x.dureeH!=null) c.dist.rhrB[x.dureeH<12?0:x.dureeH<24?1:2]++; c.heat.rhr[new Date(x.debut).getUTCHours()]++; } }
+    if(a.journeesBlanches>0) c.avecJB++; if(a.heuresSup>0) c.avecSup++;
+    c.dist.jbN[Math.min(3,a.journeesBlanches)]++;
+    if(a.joursService) c.dist.hp[binOf(a.heuresPlanifiees,V_HP)]++;
+    for(const j of a.jours){ if(j.kind!=='SERVICE') continue;
+      c.dist.amp[binOf(j.amplitude,V_AMP)]++;
+      const p=new Date(j.missions[0].start), e=new Date(j.missions[j.missions.length-1].end);
+      c.heat.prise[p.getUTCHours()]++; c.dow.prise[(p.getUTCDay()+6)%7][p.getUTCHours()]++; c.heat.fin[e.getUTCHours()]++;
+      for(const m of j.missions) for(const [s0,s1] of workSegments(m)) for(let t=Math.floor(s0/H)*H;t<s1;t+=H){
+        const o=ovl(t,t+H,s0,s1)/H; if(o<=0) continue; const d=new Date(t);
+        c.heat.presence[d.getUTCHours()]+=o; c.dow.presence[(d.getUTCDay()+6)%7][d.getUTCHours()]+=o; } }
+  }
+  for(const f of FIELDS) c.s[f.k]=r2(c.s[f.k]);
+  c.heat.presence=c.heat.presence.map(r2); c.dow.presence=c.dow.presence.map(r=>r.map(r2));
+  return c;
+}
+/** weeks : lectures brutes [{meta, agents}] ; rules : règles chargées (loadRules) */
+function vitrineData(weeks,rulesIn,K=VITRINE_K){
+  const rules={...rulesIn,agencesAlias:{...autoAliasFrom(weeks.flatMap(w=>w.agents.map(a=>a.agence))),...(rulesIn.agencesAlias||{})}};
+  const map=new Map();
+  for(const w of [...weeks].sort((a,b)=>a.meta.weekId.localeCompare(b.meta.weekId))){
+    const v=applyRules(w,rules); v.agents.forEach(a=>a.weekId=w.meta.weekId); map.set(w.meta.weekId,v); }
+  reconcile(map,rules);
+  const cells=[]; let ecartes=0;
+  for(const [id,v] of map){
+    const autres=[];
+    for(const [ag,l] of groupBy(v.agents,a=>a.agence)){
+      if(l.length<K){ autres.push(...l); continue; }
+      const byMe=[...groupBy(l,a=>a.metier)], big=byMe.filter(([,x])=>x.length>=K), small=byMe.filter(([,x])=>x.length<K).flatMap(([,x])=>x);
+      if(!small.length) big.forEach(([me,x])=>cells.push(cellStats(x,id,ag,me)));
+      else if(small.length>=K){ big.forEach(([me,x])=>cells.push(cellStats(x,id,ag,me))); cells.push(cellStats(small,id,ag,'Autres métiers')); }
+      else cells.push(cellStats(l,id,ag,'Tous métiers'));
+    }
+    if(autres.length>=K) cells.push(cellStats(autres,id,'Autres agences','Tous métiers')); else ecartes+=autres.length;
+  }
+  return {k:K, ecartes, cells,
+    semaines:[...map.values()].map(v=>({weekId:v.meta.weekId,year:v.meta.year,week:v.meta.week,monday:v.meta.monday,sunday:v.meta.sunday})),
+    regles:{rhrMinHours:rules.rhrMinHours,seuilHebdo:rules.seuilHebdo,heuresATCMD:rules.heuresATCMD,nuitAFR:rules.nuitAFR,nuitCDR:rules.nuitCDR}};
 }
 
 /* ==========================================================================
@@ -1539,6 +1630,11 @@ const backend={
     await ADB.doc('semaines/'+id).delete();
     return {ok:true};
   },
+  async vitrine(){
+    if(backend.mode!=='artifact') return backend.call('vitrine');
+    await ensureLoaded(S.weeks.map(w=>w.weekId));
+    return JSON.parse(JSON.stringify(vitrineData([...S.parsedCache.values()],S.rules)));
+  },
   async saveRegles(r){
     if(backend.mode!=='artifact') return backend.call('regles',{method:'PUT',body:JSON.stringify(r)});
     await ADB.doc('config/regles').set({...r,majLe:new Date().toISOString()});
@@ -1559,6 +1655,7 @@ const S={
   mode:'total',
   chart:{metric:'nbRHR',top:25},
   st:{metric:'nbRHR',mode:'total',echelle:'semaine',groupe:'agence',heat:'presence'},
+  vit:null, vf:{w:'__all__',ags:null,me:null,heat:'presence'},
 };
 function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
 function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
@@ -1568,29 +1665,12 @@ function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
 /** Anciens fichiers : « Agence Bordeaux » est rattachée automatiquement à « Bordeaux-St-Jean » quand un seul nom
     connu commence pareil (sans majuscules, accents, ponctuation ; « Saint » = « St »). Sinon « Agence » est retiré.
     Une correspondance saisie dans les Réglages l'emporte toujours. */
-const normAg=s=>deacc(String(s)).toUpperCase().replace(/\bSAINTE?\b/g,'ST').replace(/[^A-Z0-9]/g,'');
-function autoAlias(extra=[]){
-  const raw=[...new Set([...S.weeks.flatMap(w=>w.agences||[]),...extra])];
-  const known=raw.filter(a=>!/^agence\s/i.test(a)), out={};
-  for(const a of raw){ if(!/^agence\s/i.test(a)) continue;
-    const base=a.replace(/^agence\s+/i,'').trim(), k=normAg(base);
-    const c=known.filter(x=>normAg(x).startsWith(k));
-    out[a]=c.length===1?c[0]:base; }
-  return out;
-}
+function autoAlias(extra=[]){ return autoAliasFrom([...S.weeks.flatMap(w=>w.agences||[]),...extra]); }
 /** Règles effectivement appliquées : réglages + correspondances d'agences automatiques */
 const effRules=(extra)=>({...S.rules,agencesAlias:{...autoAlias(extra),...(S.rules.agencesAlias||{})}});
 const agName=a=>effRules().agencesAlias[a]||a;
 const allAgences=()=>{const al=effRules().agencesAlias;return [...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].sort();};
 const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMetier(m)||m))].sort();
-/** Règles lues sur le serveur : complète les champs récents ; la durée minimale d'un RHR passe à 4 h (septembre 2026) */
-function loadRules(r){
-  const o={...structuredClone(DEFAULT_RULES),...(r||{})};
-  o.corrections={rhr:{},jb:{},liens:[],...(r&&r.corrections||{})};
-  // version 3 (accord d'entreprise, art. 18 et annexe 1) : un RHR dure au moins 8 h
-  if(!r||!(r.rulesVersion>=3)){ o.rhrMinHours=8; o.rulesVersion=3; }
-  return o;
-}
 const activeWeeks=()=>S.selWeek==='__all__'?S.weeks.map(w=>w.weekId):[S.selWeek];
 const SER=['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
 const agenceColor=ag=>`var(${SER[Math.max(0,allAgences().indexOf(ag))%8]})`;
@@ -1708,13 +1788,13 @@ const el=id=>document.getElementById(id);
 const TABS=[
   {k:'synthese',l:'Synthèse'},{k:'agents',l:'Agents'},{k:'rhr',l:'RHR'},
   {k:'blanches',l:'Journées blanches'},{k:'graphiques',l:'Graphiques'},
-  {k:'stats',l:'Statistiques'},{k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
+  {k:'stats',l:'Statistiques'},{k:'vitrine',l:'Vitrine'},{k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
-  import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
+  vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
 /** Mesures des statistiques (graphiques) */
@@ -1749,15 +1829,15 @@ function stable(id,cols,rows,opt={}){
 function renderTabs(){
   const sc=scopeAgents();
   const cnt={agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
-  el('tabs').innerHTML=TABS.filter(t=>S.role==='admin'||!['import','reglages'].includes(t.k))
+  el('tabs').innerHTML=TABS.filter(t=>S.role==='admin'||['vitrine','lecture'].includes(t.k))
     .map(t=>`${t.k==='import'?'<span class="tsep" aria-hidden="true"></span>':''}<button class="tab${['import','reglages'].includes(t.k)?' adm':''}" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}"><span class="stn" aria-hidden="true"></span><span class="tl">${t.l}</span>${
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt">${nf(cnt[t.k])}</span>`:''}</button>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
   el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=TAB_CTX[S.tab]||'';
-  el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}">${S.role==='admin'?'Accès complet':'Lecture seule'}</span>`:'';
+  el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}">${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}</span>`:'';
 }
 function renderFilters(){
-  if(!S.weeks.length){ el('filters').innerHTML=''; return; }
+  if(!S.weeks.length||S.role!=='admin'||['vitrine','lecture'].includes(S.tab)&&S.role!=='admin'||S.tab==='vitrine'){ el('filters').innerHTML=''; return; }
   const ags=allAgences(), mets=allMetiers();
   const selA=scopeAgences(), selM=scopeMetiers();
   const resume=`${selA.length===ags.length?'Toutes les agences':selA.length===1?selA[0]:selA.length+' agences'} · ${selM.length===mets.length?'tous métiers':selM.join(', ')}`;
@@ -2220,7 +2300,7 @@ function videsView(x){
 }
 /** Enregistre une correction : recalcul immédiat, puis mémorisation sur le serveur pour tous les utilisateurs */
 async function saveCorrection(msg){
-  recomputeLoaded(); render();
+  recomputeLoaded(); S.vit=null; render();
   try{ await api.saveRegles(S.rules); S.msg={m:msg+' — mémorisé pour tous les utilisateurs.'}; }
   catch(err){ S.msg={m:'Correction appliquée ici mais non enregistrée : '+err.message,t:'c'}; }
   render(); setTimeout(()=>{S.msg=null;render();},4000);
@@ -2333,7 +2413,7 @@ function viewGuide(){
   const card=(t,s2,svg,cap)=>`<section class="card"><div class="card-h"><div><h2>${t}</h2><p class="card-s">${s2}</p></div></div>
     <div class="card-b"><div class="dg">${svg}</div><p class="cap">${cap}</p></div></section>`;
   return `
-  ${S.weeks.length?`<section class="card"><div class="card-h"><div><h2>Fiabilité de la lecture</h2><p class="card-s">sur le périmètre et les semaines affichés</p></div></div>
+  ${S.weeks.length&&S.role==='admin'?`<section class="card"><div class="card-h"><div><h2>Fiabilité de la lecture</h2><p class="card-s">sur le périmètre et les semaines affichés</p></div></div>
     <div class="card-b">${qualite()}</div></section>`:''}
   <section class="card"><div class="card-h"><div><h2>Du fichier aux chiffres</h2><p class="card-s">le trajet d’une semaine importée</p></div></div>
     <div class="card-b"><div class="dg">${dgFlux()}</div><p class="cap">Le fichier Excel est lu dans votre navigateur : <b>seules les données extraites</b> sont enregistrées. Les règles sont appliquées à chaque affichage — modifier un réglage ne demande jamais de réimporter.</p></div></section>
@@ -2494,6 +2574,103 @@ function viewStats(){
   </div>
   <section class="card"><div class="card-h"><div><h2>Classement — ${esc(M.l)}</h2><p class="card-s">${mode==='total'?'total':'par semaine'} · 15 premiers sur ${nf(ranked.length)} · moyenne ${fmt(r2(moyP))} · médiane ${fmt(r2(MED(ranked.map(x=>x.v))))}</p></div></div>
     <div class="card-b">${barChart(topN,{fmt,label:M.l})}</div></section>`;
+}
+
+/* ---------- vitrine : statistiques anonymes (code visiteur, et aperçu pour l'administrateur) ---------- */
+function vAgg(cells){
+  const o={n:0,rhrApp:0,avecRHR:0,avecJB:0,avecSup:0,s:{},w:new Set(cells.map(c=>c.w)).size||1,
+    heat:{presence:H24(),prise:H24(),fin:H24(),rhr:H24()},dow:{presence:D7(),prise:D7()},dist:{amp:Array(6).fill(0),hp:Array(6).fill(0),rhrB:[0,0,0],rhrN:Array(5).fill(0),jbN:Array(4).fill(0)}};
+  for(const f of FIELDS) o.s[f.k]=0;
+  for(const c of cells){ o.n+=c.n; o.rhrApp+=c.rhrApp; o.avecRHR+=c.avecRHR; o.avecJB+=c.avecJB; o.avecSup+=c.avecSup;
+    for(const f of FIELDS) o.s[f.k]+=c.s[f.k]||0;
+    for(const k in o.heat) o.heat[k]=o.heat[k].map((v,i)=>v+c.heat[k][i]);
+    for(const k in o.dow) o.dow[k]=o.dow[k].map((r,d)=>r.map((v,i)=>v+c.dow[k][d][i]));
+    for(const k in o.dist) o.dist[k]=o.dist[k].map((v,i)=>v+c.dist[k][i]); }
+  return o;
+}
+const pct=(a,b)=>b?100*a/b:null;
+/** Indicateurs publiés : tous rapportés (par semaine, par agent, par journée) pour être comparables */
+const VKPI=[
+  {k:'agents',l:'Agents par semaine',v:g=>g.n/g.w,f:v=>nf(v,v<10?1:0),d:g=>`${nf(g.s.joursService/g.w)} journées de service par semaine`},
+  {k:'rhr',l:'Repos hors résidence',v:g=>g.s.nbRHR/g.w,f:v=>nf(v,1),u:'par semaine',d:g=>`${g.rhrApp?nf(pct(g.avecRHR,g.rhrApp),0):'—'} % des conducteurs en ont chaque semaine`},
+  {k:'rhrd',l:'Durée moyenne d’un RHR',v:g=>{const n=g.dist.rhrB.reduce((s,x)=>s+x,0);return n?g.s.rhrHeures/n:null;},f:fmtH,d:g=>`${nf(g.avecRHR?g.s.nbRHR/g.avecRHR:0,1)} RHR par conducteur concerné et par semaine`},
+  {k:'jb',l:'Journées blanches',v:g=>g.s.joursService?100*g.s.journeesBlanches/g.s.joursService:null,f:v=>nf(v,1),u:'pour 100 journées',d:g=>`${nf(pct(g.avecJB,g.n),0)} % des agents concernés chaque semaine`},
+  {k:'sup',l:'Heures sup par agent',v:g=>g.s.heuresSup/g.n,f:fmtH,u:'par semaine',d:g=>`${nf(pct(g.avecSup,g.n),0)} % des agents au-delà du seuil hebdomadaire`},
+  {k:'amp',l:'Amplitude d’une journée',v:g=>g.s.joursService?g.s.amplitudeTotale/g.s.joursService:null,f:fmtH,d:g=>`${fmtH(g.s.heuresPlanifiees/g.n)} planifiées par agent et par semaine`},
+  {k:'nuit',l:'Part du travail de nuit',v:g=>pct(g.s.heuresNuit,g.s.heuresPlanifiees),f:v=>nf(v,1)+' %',d:g=>`${fmtH(g.s.heuresDimanche/g.n)} le dimanche par agent et par semaine`},
+  {k:'pan',l:'Paniers repas',v:g=>g.s.joursService?g.s.nbPaniers/g.s.joursService:null,f:v=>nf(v,2),u:'par journée',d:g=>`${nf(pct(g.s.nbTrajetsSeuls,g.s.nbMissions),1)} % des missions sont des trajets seuls`},
+];
+function spark(vals){
+  const v=vals.map(x=>x==null?null:+x), ok=v.filter(x=>x!=null); if(ok.length<2) return '';
+  const mn=Math.min(...ok), mx=Math.max(...ok), W=110, Hs=30, X=i=>2+i*(W-4)/(v.length-1), Y=x=>mx===mn?Hs/2:Hs-3-(x-mn)/(mx-mn)*(Hs-6);
+  const pts=v.map((x,i)=>x==null?null:`${X(i).toFixed(1)},${Y(x).toFixed(1)}`).filter(Boolean);
+  const li=v.length-1-[...v].reverse().findIndex(x=>x!=null);
+  return `<svg class="spk" viewBox="0 0 ${W} ${Hs}" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${X(li).toFixed(1)}" cy="${Y(v[li]).toFixed(1)}" r="3" fill="var(--accent)" stroke="var(--surface)" stroke-width="1.5"/></svg>`;
+}
+async function loadVitrine(force){
+  if(S.vit&&!force) return;
+  try{ S.vit=await withLoad(api.vitrine()); }catch(e){ S.msg={m:'Statistiques indisponibles : '+e.message,t:'c'}; }
+}
+function viewVitrine(){
+  const V=S.vit;
+  if(!V) return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Chargement des statistiques…</h3></div></section>`;
+  if(!V.cells.length) return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Aucune statistique publiable</h3><p>Aucune semaine enregistrée, ou des groupes de moins de ${V.k} agents.</p></div></section>`;
+  const vf=S.vf, sem=V.semaines.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId));
+  const AG=[...new Set(V.cells.map(c=>c.ag))].sort((a,b)=>a==='Autres agences'?1:b==='Autres agences'?-1:a.localeCompare(b,'fr'));
+  const ME=[...new Set(V.cells.map(c=>c.me))].sort();
+  const inAg=c=>!vf.ags||vf.ags.includes(c.ag), inMe=c=>!vf.me||vf.me.includes(c.me);
+  const scopeC=V.cells.filter(c=>inAg(c)&&inMe(c)), cur=scopeC.filter(c=>vf.w==='__all__'||c.w===vf.w);
+  if(!cur.length) return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Rien à afficher pour ce choix</h3><p>Élargissez les agences ou les métiers.</p></div></section>`;
+  const g=vAgg(cur), perW=sem.map(w=>{const l=scopeC.filter(c=>c.w===w.weekId);return l.length?vAgg(l):null;});
+  const wl=w=>`S${String(w.week).padStart(2,'0')} ${w.year}`;
+  const periode=vf.w==='__all__'?`${sem.length} semaine${sem.length>1?'s':''} · du ${dFull(sem[0].monday)} au ${dFull(sem[sem.length-1].sunday)}`:(()=>{const w=sem.find(x=>x.weekId===vf.w);return `${wl(w)} · du ${dFull(w.monday)} au ${dFull(w.sunday)}`;})();
+  const chips=(attr,list,sel)=>list.map(x=>`<button class="chip" data-${attr}="${esc(x)}" aria-pressed="${!sel||sel.includes(x)}">${esc(x)}</button>`).join('');
+  // cartes de chaleur
+  const byAg=[...groupBy(cur,c=>c.ag)].sort((a,b)=>AG.indexOf(a[0])-AG.indexOf(b[0]));
+  const HT=vf.heat, pres=HT==='presence';
+  const hRows=byAg.map(([ag,l])=>{const a=vAgg(l);return {l:ag,v:a.heat[HT].map(x=>r2(x/(pres?a.w*7:a.w)))};});
+  const dRows=JS.map((l,i)=>({l,v:(HT==='prise'||HT==='presence'?g.dow[HT][i]:H24()).map(x=>r2(x/g.w))}));
+  const HU=pres?'agents en service en moyenne':HT==='prise'?'prises de service par semaine':HT==='fin'?'fins de service par semaine':'départs en RHR par semaine';
+  const hf=v=>nf(v,v<10?1:0);
+  // comparaison des agences
+  const cmpK=['agents','rhr','rhrd','jb','sup','amp','nuit','pan'].map(k=>VKPI.find(x=>x.k===k));
+  const rowsA=byAg.map(([ag,l])=>{const a=vAgg(l);return {ag,vals:cmpK.map(k=>k.v(a))};});
+  const ext=cmpK.map((_,i)=>{const v=rowsA.map(r=>r.vals[i]).filter(x=>x!=null);return v.length>1?[Math.min(...v),Math.max(...v)]:[null,null];});
+  // RHR par semaine et par agence
+  const top=AG.filter(a=>cur.some(c=>c.ag===a)).slice(0,8);
+  const series0=top.map((ag,i)=>({name:ag,short:ag.length>10?ag.slice(0,9)+'…':ag,color:`var(${SER[i%8]})`,values:sem.map(w=>{const l=scopeC.filter(c=>c.w===w.weekId&&c.ag===ag);return l.length?r2(vAgg(l).s.nbRHR):null;})}));
+  const series=series0.filter(x=>x.values.filter(v=>v!=null).length>1);   // une courbe demande au moins deux semaines
+  const HEAT=[['presence','Agents en service'],['prise','Prises de service'],['fin','Fins de service'],['rhr','Départs en RHR']];
+  return `
+  <section class="vhero">
+    <div class="vh-t"><span class="vh-e">Le corridor en chiffres</span><h2>Activité, repos et temps de travail des équipes</h2>
+      <p>${esc(periode)} · ${nf(g.n/g.w,0)} agents par semaine en moyenne</p></div>
+    <div class="vh-p"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 3 3.7v4c0 3 2.2 5.4 5 6.5 2.8-1.1 5-3.5 5-6.5v-4L8 1.8Z"/><path d="m5.8 8 1.6 1.6L10.4 6.5"/></svg>
+      Statistiques anonymes : aucun nom, aucun matricule ; chaque chiffre réunit au moins ${V.k} agents.</div>
+  </section>
+  <section class="card"><div class="card-b vfil">
+    <label class="fld"><span class="flabel">Période</span><select id="vWeek"><option value="__all__">Toutes les semaines</option>${sem.slice().reverse().map(w=>`<option value="${w.weekId}"${vf.w===w.weekId?' selected':''}>${wl(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
+    <div class="fld grow"><span class="flabel">Agences</span><div class="frow">${chips('vag',AG,vf.ags)}<button class="chip chip-mini ghost" data-vag="*">Toutes</button></div></div>
+    <div class="fld"><span class="flabel">Métiers</span><div class="frow">${chips('vme',ME,vf.me)}</div></div></div></section>
+  <div class="vkpis">${VKPI.map(k=>{const v=k.v(g);return `<div class="kpi vk"><div class="k">${esc(k.l)}${k.u?` <span class="nb" style="text-transform:none;letter-spacing:0">· ${k.u}</span>`:''}</div>
+    <div class="vk-r"><div class="v">${v==null?'—':k.f(v)}</div>${vf.w==='__all__'?spark(perW.map(a=>a?k.v(a):null)):''}</div><div class="n">${k.d(g)}</div></div>`;}).join('')}</div>
+  <section class="card"><div class="card-h"><div><h2>Quand le corridor travaille</h2><p class="card-s">${esc(HU)} · heure par heure · cadre = heure de pointe</p></div>
+    <div class="seg">${HEAT.map(([k,l])=>`<button class="sg" data-vheat="${k}" aria-pressed="${HT===k}">${l}</button>`).join('')}</div></div>
+    <div class="card-b"><div class="ch">Par agence</div>${heatmap(hRows,HU,hf)}
+      ${HT==='presence'||HT==='prise'?`<div class="ch" style="margin-top:18px">Par jour de la semaine</div>${heatmap(dRows,pres?'agents en service en moyenne ce jour-là':HU,hf)}`:''}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Comparer les agences</h2><p class="card-s">indicateurs rapportés par semaine, par agent ou par journée · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span></p></div></div>
+    <div class="card-b"><div class="tw"><table class="cmp"><thead><tr><th class="l">Agence</th>${cmpK.map(k=>`<th>${esc(k.l)}${k.u?`<br><span class="nb">${k.u}</span>`:''}</th>`).join('')}</tr></thead><tbody>
+      ${rowsA.map(r=>`<tr><td class="l nm">${esc(r.ag)}</td>${r.vals.map((v,i)=>{const [mn,mx]=ext[i];const c=v==null||mn===mx?'':v===mx?'hi':v===mn?'lo':'';return `<td class="${c}">${v==null?'<span class="z">—</span>':cmpK[i].f(v)}</td>`;}).join('')}</tr>`).join('')}
+    </tbody></table></div></div></section>
+  <div class="charts">
+    <section class="card"><div class="card-h"><div><h2>Durée des repos hors résidence</h2><p class="card-s">tranches de l’accord d’entreprise (annexe 1)</p></div></div><div class="card-b">${histo(['8–12 h','12–24 h','24 h et plus'].map((l,i)=>({l,v:g.dist.rhrB[i]})),'RHR')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>RHR par conducteur et par semaine</h2><p class="card-s">part des semaines de conducteur</p></div></div><div class="card-b">${histo(['0','1','2','3','4 et +'].map((l,i)=>({l,v:g.dist.rhrN[i]})),'Semaines',v=>nf(v))}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Amplitude des journées de service</h2><p class="card-s">en ambre : au-delà de 11 h (maximum de l’accord, art. 12)</p></div></div><div class="card-b">${histo(['< 6 h','6–8 h','8–9 h','9–10 h','10–11 h','> 11 h'].map((l,i)=>({l,v:g.dist.amp[i],c:i===5?'var(--signal)':null})),'Journées')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>Heures planifiées par semaine</h2><p class="card-s">semaines d’agent · en ambre : au-delà de ${nf(V.regles.seuilHebdo)} h</p></div></div><div class="card-b">${histo(['< 20 h','20–30 h','30–35 h','35–40 h','40–45 h','≥ 45 h'].map((l,i)=>({l,v:g.dist.hp[i],c:i>=3?'var(--signal)':null})),'Semaines')}</div></section>
+  </div>
+  ${series.length?`<section class="card"><div class="card-h"><div><h2>Repos hors résidence semaine après semaine</h2><p class="card-s">une courbe par agence</p></div></div>
+    <div class="card-b">${lineChart(series,sem.map(w=>`S${String(w.week).padStart(2,'0')}`),v=>nf(v))}<div class="clg">${series.map(s=>`<span class="lg"><span class="cdot" style="background:${s.color}"></span>${esc(s.name)}</span>`).join('')}</div></div></section>`:''}
+  <p class="vfoot">Sources : fichiers ARP « Récap National Corridor ». Règles de calcul : repos hors résidence à partir de ${nfa(V.regles.rhrMinHours)} h (accord d’entreprise, art. 18) ; journée blanche = case vide encadrée par deux services ; heures sup au-delà de ${nf(V.regles.seuilHebdo)} h par semaine. Les groupes de moins de ${V.k} agents sont regroupés${V.ecartes?` ou écartés (${nf(V.ecartes)} lignes d’agent-semaine non publiées)`:''}. Détail des méthodes : onglet « Guide de lecture ».</p>`;
 }
 
 /* ---------- exports ---------- */
@@ -2821,7 +2998,7 @@ function render(){
   const v=el('view');
   const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
-    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='import'?viewImport(): viewReglages();
+    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
@@ -2830,7 +3007,7 @@ function render(){
   if(entering){ countUp(v); }
   else v.querySelectorAll('.tw').forEach((t,i)=>{ if(sc[i]){ t.scrollTop=sc[i][0]; t.scrollLeft=sc[i][1]; } });
   el('brandsub').textContent=S.weeks.length
-    ? `${S.weeks.length} semaine${S.weeks.length>1?'s':''} · ${allAgences().length} agences`
+    ? `${S.weeks.length} semaine${S.weeks.length>1?'s':''}${S.role==='admin'?` · ${allAgences().length} agences`:' · statistiques anonymes'}`
     : 'Extraction hebdomadaire ARP';
   if(S.drawer) renderDrawer();
 }
@@ -2872,7 +3049,7 @@ function renderLogin(){
       <input type="password" id="codeIn" placeholder="XXXX-XXXX-XXXX" autocomplete="current-password" autofocus></label>
     ${S.err?`<div class="note c">${esc(S.err)}</div>`:''}
     <button class="btn btn-pri lg-b" id="codeGo"${S.busy?' disabled':''}>${S.busy?'Vérification…':'Entrer'}</button>
-    <p class="lg-n">Cet outil contient des données nominatives d'agents. Le code vous est remis par l'administrateur ; il n'est pas partageable au-delà des personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
+    <p class="lg-n">Le code visiteur ouvre des statistiques anonymes : aucun nom ni matricule. Le code administrateur donne accès au détail nominatif et reste réservé aux personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
   </div>`;
   setTimeout(()=>el('codeIn')?.focus(),30);
 }
@@ -3006,7 +3183,7 @@ async function saveAll(){
   recomputeLoaded();   // les noms d'agence des anciens fichiers se rattachent aux semaines désormais connues
   if(!S.selAgences){ const p=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(p.length) S.selAgences=p; }
   await ensureLoaded(toLoad());
-  S.queue=S.queue.filter(q=>q.state!=='enregistre');
+  S.queue=S.queue.filter(q=>q.state!=='enregistre'); S.vit=null;
   S.msg={m:`${n} semaine${n>1?'s':''} enregistrée${n>1?'s':''}.`};
   if(!S.queue.length&&n) S.tab='synthese';
   savePrefs(); render();
@@ -3020,11 +3197,17 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
+    '[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.dataset.act==='theme'){ el('btnTheme').click(); return; }
   if(t.dataset.jbf){ S.jbFiltre=t.dataset.jbf; render(); return; }
+  if(t.dataset.vheat){ S.vf.heat=t.dataset.vheat; render(); return; }
+  if(t.dataset.vag!=null){ const all=[...new Set(S.vit.cells.map(c=>c.ag))], v=t.dataset.vag;
+    if(v==='*') S.vf.ags=null; else { let c=S.vf.ags||all.slice(); c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.ags=c.length&&c.length<all.length?c:null; }
+    render(); return; }
+  if(t.dataset.vme!=null){ const all=[...new Set(S.vit.cells.map(c=>c.me))], v=t.dataset.vme;
+    let c=S.vf.me||all.slice(); c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.me=c.length&&c.length<all.length?c:null; render(); return; }
   for(const [a,k] of [['stmode','mode'],['stgrp','groupe'],['stech','echelle'],['stheat','heat'],['stm','metric']])
     if(t.dataset[a]!=null){ S.st[k]=t.dataset[a]; savePrefs(); render(); return; }
   if(t.dataset.jbl!=null){ const r=(S.rows_jbl||[])[+t.dataset.jbl]; if(r){ S.drawer=r.a; renderDrawer(); } return; }
@@ -3062,7 +3245,8 @@ document.addEventListener('click',async e=>{
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs();
-    await ensureLoaded(toLoad()); render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
+    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.role==='admin') await ensureLoaded(toLoad());
+    render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; render(); return; }
   if(t.id==='btnReport'){
     const wk=S.selWeek==='__all__'?'toutes-semaines':S.selWeek;
@@ -3102,7 +3286,7 @@ document.addEventListener('click',async e=>{
   if(t.dataset.delno){ S.delAsk=null; render(); return; }
   if(t.dataset.delok){ const id=t.dataset.delok; S.delAsk=null;
     try{ await api.delSemaine(id); S.msg={m:`${id.replace('-',' ')} supprimée.`}; }catch(err){ S.msg={m:err.message,t:'c'}; }
-    S.loaded.delete(id); S.parsedCache.delete(id);
+    S.loaded.delete(id); S.parsedCache.delete(id); S.vit=null;
     const {weeks}=await api.etat(); S.weeks=weeks; recomputeLoaded();
     if(S.selWeek===id) S.selWeek=S.weeks[0]?S.weeks[0].weekId:'__all__';
     await ensureLoaded(toLoad()); render(); setTimeout(()=>{S.msg=null;render();},4000); return; }
@@ -3125,7 +3309,7 @@ document.addEventListener('click',async e=>{
       agencesAlias: (()=>{ const auto=autoAlias(), o={...(S.rules.agencesAlias||{})};
         document.querySelectorAll('[data-agal]').forEach(i=>{ const k=i.dataset.agal, v=i.value.trim();
           if(!v||v===auto[k]) delete o[k]; else o[k]=v; }); return o; })()};
-    recomputeLoaded();
+    recomputeLoaded(); S.vit=null;
     try{ await api.saveRegles(S.rules); S.msg={m:'Règles enregistrées — elles s’appliquent à tous les utilisateurs.'}; }
     catch(err){ S.msg={m:err.message,t:'c'}; }
     render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
@@ -3133,6 +3317,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
+  if(e.target.id==='vWeek'){ S.vf.w=e.target.value; render(); return; }
   if(e.target.id==='stMetric'){ S.st.metric=e.target.value; savePrefs(); render(); return; }
   if(e.target.id==='cTop'){ S.chart.top=+e.target.value; savePrefs(); render(); return; }
 });
@@ -3191,8 +3376,9 @@ async function boot(){
     if(S.selMetiers&&!S.selMetiers.length) S.selMetiers=null;
     if(!S.selAgences){ const pr=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
     if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
-    if(S.role!=='admin'&&['import','reglages'].includes(S.tab)) S.tab='synthese';
-    await ensureLoaded(toLoad());
+    if(S.role!=='admin'){ if(S.tab!=='lecture') S.tab='vitrine'; render(); await loadVitrine(true); }
+    else if(S.tab==='vitrine'){ render(); await loadVitrine(true); }
+    else await ensureLoaded(toLoad());
   }catch(e){ S.msg={m:'Chargement impossible : '+e.message,t:'c'}; }
   render();
 }
