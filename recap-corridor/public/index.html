@@ -269,6 +269,7 @@ tbody tr.clk td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-
 tbody tr.clk:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .tot td{font-weight:700;background:var(--surface-3)!important;border-top:1px solid var(--line-2)}
 .nm{font-weight:700}
+th.sub,td.sub{color:var(--ink-3);font-size:12px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:baseline}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;line-height:1.6}
 .pill-w{background:var(--signal-soft);color:var(--signal-ink)}
@@ -547,6 +548,7 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .ml2 .k{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .ml2 .v{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:-.02em}
 .ml2 .v small{font-size:11.5px;font-weight:500}
+.ml2 .codes{grid-column:1/-1}.ml2 .codes .v{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15px}.ml2 .codes .v b{margin-left:2px}
 .dw>*{flex-shrink:0}
 .dwp{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .dwp select{max-width:320px}
@@ -1957,6 +1959,7 @@ const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includ
     semaine suivante, quel que soit l'affichage, pour que les chiffres d'une semaine ne dépendent pas de la vue */
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
   const ids=S.weeks.map(w=>w.weekId).sort(), out=new Set(activeWeeks());
+  if(S.tab==='agents') for(const id of periodWeeks('y:'+anneeCP(),S.weeks)) out.add(id);
   for(const id of activeWeeks()){ const i=ids.indexOf(id); if(i>0) out.add(ids[i-1]); if(i>=0&&i<ids.length-1) out.add(ids[i+1]); }
   return [...out]; };
 /* ==========================================================================
@@ -2202,7 +2205,7 @@ function viewSynthese(){
 }
 
 /* ---------- agents : une ligne par personne ---------- */
-const pv=(a,k)=>S.mode==='total'?(a[k]||0):r2((a[k]||0)/(a.nbSemaines||1));
+const pv=(a,k)=>S.mode==='total'||k==='cpAnnee'?(a[k]||0):r2((a[k]||0)/(a.nbSemaines||1));
 const numF=(k,fmt)=>a=>{const v=pv(a,k);return v?(fmt?fmt(v):nfa(v)):'<span class="z">'+(fmt?'—':'0')+'</span>';};
 const COLS=[
   {g:'identite',k:'nom',l:'Agent',cls:'l',st:1,f:a=>`<span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}${a.fusion?' <span class="pill pill-n" title="Lignes en double dans le fichier, fusionnées">fusion</span>':''}`,t:a=>`${a.nom} ${a.prenom}`},
@@ -2234,12 +2237,17 @@ const COLS=[
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
   {g:'absences',k:'journeesBlanches',l:'J. blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
   {g:'absences',k:'joursRepos',l:'Repos'},
+  ...FAM_REPOS.map(c=>({g:'absences',k:'c_'+c,l:c,cls:'sub'})),
   {g:'absences',k:'joursCP',l:'Congés'},
+  {g:'absences',k:'c_CP',l:'CP',cls:'sub'},
+  {g:'absences',k:'cpAnnee',l:'CP année',f:a=>a.cpAnnee?`<b>${nf(a.cpAnnee)}</b>`:'<span class="z">0</span>',t:a=>a.cpAnnee},
   {g:'absences',k:'joursAbsence',l:'Absences'},
   {g:'absences',k:'joursVides',l:'Cases vides'},
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
+/** Année du compte « CP de l'année » : celle (jeudi) de la dernière semaine de la période sélectionnée */
+const anneeCP=()=>{ const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?jeudi(w).slice(0,4):String(new Date().getUTCFullYear()); };
 function sortAgents(list){
   const {k,dir}=S.sort, col=COLS.find(c=>c.k===k);
   const val=a=>col&&col.t?col.t(a):(typeof a[k]==='number'?pv(a,k):a[k]);
@@ -2249,7 +2257,11 @@ function sortAgents(list){
 }
 function viewAgents(){
   const sc=scopeAgents(); if(!sc.length) return emptyScope();
-  const list=sortAgents(mergeAcrossWeeks(sc)), cols=visCols(), nW=nbWeeksLoaded();
+  // détail des codes (RP, RF, JF, RCL, RCC, CP) et CP pris sur toute l'année de la période
+  const yr=anneeCP(), yIds=new Set(periodWeeks('y:'+yr,S.weeks)), cpY=new Map();
+  for(const [id,v] of S.loaded) if(yIds.has(id)) for(const x of v.agents) if(!x.exclu){ const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); }
+  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0; return o; });
+  const list=sortAgents(merged), cols=visCols().map(c=>c.k==='cpAnnee'?{...c,l:'CP '+yr}:c), nW=nbWeeksLoaded();
   S.rows_agents=list;
   const spans=[]; let cur=null;
   for(const c of cols){ if(!cur||cur.g!==c.g){cur={g:c.g,n:0};spans.push(cur);} cur.n++; }
@@ -3925,6 +3937,7 @@ function closeDrawer(){
   d.classList.add('out'); setTimeout(()=>d.remove(),200);
 }
 /** Détail d'un agent : ses totaux, puis chacune de ses semaines */
+const codeOrd=k=>FAM_REPOS.includes(k)?0:FAM_CONGES.includes(k)?1:2;
 function renderDrawer(){
   if(!S.drawer) return;
   // après une correction, la fiche est reconstruite à partir des chiffres recalculés
@@ -3957,6 +3970,9 @@ function renderDrawer(){
       <div><div class="k">Heures du dimanche</div><div class="v">${fmtH(a.heuresDimanche)}</div></div>
       <div><div class="k">Paniers</div><div class="v">${nf(a.nbPaniers)} <small class="mut">${nf(a.ratioPanierJS,2)}/JS</small></div></div>
       <div><div class="k">MHIS · DISPO · ATCMD</div><div class="v">${a.nbMHIS} · ${a.nbDISPO} · ${a.nbATCMD}</div></div>
+      <div class="codes"><div class="k">Codes (repos, congés, absences)</div><div class="v">${Object.keys(a.codeCounts||{}).filter(k=>k!=='HORS').length
+        ?Object.entries(a.codeCounts).filter(([k])=>k!=='HORS').sort((x,y)=>codeOrd(x[0])-codeOrd(y[0])||x[0].localeCompare(y[0])).map(([k,v])=>`<span title="${esc(CODEL[k]||k)}">${esc(k)} <b>${v}</b></span>`).join('')
+        :'<span class="mut" style="font-size:13px">aucun</span>'}</div></div>
     </div>
     ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
       const xk=personKey(x)+'|'+x.weekId, xe=(S.rules.corrections.exclus||{})[xk];

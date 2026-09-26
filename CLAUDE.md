@@ -74,6 +74,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   de service de nuit à hh:mm).
 - Classement des codes (validé) : Repos = RP, RF, JF, RCL, RCC ; Congés = CP, CPAT, CFAM, CSS/CPAR ;
   Absences = tout le reste (MAL, AT, CPRCL…).
+  Onglet Agents (groupe Repos & absences) : détail RP, RF, JF, RCL, RCC, puis CP sur la période et « CP <année> »
+  (CP de toute l'année civile — jeudi — de la dernière semaine sélectionnée). Fiche agent : tuile « Codes » (acronyme + nombre).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
   CPAR et CSS congés sans solde ; SUPP (dans un intitulé de mission) = supplémentaire.
