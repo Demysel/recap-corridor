@@ -67,10 +67,13 @@ test('RHR : coupure ouverte en fin de semaine, clôturée par la semaine suivant
   assert.equal(w2.agents[0].nbRHR, 0);
 });
 
-test('journée blanche : case vide encadrée par deux services, pas le lendemain de nuit', () => {
-  const a = one([svc(['T', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00']), null, svc(['N', 'HENDAYE', 'HENDAYE', 9, '22:00', 10, '05:00']), null, null, svc(['T', 'HENDAYE', 'HENDAYE', 12, '06:00', 12, '12:00']), 'RP'], {}, RES);
-  // mardi : blanche ; jeudi : fin du service de nuit, exclu ; vendredi : blanche
-  assert.equal(JSON.stringify(a.blanches.map((x) => x.d)), "[1,4]");
+test('journée blanche : case vide encadrée par deux services, lendemain de nuit compris (règle validée par l’utilisateur)', () => {
+  const j = [svc(['T', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00']), null, svc(['N', 'HENDAYE', 'HENDAYE', 9, '22:00', 10, '05:00']), null, null, svc(['T', 'HENDAYE', 'HENDAYE', 12, '06:00', 12, '12:00']), 'RP'];
+  const a = one(j, {}, RES);
+  // mardi, jeudi (lendemain du service de nuit, fini à 05:00) et vendredi : blanches
+  assert.equal(JSON.stringify(a.blanches.map((x) => x.d)), "[1,3,4]");
+  // l'ancienne exclusion reste réglable
+  assert.equal(JSON.stringify(one(j, {}, { ...RES, jbExcludeNightOverlap: true }).blanches.map((x) => x.d)), "[1,4]");
 });
 
 test('heures planifiées, pauses, heures sup et ATCMD', () => {
@@ -229,12 +232,14 @@ test('corrections mémorisées : coupure écartée, coupure forcée, missions li
 
 test('journée blanche : corrections jour par jour et raison des cases non comptées', () => {
   const j = [svc(['T', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00']), null, svc(['T', 'HENDAYE', 'HENDAYE', 9, '18:00', 10, '02:00']), null, svc(['T', 'HENDAYE', 'HENDAYE', 11, '06:00', 11, '12:00']), 'RP', null];
-  const a = one(j, {}, RES);
+  const a = one(j, {}, { ...RES, jbExcludeNightOverlap: true });
   assert.equal(a.journeesBlanches, 1);
   assert.equal(a.casesVides.find((c) => c.d === 3).raison, 'fin du service de nuit à 02:00');
+  assert.equal(one(j, {}, RES).journeesBlanches, 2);
   assert.equal(a.casesVides.find((c) => c.d === 6).raison, 'après le dernier service de la semaine');
-  assert.equal(one(j, {}, { ...RES, corrections: { jb: { 'm:1|2026-09-08': 'non' } } }).journeesBlanches, 0);
-  assert.equal(one(j, {}, { ...RES, corrections: { jb: { 'm:1|2026-09-13': 'oui' } } }).journeesBlanches, 2);
+  const N = { ...RES, jbExcludeNightOverlap: true };
+  assert.equal(one(j, {}, { ...N, corrections: { jb: { 'm:1|2026-09-08': 'non' } } }).journeesBlanches, 0);
+  assert.equal(one(j, {}, { ...N, corrections: { jb: { 'm:1|2026-09-13': 'oui' } } }).journeesBlanches, 2);
 });
 
 test('ancien format : jours en ligne 1, dates en ligne 2, métier dans « Commentaires », codes « CP/CP »', () => {

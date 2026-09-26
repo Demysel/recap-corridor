@@ -548,7 +548,10 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .ml2 .k{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .ml2 .v{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:-.02em}
 .ml2 .v small{font-size:11.5px;font-weight:500}
-.ml2 .codes{grid-column:1/-1}.ml2 .codes .v{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15px}.ml2 .codes .v b{margin-left:2px}
+.ml2 .codes{grid-column:1/-1}.ml2 .codes .v{display:flex;flex-wrap:wrap;gap:6px 8px;font-size:15px;margin-top:6px}
+.cd-b{border:1px solid var(--line-2);background:var(--surface-2);border-radius:8px;padding:3px 10px;font-family:var(--mono);font-size:14px}
+.cd-b b{margin-left:3px}.cd-b:hover{border-color:var(--ink-3)}.cd-b[aria-pressed=true]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cd-l{margin-top:4px;display:flex;flex-direction:column;gap:2px;max-height:220px;overflow:auto}
 .dw>*{flex-shrink:0}
 .dwp{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .dwp select{max-width:320px}
@@ -1020,9 +1023,9 @@ const DEFAULT_RULES={
   lieuxResidence:{},          // par agence : autres écritures de la résidence (HE, HENDAYE…) apprises à la correction
   agencesAlias:{},            // nom d'agence du fichier -> nom retenu (anciens fichiers : « Agence Bordeaux »)
   corrections:{rhr:{},jb:{},liens:[]},   // corrections manuelles, mémorisées et rejouées à chaque affichage
-  rulesVersion:3,
+  rulesVersion:4,
   rhrCountPending:true,
-  jbExcludeNightOverlap:true,
+  jbExcludeNightOverlap:false,   // lendemain de service de nuit : journée blanche quand même (validé par l'utilisateur)
   jbRequireFramed:true,
   jbExcludeHorsResidence:true, // une case vide passée hors résidence (pendant un RHR) n'est pas une journée blanche
   residences:{},
@@ -1527,6 +1530,8 @@ function loadRules(r){
   o.corrections={rhr:{},jb:{},liens:[],...(r&&r.corrections||{})};
   // version 3 (accord d'entreprise, art. 18 et annexe 1) : un RHR dure au moins 8 h
   if(!r||!(r.rulesVersion>=3)){ o.rhrMinHours=8; o.rulesVersion=3; }
+  // version 4 : une case vide encadrée reste une journée blanche même au lendemain d'un service de nuit (réactivable)
+  if(!r||!(r.rulesVersion>=4)){ o.jbExcludeNightOverlap=false; o.rulesVersion=4; }
   return o;
 }
 
@@ -2236,8 +2241,7 @@ const COLS=[
   {g:'paniers',k:'nbPaniers',l:'Paniers'},
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
   // une seule colonne : journées blanches, avec en petit les cases vides (qui les contiennent) — demandé par l'utilisateur
-  {g:'absences',k:'journeesBlanches',l:'Journées blanches',f:a=>{const j=pv(a,'journeesBlanches'), v=pv(a,'joursVides');
-    return `${j?`<b>${nfa(j)}</b>`:'<span class="z">0</span>'}${v?` <span class="mut sm" title="cases vides, journées blanches comprises">/ ${nfa(v)} vide${v>1?'s':''}</span>`:''}`;}},
+  {g:'absences',k:'journeesBlanches',l:'Journées blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
   {g:'absences',k:'joursRepos',l:'Repos'},
   ...FAM_REPOS.map(c=>({g:'absences',k:'c_'+c,l:c,cls:'sub'})),
   {g:'absences',k:'joursCP',l:'Congés'},
@@ -2429,7 +2433,7 @@ function viewBlanches(){
     <div class="card-h"><div><h2>Journées blanches</h2><p class="card-s">${nf(rows.length)} journée${rows.length>1?'s':''} sur le périmètre</p></div>
       <button class="btn btn-sm" data-goto="exports">Exporter</button></div>
     <div class="card-b">
-      <div class="note mb">Journée sans mission ni code — ni RP, ni congé — encadrée par deux services dans la semaine. Les lendemains de service de nuit, où l'agent est encore en service jusqu'au matin, sont exclus. Chaque case peut être corrigée ci-dessous ; la correction est mémorisée.</div>
+      <div class="note mb">Journée sans mission ni code — ni RP, ni congé — encadrée par deux services dans la semaine. ${S.rules.jbExcludeNightOverlap?"Les lendemains de service de nuit, où l'agent est encore en service jusqu'au matin, sont exclus. ":'Le lendemain d’un service de nuit compte aussi. '}Chaque case peut être corrigée ci-dessous ; la correction est mémorisée.</div>
       ${rows.length?`<div class="cols2">
         <div class="tw"><table><thead><tr><th class="l">Agence</th><th class="l">Métier</th><th>Journées</th><th>Agents</th></tr></thead>
           <tbody>${byAg.map(([k,l])=>{const[ag,me]=k.split('||');
@@ -2761,7 +2765,7 @@ function explain(k){
         <td class="l">${x.dureeH==null?'—':x.dureeH<12?'8–12 h':x.dureeH<24?'12–24 h':'24 h et plus'}${x.manuel?' <span class="pill pill-a">corrigé</span>':''}</td></tr>`));
   } else if(k==='journeesBlanches'){
     const l=sc.flatMap(a=>(a.blanches||[]).map(c=>({a,c})));
-    title='Journées blanches'; rule='Case vide (ni mission ni code) encadrée par deux services, y compris par la semaine voisine ; pas le lendemain d’un service de nuit, pas si l’agent est hors résidence. Un repos entre la case et le service ne l’empêche pas.';
+    title='Journées blanches'; rule='Case vide (ni mission ni code) encadrée par deux services, y compris par la semaine voisine ; '+(r.jbExcludeNightOverlap?'pas le lendemain d’un service de nuit, ':'y compris le lendemain d’un service de nuit, ')+'pas si l’agent est hors résidence. Un repos entre la case et le service ne l’empêche pas.';
     html=tbl([['Agent','l'],['Jour','l'],['Mission avant','l'],['Mission après','l'],['Motif','l']],l.slice(0,lim).map(({a,c})=>`<tr><td class="l">${nm(a)}</td><td class="l">${JS[c.d]} ${dISO(c.date)}</td>
       <td class="l mono">${c.avant?`${esc(c.avant.label)} <span class="mut">fin ${dtISO(c.avant.end)}</span>`:'—'}</td><td class="l mono">${c.apres?`${esc(c.apres.label)} <span class="mut">début ${dtISO(c.apres.start)}</span>`:'—'}</td><td class="l mut">${esc(c.raison||'')}</td></tr>`));
   } else if(k==='heuresSup'||k==='heuresPlanifiees'){
@@ -2946,7 +2950,7 @@ function dgRHR(){
     <text class="t" x="14" y="126">Résidence HENDAYE : deux services finissent ailleurs, 2 RHR. Le dernier rentre : aucun.</text></svg>`;
 }
 function dgBlanche(){
-  const J=[['Lun','svc','Service',[]],['Mar','bl','Journée blanche',['comptée']],['Mer','nuit','Service de nuit',['22h → 5h']],['Jeu','vide','Case vide',['lendemain','de nuit : exclue']],
+  const J=[['Lun','svc','Service',[]],['Mar','bl','Journée blanche',['comptée']],['Mer','nuit','Service de nuit',['22h → 5h']],['Jeu',S.rules.jbExcludeNightOverlap?'vide':'bl',S.rules.jbExcludeNightOverlap?'Case vide':'Journée blanche',S.rules.jbExcludeNightOverlap?['lendemain','de nuit : exclue']:['lendemain de nuit','comptée']],
     ['Ven','svc','Service',[]],['Sam','vide','Case vide',['après le dernier','service : ignorée']],['Dim','code','Code RP',['jamais','une blanche']]];
   const w=80,g=6;
   return `<svg viewBox="0 0 596 124">${DG_DEFS}${J.map(([d,k,t,s2],i)=>{const x=i*(w+g);
@@ -3841,7 +3845,7 @@ function viewReglages(){
   <section class="card"><div class="card-h"><h2>Comment les chiffres sont calculés</h2></div>
     <div class="card-b prose">
       <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR (repos journalier hors résidence, accord d'entreprise art. 18), de jour comme de nuit — même si les deux missions sont dans la même case${r.rhrCoupeParRepos?'. Un arrêt qui contient un jour de repos ou d’absence n’en est pas un : le repos périodique se prend à résidence (art. 19)':''}. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
-      <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
+      <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. ${r.jbExcludeNightOverlap?"Le lendemain d'un service de nuit terminé au petit matin n'en est pas une":"Le lendemain d'un service de nuit en est une aussi"}${r.jbExcludeHorsResidence?" ; une journée passée hors résidence (pendant un RHR) n'en est pas une":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
       <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h (son amplitude reste l’horaire réel) ; une autre mission de moins de ${nf(r.minMission??5)} h d’amplitude compte ${nf(r.minMission??5)} h d’amplitude et de TTE. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche. Pour une ATCMD, ces deux compteurs sont ramenés à ses ${nf(r.heuresATCMD)} h, au prorata de l’horaire réel.</p>
@@ -3932,13 +3936,27 @@ function renderLogin(){
   setTimeout(()=>el('codeIn')?.focus(),30);
 }
 function closeDrawer(){
-  S.drawer=null; S.dwPer=null; document.body.style.overflow='';   // à la fermeture, le filtre principal reprend la main
+  S.drawer=null; S.dwPer=null; S.dwCode=null; document.body.style.overflow='';   // à la fermeture, le filtre principal reprend la main
   const d=document.querySelector('.ov'); if(!d) return;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){ d.remove(); return; }
   d.classList.add('out'); setTimeout(()=>d.remove(),200);
 }
 /** Détail d'un agent : ses totaux, puis chacune de ses semaines */
 const codeOrd=k=>FAM_REPOS.includes(k)?0:FAM_CONGES.includes(k)?1:2;
+/** Tuile « Codes » de la fiche : acronyme + nombre ; au survol ou au clic, les jours décomptés avec le code du fichier */
+function codesTile(weeks,a){
+  const jours={};
+  for(const x of weeks) for(const j of x.jours||[]) if(j.kind==='CODE'&&j.family!=='HORS') (jours[j.family]=jours[j.family]||[]).push({date:j.date,code:j.code,sh:!!j.sansHoraire});
+  const fam=Object.keys(jours).sort((p,q)=>codeOrd(p)-codeOrd(q)||p.localeCompare(q));
+  if(!fam.length) return `<div class="codes"><div class="k">Codes (repos, congés, absences)</div><div class="v"><span class="mut" style="font-size:13px">aucun</span></div></div>`;
+  const lab=k=>k==='AUTRE'?'Autres codes (absences)':CODEL[k]||k;
+  const line=d=>`${JS[(new Date(d.date+'T00:00:00Z').getUTCDay()+6)%7]} ${dFull(d.date)} · ${d.code}${d.sh?' (mission sans horaire lisible)':''}`;
+  const sel=S.dwCode&&jours[S.dwCode]?S.dwCode:null;
+  return `<div class="codes"><div class="k">Codes (repos, congés, absences) · touchez un code pour voir ses jours</div><div class="v">${fam.map(k=>{
+      const l=jours[k].sort((x,y)=>x.date.localeCompare(y.date));
+      return `<button class="cd-b" data-dwcode="${esc(k)}" aria-pressed="${sel===k}" title="${esc(lab(k)+'\n'+l.map(line).join('\n'))}">${esc(k)} <b>${l.length}</b></button>`;}).join('')}</div>
+    ${sel?`<div class="cd-l"><div class="sub-h" style="margin:8px 0 4px">${esc(lab(sel))} — ${jours[sel].length} jour${jours[sel].length>1?'s':''}</div>${jours[sel].map(d=>`<div class="mono sm">${esc(line(d))}</div>`).join('')}</div>`:''}</div>`;
+}
 function renderDrawer(){
   if(!S.drawer) return;
   // après une correction, la fiche est reconstruite à partir des chiffres recalculés
@@ -3971,9 +3989,7 @@ function renderDrawer(){
       <div><div class="k">Heures du dimanche</div><div class="v">${fmtH(a.heuresDimanche)}</div></div>
       <div><div class="k">Paniers</div><div class="v">${nf(a.nbPaniers)} <small class="mut">${nf(a.ratioPanierJS,2)}/JS</small></div></div>
       <div><div class="k">MHIS · DISPO · ATCMD</div><div class="v">${a.nbMHIS} · ${a.nbDISPO} · ${a.nbATCMD}</div></div>
-      <div class="codes"><div class="k">Codes (repos, congés, absences)</div><div class="v">${Object.keys(a.codeCounts||{}).filter(k=>k!=='HORS').length
-        ?Object.entries(a.codeCounts).filter(([k])=>k!=='HORS').sort((x,y)=>codeOrd(x[0])-codeOrd(y[0])||x[0].localeCompare(y[0])).map(([k,v])=>`<span title="${esc(CODEL[k]||k)}">${esc(k)} <b>${v}</b></span>`).join('')
-        :'<span class="mut" style="font-size:13px">aucun</span>'}</div></div>
+      ${codesTile(weeks,a)}
     </div>
     ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
       const xk=personKey(x)+'|'+x.weekId, xe=(S.rules.corrections.exclus||{})[xk];
@@ -4094,7 +4110,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4156,6 +4172,7 @@ document.addEventListener('click',async e=>{
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=normLieu(l);
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
   if(t.dataset.dwreset){ S.dwPer=null; renderDrawer(); return; }
+  if(t.dataset.dwcode){ S.dwCode=S.dwCode===t.dataset.dwcode?null:t.dataset.dwcode; renderDrawer(); return; }
   if(t.dataset.metag!=null&&admin()){ const pk=t.dataset.metag, m=el('mtM').value, w=el('mtW').value;
     const c=S.rules.corrections; c.metierAgent=c.metierAgent||{}; c.metierAgent[pk+'|'+w]=m;
     return saveCorrection(`Métier de l’agent : ${m} (${perLab(w)})`,nmPk(pk)); }
