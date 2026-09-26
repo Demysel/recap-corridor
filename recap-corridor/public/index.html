@@ -269,6 +269,9 @@ tbody tr.clk td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-
 tbody tr.clk:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .tot td{font-weight:700;background:var(--surface-3)!important;border-top:1px solid var(--line-2)}
 .nm{font-weight:700}
+.agchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.agc{border:0;background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:3px 9px;font-size:12.5px;font-weight:600}
+.agc:hover{background:var(--accent-line)}
 th.sub,td.sub{color:var(--ink-3);font-size:12px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:baseline}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;line-height:1.6}
@@ -1929,6 +1932,7 @@ function scopeAgents(opts={}){
       if(S.selAgences&&!S.selAgences.includes(a.agence)) continue;
       if(S.selMetiers&&!S.selMetiers.includes(a.metier)) continue;
       if(S.search&&!deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(deacc(S.search).toLowerCase())) continue;
+      if(!opts.tousAgents&&S.selAgents&&S.selAgents.length&&!S.selAgents.includes(personKey(a))) continue;
       out.push(a.weekId?a:Object.assign(a,{weekId:id}));
     }
   }
@@ -2104,11 +2108,11 @@ function renderFilters(){
         <select id="fWeek" title="${esc(periodLabel(S.selWeek,S.weeks))}">${periodOptions(S.selWeek,S.weeks)}</select></label>
       <div class="fld"><span class="flabel">Périmètre</span>
         <button class="sel" id="scopeBtn" aria-expanded="${S.scopeOpen}">${esc(resume)}<span class="car">▾</span></button></div>
-      <label class="fld"><span class="flabel">Agent</span>
-        <span class="srch"><input type="search" id="fSearch" placeholder="Nom ou matricule" value="${esc(S.search)}" autocomplete="off"></span></label>
+      ${agentPicker()}
       <div class="fld grow"></div>
       ${S.role==='admin'&&S.tab!=='import'?`<div class="fld"><button class="btn" data-goto="import"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Importer</button></div>`:''}
     </div>
+    ${S.agtOpen?agentPanel():''}
     ${S.scopeOpen?`<div class="scope">
       <div class="sgrp"><span class="flabel">Agences</span><div class="frow">
         ${ags.map(a=>`<button class="chip" data-ag="${esc(a)}" aria-pressed="${selA.includes(a)}">${esc(a)}</button>`).join('')}
@@ -2118,6 +2122,24 @@ function renderFilters(){
         ${mets.map(m=>`<button class="chip" data-me="${esc(m)}" aria-pressed="${selM.includes(m)}">${esc(m)}</button>`).join('')}
         <button class="chip chip-mini ghost" id="meAll">Tous</button></div></div>
     </div>`:''}`;
+}
+/** Sélecteur multiple d'agents (filtre principal) : toutes les vues se limitent aux agents choisis */
+const selAg=()=>S.selAgents||[];
+function agentNoms(){ const m=new Map(); for(const a of scopeAgents({tousAgents:true,allWeeks:true})){ const k=personKey(a); if(!m.has(k)) m.set(k,a); } return m; }
+function agentPicker(){
+  const sel=selAg(), noms=agentNoms(), nm=k=>{const a=noms.get(k);return a?`${a.nom} ${a.prenom}`:k.replace(/^[mn]:/,'');};
+  return `<div class="fld agp"><span class="flabel" style="display:flex;justify-content:space-between;gap:10px">Agent${sel.length?'<button class="lk" id="agtClr" style="padding:0;text-decoration:underline">Effacer</button>':''}</span>
+    <button class="sel" id="agtBtn" aria-expanded="${!!S.agtOpen}">${sel.length?`${sel.length} sélectionné${sel.length>1?'s':''}`:'Tous les agents'}<span class="car">▾</span></button>
+    ${sel.length?`<div class="agchips">${sel.slice(0,2).map(k=>`<button class="agc" data-agsel="${esc(k)}" title="Retirer">${esc(nm(k))} ×</button>`).join('')}${sel.length>2?`<span class="mut sm">+${sel.length-2}</span>`:''}</div>`:''}</div>`;
+}
+function agentPanel(){
+  const sel=selAg(), q=deacc(S.agtQ||'').toLowerCase();
+  const l=[...agentNoms()].map(([k,a])=>({k,a})).filter(({a})=>!q||deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(q))
+    .sort((x,y)=>(sel.includes(y.k)-sel.includes(x.k))||x.a.nom.localeCompare(y.a.nom,'fr'));
+  return `<div class="scope"><div class="sgrp"><span class="flabel">Agents — cliquez pour ajouter ou retirer · ${sel.length} sélectionné${sel.length>1?'s':''}</span>
+    <span class="srch" style="max-width:320px"><input type="search" id="agtQ" placeholder="Nom ou matricule" value="${esc(S.agtQ||'')}" autocomplete="off"></span>
+    <div class="frow" style="max-height:240px;overflow:auto">${l.slice(0,300).map(({k,a})=>`<button class="chip chip-mini" data-agsel="${esc(k)}" aria-pressed="${sel.includes(k)}">${esc(a.nom)} ${esc(a.prenom)} <span class="mut">· ${esc(a.agence)}</span></button>`).join('')||'<span class="mut sm">Aucun agent</span>'}</div>
+    <div class="btns"><button class="btn btn-sm" id="agtAll">Tout sélectionner (liste affichée)</button><button class="btn btn-sm" id="agtClr">Effacer la sélection</button><button class="btn btn-sm btn-pri" id="agtBtn">Fermer</button></div></div></div>`;
 }
 function kpiRow(g){
   const nW=S.rules.nuitAFR, nC=S.rules.nuitCDR, T='title="Cliquez : règle et détail"';
@@ -2228,7 +2250,6 @@ const COLS=[
   {g:'activite',k:'weekendTravaille',l:'J. week-end'},
   {g:'rhr',k:'nbRHR',l:'RHR',f:a=>a.rhrApplicable?(a.nbRHR?`<b>${nfa(pv(a,'nbRHR'))}</b>`+(a.rhrEnCours?' <span class="pill pill-w">en cours</span>':''):'<span class="z">0</span>'):'<span class="z">n/a</span>',t:a=>a.rhrApplicable?pv(a,'nbRHR'):-1},
   {g:'rhr',k:'rhrNuits',l:'Nuits HR'},
-  {g:'rhr',k:'rhrHeures',l:'Heures HR',f:numF('rhrHeures',fmtH)},
   {g:'rhr',k:'rhrLieux',l:'Lieux',cls:'l mono',f:a=>a.rhrLieux.length?esc(a.rhrLieux.join(' ')):'<span class="z">—</span>',t:a=>a.rhrLieux.join(' ')},
   {g:'temps',k:'amplitudeTotale',l:'Amplitude',f:numF('amplitudeTotale',fmtH)},
   {g:'temps',k:'amplitudeMoyenne',l:'Ampl. moy.',f:a=>a.amplitudeMoyenne?fmtH(a.amplitudeMoyenne):'<span class="z">—</span>',t:a=>a.amplitudeMoyenne},
@@ -3392,6 +3413,16 @@ function viewComparer(){
         <div class="clg"><span class="lg"><span class="cdot" style="background:var(--s1)"></span>${esc(c.gA)}</span><span class="lg"><span class="cdot" style="background:var(--s2)"></span>${esc(c.gB)}</span></div></div></section>`;
   } else {
     const ps=mergeAcrossWeeks(all).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')), pk=personKey;
+    if(selAg().length>=2){
+      // agents choisis dans le sélecteur du haut : tous côte à côte, sur la période du filtre principal
+      const act=new Set(activeWeeks()), rows=scopeAgents().filter(a=>act.has(a.weekId)), G=groupBy(rows,personKey), ks=selAg().filter(k=>G.has(k));
+      const who=k=>{const a=G.get(k)[0];return `${a.nom} ${a.prenom}`;};
+      body+=`<section class="card"><div class="card-h"><div><h2>${ks.length} agents sélectionnés</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · en ambre la valeur la plus haute, en rose la plus basse</p></div></div>
+        <div class="card-b"><div class="tw tall"><table class="sticky1 cmp"><thead><tr><th class="l st">Mesure</th>${ks.map(k=>`<th>${esc(who(k))}</th>`).join('')}</tr></thead><tbody>
+        ${FIELDS.map(f=>{const v=ks.map(k=>statVal(G.get(k),f.k,c.val)), F=stFmt(f.k), nn=v.filter(x=>x!=null), mx=nn.length>1?Math.max(...nn):null, mn=nn.length>1?Math.min(...nn):null;
+          return `<tr><td class="l st">${esc(f.l)}</td>${v.map(x=>`<td class="${x!=null&&mx!==mn&&x===mx?'hi':x!=null&&mx!==mn&&x===mn?'lo':''}">${x==null?'<span class="z">—</span>':F(x)}</td>`).join('')}</tr>`;}).join('')}
+        </tbody></table></div></div></section>`;
+    }
     c.pA=ps.some(p=>pk(p)===c.pA)?c.pA:(ps[0]&&pk(ps[0])); c.pB=ps.some(p=>pk(p)===c.pB)&&c.pB!==c.pA?c.pB:(ps[1]&&pk(ps[1]));
     const A=ps.find(p=>pk(p)===c.pA), B=ps.find(p=>pk(p)===c.pB);
     const wks=[...new Set([...(A?A.parSemaine:[]),...(B?B.parSemaine:[])].map(x=>x.weekId))].sort();
@@ -3402,7 +3433,7 @@ function viewComparer(){
     const wa=A&&A.parSemaine.find(x=>x.weekId===c.wk), wb=B&&B.parSemaine.find(x=>x.weekId===c.wk);
     const card=(p,x)=>`<section class="card"><div class="card-h"><div><h2>${p?`${esc(p.nom)} ${esc(p.prenom)}`:'—'}</h2><p class="card-s">${p?`${esc(p.agence)} · ${esc(p.metier)}`:''}${x?` · ${fmtH(x.heuresPlanifiees)} de TTE · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.journeesBlanches} journée(s) blanche(s)`:' · absent cette semaine'}</p></div></div>
       <div class="card-b">${x?weekTimeline(x):'<p class="mut">Pas de ligne pour cet agent cette semaine.</p>'}</div></section>`;
-    body=`${card(A,wa)}${card(B,wb)}<div style="margin-top:-6px">${legendTimeline()}</div>
+    body+=`${card(A,wa)}${card(B,wb)}<div style="margin-top:-6px">${legendTimeline()}</div>
       <section class="card"><div class="card-h"><div><h2>Chiffres de la semaine</h2></div></div><div class="card-b">${wa&&wb?cmpTable(`${A.nom} ${A.prenom}`,`${B.nom} ${B.prenom}`,[wa],[wb],'total'):'<p class="mut">Les deux agents doivent être présents cette semaine.</p>'}</div></section>`;
   }
   return `<section class="card"><div class="card-b"><div class="ctrls" style="margin-bottom:0;border-bottom:0;padding-bottom:0">
@@ -4109,7 +4140,7 @@ async function saveAll(){
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
-    '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
+    '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
     '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
@@ -4213,7 +4244,11 @@ document.addEventListener('click',async e=>{
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs(); menuClose();
     if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.role==='admin') await ensureLoaded(toLoad());
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
-  if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; render(); return; }
+  if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; S.agtOpen=false; render(); return; }
+  if(t.id==='agtBtn'){ S.agtOpen=!S.agtOpen; S.scopeOpen=false; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
+  if(t.id==='agtClr'){ S.selAgents=null; render(); return; }
+  if(t.id==='agtAll'){ const q=deacc(S.agtQ||'').toLowerCase(); S.selAgents=[...new Set([...selAg(),...[...agentNoms()].filter(([,a])=>!q||deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(q)).map(([k])=>k)])]; render(); return; }
+  if(t.dataset.agsel!=null){ const k=t.dataset.agsel, c=selAg(); S.selAgents=c.includes(k)?c.filter(x=>x!==k):[...c,k]; if(!S.selAgents.length) S.selAgents=null; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
   if(t.id==='btnReport'){
     const wk=S.selWeek==='__all__'?'toutes-semaines':slug(S.selWeek.replace(':','-'));
     dl(`rapport-recap-corridor-${wk}.html`, buildReport(), 'text/html;charset=utf-8'); return; }
@@ -4309,10 +4344,13 @@ document.addEventListener('input',e=>{
   if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
   if(e.target.id==='fSearch'){ S.search=e.target.value; const p=e.target.selectionStart; render();
     const n=el('fSearch'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
+  if(e.target.id==='agtQ'){ S.agtQ=e.target.value; const p=e.target.selectionStart; render();
+    const n=el('agtQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&S.drawer){ closeDrawer(); return; }
   if(e.key==='Escape'&&S.scopeOpen){ S.scopeOpen=false; render(); return; }
+  if(e.key==='Escape'&&S.agtOpen){ S.agtOpen=false; render(); return; }
   const typing=/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'');
   if(document.querySelector('.pal')){
     if(e.key==='Escape'){ document.querySelector('.pal').remove(); return; }

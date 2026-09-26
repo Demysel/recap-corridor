@@ -124,6 +124,9 @@ Sélecteur « Période » en haut (et dans la Vitrine, et pour les périodes A e
 semaine enregistrée (2 et 4 dernières semaines, dernier mois, 3, 6 et 12 derniers mois, toujours),
 années, mois, semaines. Une semaine appartient au mois et à l'année de son jeudi (règle ISO), y compris
 pour les regroupements par mois / trimestre / année de l'onglet Statistiques.
+Sélecteur « Agent » du filtre principal : choix multiple (liste avec recherche, puces retirables, « Effacer ») ;
+toutes les vues se limitent aux agents choisis ; dans Comparer → agents, 2 agents ou plus choisis s'affichent côte à côte
+(valeur la plus haute en ambre, la plus basse en rose). Colonne « Heures HR » retirée du détail par agent (demandé).
 Fiche agent : elle suit la période du filtre principal ; un sélecteur « Période de la fiche » (mêmes choix) la
 remplace tant que la fiche est ouverte ; à la fermeture, le filtre principal reprend la main (demandé par l'utilisateur).
 
