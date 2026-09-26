@@ -277,9 +277,13 @@ tbody tr.clk td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-
 tbody tr.clk:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .tot td{font-weight:700;background:var(--surface-3)!important;border-top:1px solid var(--line-2)}
 .nm{font-weight:700}
-.vddb{display:none}
-@media (max-width:640px){.vfil{flex-direction:column;align-items:stretch}.vfil>.fld{width:100%}.vddb{display:inline-flex;width:100%;max-width:none;justify-content:space-between;white-space:normal;text-align:left}
-  .vddp{display:none}.vddp.open{display:block;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}}
+.vdd{position:relative}
+.vddb{display:inline-flex;min-width:240px;max-width:420px;justify-content:space-between;white-space:normal;text-align:left}
+.vddp{display:none}
+.vddp.open{display:block;position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:min(480px,92vw);padding:12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-lg)}
+.vfil{align-items:flex-start}
+@media (max-width:640px){.vfil{flex-direction:column;align-items:stretch}.vfil>.fld{width:100%}.vddb{width:100%;max-width:none;min-width:0}
+  .vddp.open{position:static;width:auto;margin-top:8px;box-shadow:none;background:var(--surface-2)}}
 .agchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
 .agc{border:0;background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:3px 9px;font-size:12.5px;font-weight:600}
 .agc:hover{background:var(--accent-line)}
@@ -3396,7 +3400,7 @@ function viewVitrine(){
       return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`; })()}
   <section class="card"><div class="card-b vfil">
     <label class="fld"><span class="flabel">Période</span><select id="vWeek">${periodOptions(vf.w,sem)}</select></label>
-    <div class="fld grow vdd"><span class="flabel">Agences à comparer</span>
+    <div class="fld vdd"><span class="flabel">Agences à comparer</span>
       <button class="sel vddb" data-vdd="ag" aria-expanded="${S.vdd==='ag'}">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} : ${vf.ags.map(esc).join(', ')}`:'Toutes les agences'}<span class="car">▾</span></button>
       <div class="vddp${S.vdd==='ag'?' open':''}"><div class="frow">${AG.map(x=>`<button class="chip" data-vag="${esc(x)}" aria-pressed="${!!(vf.ags&&vf.ags.includes(x))}">${esc(x)}</button>`).join('')}<button class="chip chip-mini ghost" data-vag="*" aria-pressed="${!vf.ags}">Toutes</button></div>
       <span class="hint" style="margin-top:2px">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} choisie${vf.ags.length>1?'s':''} : tous les chiffres portent sur elles ; touchez une agence pour l’ajouter ou la retirer.`:'Touchez une agence pour ne garder qu’elle, puis ajoutez-en d’autres pour les comparer.'}</span></div></div>
@@ -4407,7 +4411,9 @@ document.addEventListener('input',e=>{
   if(e.target.id==='agtQ'){ S.agtQ=e.target.value; const p=e.target.selectionStart; render();
     const n=el('agtQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
 });
+document.addEventListener('click',e=>{ if(S.vdd&&!e.target.closest('.vdd')){ S.vdd=null; render(); } });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&S.vdd){ S.vdd=null; render(); return; }
   if(e.key==='Escape'&&S.drawer){ closeDrawer(); return; }
   if(e.key==='Escape'&&S.scopeOpen){ S.scopeOpen=false; render(); return; }
   if(e.key==='Escape'&&S.agtOpen){ S.agtOpen=false; render(); return; }

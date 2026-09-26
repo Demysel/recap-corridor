@@ -32,7 +32,8 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   Vitrine : « Agences à comparer » — toucher une agence (depuis « Toutes ») ne garde qu'elle, les suivantes s'ajoutent ;
   avec une sélection, le tableau « Comparer : A · B » remonte juste sous les filtres et tous les chiffres portent dessus
   (agrégats déjà publiables, aucune donnée individuelle ajoutée).
-  Sur téléphone, agences et métiers de la vitrine sont des menus déroulants (bouton qui ouvre la liste). Le code visiteur
+  Agences et métiers de la vitrine sont des menus déroulants sur tous les écrans (bouton qui ouvre la liste ; sur
+  ordinateur et tablette elle flotte sous le bouton, sur téléphone elle s'ouvre dans la page ; se ferme en touchant ailleurs ou Échap). Le code visiteur
   ne demande jamais le détail des semaines (`ensureLoaded` s'arrête pour un non-admin).
 - `recap-corridor/public/icons/` — icône de l'application (carré rouge, rail blanc, deux stations, comme la marque) :
   favicon SVG et PNG, `apple-touch-icon.png` (écran d'accueil iPhone), icônes 192/512 et `manifest.webmanifest`
