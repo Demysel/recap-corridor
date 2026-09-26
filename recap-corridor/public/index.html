@@ -3370,6 +3370,11 @@ function viewVitrine(){
   const series0=top.map((ag,i)=>({name:ag,short:ag.length>10?ag.slice(0,9)+'…':ag,color:`var(${SER[i%8]})`,values:sem.map(w=>{const l=scopeC.filter(c=>c.w===w.weekId&&c.ag===ag);return l.length?r2(vAgg(l).s.nbRHR):null;})}));
   const series=series0.filter(x=>x.values.filter(v=>v!=null).length>1);   // une courbe demande au moins deux semaines
   const HEAT=[['presence','Agents en service'],['prise','Prises de service'],['fin','Fins de service'],['rhr','Départs en RHR']];
+  const choix=vf.ags&&vf.ags.length<AG.length, cmpTitle=choix?`Comparer : ${vf.ags.map(esc).join(' · ')}`:'Comparer les agences';
+  const cmpBlock=`  <section class="card"><div class="card-h"><div><h2>${cmpTitle}</h2><p class="card-s">indicateurs rapportés par semaine, par agent ou par journée · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span></p></div></div>
+    <div class="card-b"><div class="tw"><table class="cmp"><thead><tr><th class="l">Agence</th>${cmpK.map(k=>`<th>${esc(k.l)}${k.u?`<br><span class="nb">${k.u}</span>`:''}</th>`).join('')}</tr></thead><tbody>
+      ${rowsA.map(r=>`<tr><td class="l nm">${esc(r.ag)}</td>${r.vals.map((v,i)=>{const [mn,mx]=ext[i];const c=v==null||mn===mx?'':v===mx?'hi':v===mn?'lo':'';return `<td class="${c}">${v==null?'<span class="z">—</span>':cmpK[i].f(v)}</td>`;}).join('')}</tr>`).join('')}
+    </tbody></table></div></div></section>`;
   return `
   <section class="vhero">
     <div class="vh-t"><span class="vh-e">Le corridor en chiffres</span><h2>Activité, repos et temps de travail des équipes</h2>
@@ -3387,8 +3392,10 @@ function viewVitrine(){
       return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`; })()}
   <section class="card"><div class="card-b vfil">
     <label class="fld"><span class="flabel">Période</span><select id="vWeek">${periodOptions(vf.w,sem)}</select></label>
-    <div class="fld grow"><span class="flabel">Agences</span><div class="frow">${chips('vag',AG,vf.ags)}<button class="chip chip-mini ghost" data-vag="*">Toutes</button></div></div>
+    <div class="fld grow"><span class="flabel">Agences à comparer</span><div class="frow">${AG.map(x=>`<button class="chip" data-vag="${esc(x)}" aria-pressed="${!!(vf.ags&&vf.ags.includes(x))}">${esc(x)}</button>`).join('')}<button class="chip chip-mini ghost" data-vag="*" aria-pressed="${!vf.ags}">Toutes</button></div>
+      <span class="hint" style="margin-top:2px">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} choisie${vf.ags.length>1?'s':''} : tous les chiffres portent sur elles ; touchez une agence pour l’ajouter ou la retirer.`:'Touchez une agence pour ne garder qu’elle, puis ajoutez-en d’autres pour les comparer.'}</span></div>
     <div class="fld"><span class="flabel">Métiers</span><div class="frow">${chips('vme',ME,vf.me)}</div></div></div></section>
+  ${choix?cmpBlock:''}
   <div class="vkpis">${VKPI.map(k=>{const v=k.v(g);return `<div class="kpi vk"><div class="k">${esc(k.l)}${k.u?` <span class="nb" style="text-transform:none;letter-spacing:0">· ${k.u}</span>`:''}</div>
     <div class="vk-r"><div class="v">${v==null?'—':k.f(v)}</div>${multi?spark(perW.map(a=>a?k.v(a):null)):''}</div><div class="n">${k.d(g)}</div></div>`;}).join('')}</div>
   <section class="card"><div class="card-h"><div><h2>Quand le corridor travaille</h2><p class="card-s">${esc(HU)} · heure par heure · cadre = heure de pointe</p></div>
@@ -3399,10 +3406,7 @@ function viewVitrine(){
       for(const f of fx){ f.res.forEach(x=>RS.add(x)); for(const e of f.edges){const k=e.a+'|'+e.b; E.set(k,(E.get(k)||0)+e.n);} for(const r of f.rhr) R.set(r.l,(R.get(r.l)||0)+r.n); }
       return `<section class="card"><div class="card-h"><div><h2>Carte des flux</h2><p class="card-s">lieux reliés par les missions · tout le réseau · seuls les trajets et lieux fréquentés par au moins ${V.k} agents différents sont montrés</p></div></div>
       <div class="card-b">${fluxMap([...E].map(([k,n])=>{const [a,b]=k.split('|');return {a,b,n};}),[...R].map(([l,n])=>({l,n})),[...RS],{vide:'Aucun trajet assez fréquenté pour être publié.'})}</div></section>`; })()}
-  <section class="card"><div class="card-h"><div><h2>Comparer les agences</h2><p class="card-s">indicateurs rapportés par semaine, par agent ou par journée · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span></p></div></div>
-    <div class="card-b"><div class="tw"><table class="cmp"><thead><tr><th class="l">Agence</th>${cmpK.map(k=>`<th>${esc(k.l)}${k.u?`<br><span class="nb">${k.u}</span>`:''}</th>`).join('')}</tr></thead><tbody>
-      ${rowsA.map(r=>`<tr><td class="l nm">${esc(r.ag)}</td>${r.vals.map((v,i)=>{const [mn,mx]=ext[i];const c=v==null||mn===mx?'':v===mx?'hi':v===mn?'lo':'';return `<td class="${c}">${v==null?'<span class="z">—</span>':cmpK[i].f(v)}</td>`;}).join('')}</tr>`).join('')}
-    </tbody></table></div></div></section>
+  ${choix?'':cmpBlock}
   <div class="charts">
     <section class="card"><div class="card-h"><div><h2>Durée des repos hors résidence</h2><p class="card-s">tranches de l’accord d’entreprise (annexe 1)</p></div></div><div class="card-b">${histo(['8–12 h','12–24 h','24 h et plus'].map((l,i)=>({l,v:g.dist.rhrB[i]})),'RHR')}</div></section>
     <section class="card"><div class="card-h"><div><h2>RHR par conducteur et par semaine</h2><p class="card-s">part des semaines de conducteur</p></div></div><div class="card-b">${histo(['0','1','2','3','4 et +'].map((l,i)=>({l,v:g.dist.rhrN[i]})),'Semaines',v=>nf(v))}</div></section>
@@ -4218,7 +4222,7 @@ document.addEventListener('click',async e=>{
   if(t.dataset.alnote!=null&&admin()){ const a=S.rows_al[+t.dataset.alnote]; if(!a) return; const n=prompt('Note sur cette alerte :',a.suivi?.note||''); if(n!=null) setSuivi(a,'note',n.trim()); return; }
   if(t.dataset.vheat){ S.vf.heat=t.dataset.vheat; render(); return; }
   if(t.dataset.vag!=null){ const all=[...new Set(S.vit.cells.map(c=>c.ag))], v=t.dataset.vag;
-    if(v==='*') S.vf.ags=null; else { let c=S.vf.ags||all.slice(); c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.ags=c.length&&c.length<all.length?c:null; }
+    if(v==='*') S.vf.ags=null; else if(!S.vf.ags) S.vf.ags=[v]; else { let c=S.vf.ags; c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.ags=c.length&&c.length<all.length?c:null; }
     render(); return; }
   if(t.dataset.vme!=null){ const all=[...new Set(S.vit.cells.map(c=>c.me))], v=t.dataset.vme;
     let c=S.vf.me||all.slice(); c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.me=c.length&&c.length<all.length?c:null; render(); return; }

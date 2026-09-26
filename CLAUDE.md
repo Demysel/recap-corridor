@@ -29,6 +29,9 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   groupes sont fusionnés (« Autres métiers », « Tous métiers », « Autres agences ») ou écartés.
   La carte des flux de la vitrine ne publie un trajet ou un lieu de RHR que s'il concerne au moins 5 agents différents.
   Ne jamais ajouter de donnée individuelle à cette réponse.
+  Vitrine : « Agences à comparer » — toucher une agence (depuis « Toutes ») ne garde qu'elle, les suivantes s'ajoutent ;
+  avec une sélection, le tableau « Comparer : A · B » remonte juste sous les filtres et tous les chiffres portent dessus
+  (agrégats déjà publiables, aucune donnée individuelle ajoutée).
 - `recap-corridor/public/icons/` — icône de l'application (carré rouge, rail blanc, deux stations, comme la marque) :
   favicon SVG et PNG, `apple-touch-icon.png` (écran d'accueil iPhone), icônes 192/512 et `manifest.webmanifest`
   (installation en app). Servies par `server.js` (liste fermée `ICONES`, plus `/favicon.ico` et `/apple-touch-icon.png`).
