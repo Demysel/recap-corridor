@@ -12,7 +12,13 @@ par agence et par corps de métier, semaine par semaine ou cumulé.
 | `public/index.html` | L'application entière, comme dans la version d'origine : lecture des .xlsx dans le navigateur, calculs, onglets, graphiques, exports Excel/CSV et rapport autonome. |
 | `server.js` | Serveur Node (une dépendance : `pg`). Contrôle les codes d'accès et stocke les semaines. Mêmes adresses que l'ancienne fonction Netlify : `session`, `etat`, `semaine`, `regles`. |
 | `db/schema.sql` | Schéma Postgres (Supabase), à exécuter une fois. |
+| `test/moteur.test.mjs` | Tests des règles de calcul sur des semaines fictives (`npm test`). |
 | `package.json` | Démarrage (`npm start`) et dépendance. |
+
+L'onglet **Guide de lecture** explique en schémas comment le fichier est lu et chaque chiffre calculé,
+et affiche un contrôle de fiabilité (cases lues, résidences à confirmer, missions hors colonne…).
+La fiche d'un agent présente sa semaine en frise horaire : services, pauses, plage de nuit,
+repos hors résidence et journées blanches.
 
 Le fichier Excel n'est jamais envoyé au serveur : seules les données extraites
 le sont. Les règles de calcul sont rejouées à chaque affichage : modifier une

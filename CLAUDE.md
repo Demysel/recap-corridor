@@ -16,12 +16,14 @@ Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean**. Métiers : A
 L'application reprend la structure du zip d'origine : **une seule page** qui contient tout.
 
 - `recap-corridor/public/index.html` — toute l'application : lecture des .xlsx dans le navigateur,
-  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Exports, Import, Réglages),
-  graphiques, exports Excel/CSV, rapport autonome. Le fichier Excel n'est jamais envoyé au serveur.
+  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Guide de lecture, Exports,
+  Import, Réglages), graphiques, exports Excel/CSV, rapport autonome. Le fichier Excel n'est jamais envoyé au serveur.
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
   `GET|PUT|DELETE /api/semaine`, `PUT /api/regles`, `GET /api/ping`.
 - `recap-corridor/db/schema.sql` — schéma Postgres.
+- `recap-corridor/test/moteur.test.mjs` — tests du moteur de calcul, lus directement dans `index.html`
+  (`cd recap-corridor && npm test`, sans dépendance, données fictives). À lancer avant chaque envoi.
 
 Quand l'utilisateur demande une modification : **garder l'affichage et les méthodes de calcul
 existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « moderniser ».
