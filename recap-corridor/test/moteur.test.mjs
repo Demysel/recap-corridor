@@ -29,6 +29,10 @@ const one = (j, extra = {}, rules) => run(week([2026, 9, 7], [{ mat: '1', nom: '
 // semaine du lundi 07/09/2026 au dimanche 13/09/2026
 const RES = { residences: { Hendaye: 'HENDAYE' } };
 
+test('la page entière se compile (aucune erreur de syntaxe)', () => {
+  for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(m[1]);
+});
+
 test('lecture de la semaine : identifiant ISO et dates', () => {
   const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: Array(7).fill('RP') }]));
   assert.equal(p.meta.weekId, '2026-S37');
@@ -130,4 +134,66 @@ test('classeur Excel produit puis relu', async () => {
   const r = await E.readRecapSheet(x.buffer.slice(x.byteOffset, x.byteOffset + x.byteLength));
   assert.equal(r.sheetName, 'Récap');
   assert.equal(JSON.stringify(r.rows[1]), JSON.stringify(["12", "DUPONT"]));
+});
+
+/* ---- règles précisées par l'utilisateur (septembre 2026) ---- */
+test('RHR : un arrêt de 30 min hors résidence ne compte pas, un arrêt de 12 h dans la même case compte', () => {
+  const a = one([svc(['VOY-1', 'HENDAYE', 'IRUN', 7, '08:00', 7, '09:00'], ['T-2', 'IRUN', 'HENDAYE', 7, '09:30', 7, '11:00']),
+    svc(['VOY-3', 'HENDAYE', 'BORDEAUX', 8, '08:00', 8, '11:30'], ['T-4', 'BORDEAUX', 'HENDAYE', 8, '23:30', 9, '07:12']), null, 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.nbRHR, 1);
+  assert.equal(a.rhr[0].lieu, 'BORDEAUX');
+  assert.equal(a.coupures.find((c) => c.lieu === 'IRUN').statut, 'court');
+});
+
+test('lieux comparés sans majuscules ni accents', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'Hendaye ', 7, '06:00', 7, '10:00']), svc(['T2', 'hendaye', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.nbRHR, 0);
+});
+
+test('corrections mémorisées : coupure écartée, coupure forcée, missions liées, lieu appris', () => {
+  const j = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'DAX', 8, '06:00', 8, '10:00']), svc(['T3', 'DAX', 'HE', 9, '06:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'];
+  const base = one(j, {}, RES);
+  assert.equal(base.nbRHR, 3);                            // BORDEAUX, DAX, et HE (écriture inconnue de la résidence)
+  const k = base.coupures.find((c) => c.lieu === 'BORDEAUX').key;
+  assert.equal(one(j, {}, { ...RES, corrections: { rhr: { [k]: 'non' } } }).nbRHR, 2);
+  assert.equal(one(j, {}, { ...RES, lieuxResidence: { Hendaye: ['he'] } }).nbRHR, 2);
+  const lie = one(j, {}, { ...RES, lieuxResidence: { Hendaye: ['HE'] }, corrections: { liens: [{ p: 'm:1', a: base.missions[0].start, b: base.missions[2].start }] } });
+  assert.equal(lie.nbRHR, 1);
+  assert.equal(lie.rhr[0].dureeH, 44);
+});
+
+test('journée blanche : corrections jour par jour et raison des cases non comptées', () => {
+  const j = [svc(['T', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00']), null, svc(['T', 'HENDAYE', 'HENDAYE', 9, '18:00', 10, '02:00']), null, svc(['T', 'HENDAYE', 'HENDAYE', 11, '06:00', 11, '12:00']), 'RP', null];
+  const a = one(j, {}, RES);
+  assert.equal(a.journeesBlanches, 1);
+  assert.equal(a.casesVides.find((c) => c.d === 3).raison, 'fin du service de nuit à 02:00');
+  assert.equal(a.casesVides.find((c) => c.d === 6).raison, 'après le dernier service de la semaine');
+  assert.equal(one(j, {}, { ...RES, corrections: { jb: { 'm:1|2026-09-08': 'non' } } }).journeesBlanches, 0);
+  assert.equal(one(j, {}, { ...RES, corrections: { jb: { 'm:1|2026-09-13': 'oui' } } }).journeesBlanches, 2);
+});
+
+test('ancien format : jours en ligne 1, dates en ligne 2, métier dans « Commentaires », codes « CP/CP »', () => {
+  const s = serial(2025, 12, 29);
+  const rows = [
+    [null, null, 'Extrait ARP effectué le : ', 'Lundi 22 Décembre 2025', null, null, 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+    ['Matricule', 'Prenom', 'Nom', 'Region', 'Residence', 'Commentaires', s, s + 1, s + 2, s + 3, s + 4, s + 5, s + 6],
+    [11, 'LUC', 'TEST', 'CEW', 'Agence Bordeaux', 'CDR', 'CP/CP', 'ENTRETIEN\nVS-251-BX\nBX - BX\n30/8:00 - 30/14:00', 'JF/JF', null, null, 'RP-1', 'RP-2'],
+    [12, 'ANA', 'ESSAI', 'CEW', 'Agence Bordeaux', 'CDR + AFR', null, null, null, null, null, null, null],
+    [null, 'Congé', 'CP + RF + RCC + RP'],
+  ];
+  const p = E.parseWeek(rows);
+  assert.equal(p.meta.weekId, '2026-S01');
+  assert.equal(p.meta.extractDate, '2025-12-22');
+  assert.equal(p.agents.length, 2);
+  assert.equal(p.agents[0].metier, 'CONDUCTEUR');
+  assert.equal(p.agents[1].metier, 'CONDUCTEUR');
+  assert.equal(p.anomalies.length, 0);
+  const v = E.applyRules(p, { agencesAlias: { 'Agence Bordeaux': 'Bordeaux-St-Jean' } });
+  const a = v.agents[0];
+  assert.equal(a.agence, 'Bordeaux-St-Jean');
+  assert.equal(a.jours[0].family, 'CP');
+  assert.equal(a.jours[0].code, 'CP');
+  assert.equal(a.jours[2].family, 'JF');
+  assert.equal(a.jours[1].missions[0].label, 'VS-251-BX');
+  assert.equal(a.jours[1].missions[0].note, 'ENTRETIEN');
 });

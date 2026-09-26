@@ -30,9 +30,23 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 
-- RHR : une coupure hors résidence = 1 RHR, de jour comme de nuit. AFR exclus. Moyennes RHR
-  calculées uniquement sur les agents qui ont eu au moins un RHR.
+- RHR : arrêt entre deux missions quand la première ne finit pas à la résidence de l'agence, et
+  d'au moins 4 h (réglable) — un arrêt de 30 min n'est pas un RHR ; deux missions d'une même case
+  séparées d'un long arrêt hors résidence en donnent un. De jour comme de nuit. AFR exclus.
+  Moyennes RHR calculées uniquement sur les agents qui ont eu au moins un RHR.
+- Lieux comparés sans majuscules, accents ni ponctuation (fautes de frappe des fichiers).
+- Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
+  comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
+  résidence d'une agence. Mémorisées dans `recap.config` (clé `regles`, champs `corrections`,
+  `lieuxResidence`) et rejouées à chaque affichage, même après réimport.
 - Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit.
+  Chaque case vide non comptée affiche sa raison (avant le premier / après le dernier service, fin
+  de service de nuit à hh:mm).
+- Formats de fichier : récent (ligne 1 dates, ligne 2 Matricule… Lundi…) et ancien (ligne 1
+  Lundi…Dimanche, ligne 2 Matricule, Prenom, Nom, Region, Residence, Commentaires, dates ; feuille
+  « Corridor … » à côté d'une feuille « Extract » ignorée). Métiers : CDR et « CDR + AFR » =
+  CONDUCTEUR, Coordo = COORDO AFR. Agences « Agence X » rattachées automatiquement au nom récent
+  qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP.
 - Heures planifiées : amplitude moins les pauses « P: » ; une ATCMD compte 5 h.
   Heures sup : au-delà de 35 h par agent et par semaine.
 - Heures de nuit, hors pauses : AFR 22h–7h, conducteurs 22h–5h (l'utilisateur a aussi évoqué
