@@ -2054,7 +2054,7 @@ const TABS=[
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
-  comparer:'deux périodes, deux agences ou deux agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
+  comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
 /** Mesures des statistiques (graphiques) */
@@ -3362,7 +3362,7 @@ function viewVitrine(){
 }
 
 /* ---------- 5 et 6. comparer : deux périodes, deux agences, deux agents ---------- */
-const CMP_MODES=[['periodes','Deux périodes'],['agences','Deux agences'],['agents','Deux agents']];
+const CMP_MODES=[['periodes','Deux périodes'],['agences','Deux agences'],['agents','Agents']];
 function cmpTable(labA,labB,la,lb,mode){
   return `<div class="tw tall"><table class="sticky1 cmp"><thead><tr><th class="l st">Mesure</th><th>${esc(labA)}</th><th>${esc(labB)}</th><th>Écart</th><th>Évolution</th></tr></thead><tbody>
     ${FIELDS.map(f=>{ const a=statVal(la,f.k,mode), b=statVal(lb,f.k,mode), F=stFmt(f.k), d=a!=null&&b!=null?b-a:null, ev=d!=null&&a?100*d/a:null;
@@ -3412,32 +3412,26 @@ function viewComparer(){
       <div class="card-b">${lineChart([{name:c.gA,short:c.gA.slice(0,10),color:'var(--s1)',values:hA},{name:c.gB,short:c.gB.slice(0,10),color:'var(--s2)',values:hB}],Array.from({length:24},(_,h)=>String(h).padStart(2,'0')+'h'),v=>nf(v,1))}
         <div class="clg"><span class="lg"><span class="cdot" style="background:var(--s1)"></span>${esc(c.gA)}</span><span class="lg"><span class="cdot" style="background:var(--s2)"></span>${esc(c.gB)}</span></div></div></section>`;
   } else {
-    const ps=mergeAcrossWeeks(all).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')), pk=personKey;
-    if(selAg().length>=2){
-      // agents choisis dans le sélecteur du haut : tous côte à côte, sur la période du filtre principal
-      const act=new Set(activeWeeks()), rows=scopeAgents().filter(a=>act.has(a.weekId)), G=groupBy(rows,personKey), ks=selAg().filter(k=>G.has(k));
-      const who=k=>{const a=G.get(k)[0];return `${a.nom} ${a.prenom}`;};
-      body+=`<section class="card"><div class="card-h"><div><h2>${ks.length} agents sélectionnés</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · en ambre la valeur la plus haute, en rose la plus basse</p></div></div>
+    // agents choisis dans le sélecteur « Agent » du haut, tous côte à côte, sur une période au choix (mêmes options que le filtre)
+    const per=c.per||S.selWeek, wk=new Set(periodWeeks(per,S.weeks));
+    const rows=all.filter(a=>wk.has(a.weekId)), G=groupBy(rows,personKey), ks=selAg().filter(k=>G.has(k));
+    const who=k=>{const a=G.get(k)[0];return `${a.nom} ${a.prenom}`;};
+    ctrls=`<div class="fld"><span class="flabel">Période</span><select data-cmpf="per" style="max-width:300px">${periodOptions(per,S.weeks)}</select></div>
+      <div class="fld"><span class="flabel">Agents</span><span class="mut sm" style="padding-top:8px">choisis dans « Agent » en haut (${nf(selAg().length)})</span></div>`;
+    if(ks.length<2) body=`<section class="card"><div class="card-b"><p class="mut">Choisissez au moins deux agents dans le sélecteur « Agent » en haut de la page${selAg().length&&ks.length<selAg().length?` (certains n’ont aucune semaine sur ${esc(periodLabel(per,S.weeks))})`:''}.</p></div></section>`;
+    else {
+      body=`<section class="card"><div class="card-h"><div><h2>${ks.length} agents</h2><p class="card-s">${esc(periodLabel(per,S.weeks))} · en ambre la valeur la plus haute, en rose la plus basse</p></div></div>
         <div class="card-b"><div class="tw tall"><table class="sticky1 cmp"><thead><tr><th class="l st">Mesure</th>${ks.map(k=>`<th>${esc(who(k))}</th>`).join('')}</tr></thead><tbody>
         ${FIELDS.map(f=>{const v=ks.map(k=>statVal(G.get(k),f.k,c.val)), F=stFmt(f.k), nn=v.filter(x=>x!=null), mx=nn.length>1?Math.max(...nn):null, mn=nn.length>1?Math.min(...nn):null;
           return `<tr><td class="l st">${esc(f.l)}</td>${v.map(x=>`<td class="${x!=null&&mx!==mn&&x===mx?'hi':x!=null&&mx!==mn&&x===mn?'lo':''}">${x==null?'<span class="z">—</span>':F(x)}</td>`).join('')}</tr>`;}).join('')}
         </tbody></table></div></div></section>`;
+      // une seule semaine : le planning de chaque agent, l'un sous l'autre
+      if(wk.size===1) body+=ks.map(k=>{const x=G.get(k)[0];return `<section class="card"><div class="card-h"><div><h2>${esc(who(k))}</h2><p class="card-s">${esc(x.agence)} · ${esc(x.metier)} · ${fmtH(x.heuresPlanifiees)} de TTE · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.journeesBlanches} journée(s) blanche(s)</p></div></div>
+        <div class="card-b">${weekTimeline(x)}</div></section>`;}).join('')+`<div style="margin-top:-6px">${legendTimeline()}</div>`;
     }
-    c.pA=ps.some(p=>pk(p)===c.pA)?c.pA:(ps[0]&&pk(ps[0])); c.pB=ps.some(p=>pk(p)===c.pB)&&c.pB!==c.pA?c.pB:(ps[1]&&pk(ps[1]));
-    const A=ps.find(p=>pk(p)===c.pA), B=ps.find(p=>pk(p)===c.pB);
-    const wks=[...new Set([...(A?A.parSemaine:[]),...(B?B.parSemaine:[])].map(x=>x.weekId))].sort();
-    c.wk=wks.includes(c.wk)?c.wk:wks[wks.length-1];
-    const o=v=>ps.map(p=>`<option value="${esc(pk(p))}"${pk(p)===v?' selected':''}>${esc(p.nom)} ${esc(p.prenom)} · ${esc(p.agence)}</option>`).join('');
-    ctrls=`<div class="fld"><span class="flabel">Agent A</span><select data-cmpf="pA" style="max-width:260px">${o(c.pA)}</select></div><div class="fld"><span class="flabel">Agent B</span><select data-cmpf="pB" style="max-width:260px">${o(c.pB)}</select></div>
-      <div class="fld"><span class="flabel">Semaine</span><select data-cmpf="wk">${wks.map(id=>`<option value="${id}"${id===c.wk?' selected':''}>${weekLabel(W(id))}</option>`).join('')}</select></div>`;
-    const wa=A&&A.parSemaine.find(x=>x.weekId===c.wk), wb=B&&B.parSemaine.find(x=>x.weekId===c.wk);
-    const card=(p,x)=>`<section class="card"><div class="card-h"><div><h2>${p?`${esc(p.nom)} ${esc(p.prenom)}`:'—'}</h2><p class="card-s">${p?`${esc(p.agence)} · ${esc(p.metier)}`:''}${x?` · ${fmtH(x.heuresPlanifiees)} de TTE · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.journeesBlanches} journée(s) blanche(s)`:' · absent cette semaine'}</p></div></div>
-      <div class="card-b">${x?weekTimeline(x):'<p class="mut">Pas de ligne pour cet agent cette semaine.</p>'}</div></section>`;
-    body+=`${card(A,wa)}${card(B,wb)}<div style="margin-top:-6px">${legendTimeline()}</div>
-      <section class="card"><div class="card-h"><div><h2>Chiffres de la semaine</h2></div></div><div class="card-b">${wa&&wb?cmpTable(`${A.nom} ${A.prenom}`,`${B.nom} ${B.prenom}`,[wa],[wb],'total'):'<p class="mut">Les deux agents doivent être présents cette semaine.</p>'}</div></section>`;
   }
   return `<section class="card"><div class="card-b"><div class="ctrls" style="margin-bottom:0;border-bottom:0;padding-bottom:0">
-    <div class="fld"><span class="flabel">Comparer</span>${seg}</div>${ctrls}${c.mode!=='agents'?`<div class="fld"><span class="flabel">Valeur</span>${modeSel}</div>`:''}</div></div></section>${body}`;
+    <div class="fld"><span class="flabel">Comparer</span>${seg}</div>${ctrls}<div class="fld"><span class="flabel">Valeur</span>${modeSel}</div></div></div></section>${body}`;
 }
 
 /* ---------- 13. export détaillé : une ligne par RHR, par arrêt, par case vide, par mission ---------- */
