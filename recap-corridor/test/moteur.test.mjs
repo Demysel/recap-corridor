@@ -208,3 +208,13 @@ test('journée blanche : comptée la veille d’une reprise après minuit, sauf 
   assert.equal(b.journeesBlanches, 0);
   assert.equal(b.casesVides[0].raison, 'agent hors résidence ce jour-là (RHR)');
 });
+
+test('RHR ouvert en fin de semaine : écarté à la clôture s’il dure moins que le minimum', () => {
+  const w1 = run(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: ['RP', 'RP', 'RP', 'RP', 'RP', 'RP', svc(['T1', 'HENDAYE', 'IRUN', 13, '20:00', 13, '22:00'])] }]), RES);
+  const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'A', j: [svc(['T2', 'IRUN', 'HENDAYE', 13, '23:30', 14, '01:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]), RES);
+  assert.equal(w1.agents[0].nbRHR, 1);
+  E.reconcile(new Map([['2026-S37', w1], ['2026-S38', w2]]), RES);
+  assert.equal(w1.agents[0].nbRHR, 0);
+  assert.equal(w1.agents[0].rhrEnCours, 0);
+  assert.equal(w1.agents[0].coupures[0].statut, 'court');
+});

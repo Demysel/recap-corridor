@@ -1125,6 +1125,9 @@ function computeAgent(a,days,rules,residence){
   const paniers=computePaniers(all,rhr,days,rules);
 
   const toucheRes=all.some(m=>isRes(m.from)||isRes(m.to));
+  // lieu où l'agent passe le plus : s'il n'est pas la résidence, ses RHR reposent sur une résidence peut-être fausse
+  const lc={}; for(const m of all) for(const x of [m.from,m.to]) if(x){const k=normLieu(x); lc[k]=(lc[k]||0)+1;}
+  const lieuHabituel=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
   const heuresPlanifiees=r2(plan);
   return {
     matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
@@ -1150,6 +1153,7 @@ function computeAgent(a,days,rules,residence){
     warnings:warn, typesMission:types, destinations:dests, pausesInconnues, coupures, casesVides,
     nbHorsColonne:jours.reduce((s,j)=>s+(j.horsColonne?j.horsColonne.length:0),0),
     jamaisEnResidence: rhrOk&&!!residence&&all.length>0&&!toucheRes,
+    lieuHabituel, basAilleurs: rhrOk&&!!residence&&!!lieuHabituel&&!isRes(lieuHabituel),
     premiereMission: all.length?{label:all[0].label,from:all[0].from,start:all[0].start}:null,
     missions: all.map(m=>({label:m.label,from:m.from,to:m.to,start:m.start,end:m.end,d:m.d}))
   };
@@ -1192,8 +1196,15 @@ function reconcile(weeks,rulesIn){
       const fin=new Date(pm.start), deb=new Date(p.debut);
       if(fin<=deb) continue;
       p.fin=pm.start; p.dureeH=r2((fin-deb)/H); p.nuits=nights(deb,fin); p.retour=pm.label; p.cloturee=true;
+      a.rhrEnCours=0;
+      const cp=(a.coupures||[]).find(x=>x.fin==null&&x.debut===p.debut);
+      if(cp){ cp.fin=pm.start; cp.dureeH=p.dureeH; cp.retour=pm.label; if(cp.statut==='ouvert') cp.statut='rhr'; }
+      // la durée n'est connue qu'ici : un arrêt plus court que le minimum n'est pas un RHR
+      const court=p.dureeH<rules.rhrMinHours&&p.manuel!=='oui';
+      if(court){ a.rhr.splice(a.rhr.indexOf(p),1); a.nbRHR=a.rhr.length; a.rhrLieux=[...new Set(a.rhr.map(x=>x.lieu))]; if(cp){cp.statut='court';cp.compte=false;} }
       a.rhrHeures=r2(a.rhr.reduce((s,x)=>s+(x.dureeH||0),0));
       a.rhrNuits=a.rhr.reduce((s,x)=>s+(x.nuits||0),0);
+      if(court) continue;
       if(rules.panierRHR){   // paniers pris pendant la partie du RHR qui déborde sur la semaine suivante
         const seen=new Set(a.paniers.map(q=>q.date+'|'+q.plage));
         const sun1=new Date(c.meta.sunday+'T00:00:00Z').getTime()+DAY, e=fin.getTime(), s=deb.getTime();
@@ -1528,7 +1539,12 @@ function recomputeLoaded(){
 }
 /** L'évolution hebdomadaire et l'historique portent sur toutes les semaines enregistrées */
 const needsAll=()=>['graphiques','exports'].includes(S.tab);
-const toLoad=()=>needsAll()?S.weeks.map(w=>w.weekId):activeWeeks();
+/** Semaines à charger : celles affichées, plus leurs voisines — un RHR ouvert le dimanche se referme avec la
+    semaine suivante, quel que soit l'affichage, pour que les chiffres d'une semaine ne dépendent pas de la vue */
+const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
+  const ids=S.weeks.map(w=>w.weekId).sort(), out=new Set(activeWeeks());
+  for(const id of activeWeeks()){ const i=ids.indexOf(id); if(i>0) out.add(ids[i-1]); if(i>=0&&i<ids.length-1) out.add(ids[i+1]); }
+  return [...out]; };
 /* ==========================================================================
    10. GRAPHIQUES
    ========================================================================== */
@@ -1726,6 +1742,7 @@ function viewSynthese(){
   const lieux={}; sc.forEach(a=>a.rhr.forEach(r=>lieux[r.lieu]=(lieux[r.lieu]||0)+1));
   const perLieu=Object.entries(lieux).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([l,v])=>({l,v}));
   const vig=persons.filter(a=>a.jamaisEnResidence), warn=persons.filter(a=>a.warnings.length);
+  const ail=sc.filter(a=>a.basAilleurs&&!a.jamaisEnResidence);
   const fus=sc.filter(a=>a.fusion), hc=sc.filter(a=>a.nbHorsColonne>0), nHC=hc.reduce((s,a)=>s+a.nbHorsColonne,0);
   return `
   ${nW>1?`<div class="note">Périmètre cumulé sur <b>${nW} semaines</b>. Chaque agent n'apparaît qu'une fois ; les moyennes par agent sont calculées par agent et par semaine.</div>`:''}
@@ -1741,7 +1758,7 @@ function viewSynthese(){
     <section class="card"><div class="card-h"><div><h2>RHR par lieu de repos</h2><p class="card-s">destination du service aller</p></div></div>
       <div class="card-b">${barChart(perLieu,{label:'RHR'})}</div></section>
   </div>
-  ${(vig.length||warn.length||fus.length||hc.length)?`<section class="card"><div class="card-h"><h2>Points de vigilance</h2></div>
+  ${(vig.length||warn.length||fus.length||hc.length||ail.length)?`<section class="card"><div class="card-h"><h2>Points de vigilance</h2></div>
     <div class="card-b stack" style="padding-top:0;gap:9px">
     ${fus.length?`<div class="note"><b>${fus.length} agent${fus.length>1?'s':''} apparaissai${fus.length>1?'en':''}t sur plusieurs lignes du fichier</b> et ${fus.length>1?'ont été fusionnés':'a été fusionné'} jour par jour — un service l'emporte sur un code, un code sur une case vide :
       ${fus.slice(0,8).map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(String(a.weekId).replace(/^\d+-/,''))}, ${a.fusion.lignes} lignes)`).join(' · ')}${fus.length>8?' …':''}</div>`:''}
@@ -1750,6 +1767,8 @@ function viewSynthese(){
     ${vig.length?`<div class="note w"><b>${vig.length} agent${vig.length>1?'s':''} ne passe${vig.length>1?'nt':''} jamais par la résidence de son agence</b> :
       ${vig.map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(a.agence)}, résidence ${esc(a.residence)})`).join(' · ')}.
       Leurs services comptent donc intégralement comme hors résidence — à vérifier dans les Réglages.</div>`:''}
+    ${ail.length?`<div class="note w"><b>${ail.length} semaine${ail.length>1?'s':''} d'agent passée${ail.length>1?'s':''} surtout loin de la résidence de l'agence</b> — le lieu le plus fréquent de leurs missions n'est pas la résidence : leurs RHR sont à vérifier (agent détaché, prêté, ou résidence mal réglée) :
+      ${ail.slice(0,8).map(a=>`${esc(a.nom)} ${esc(a.prenom)} (${esc(String(a.weekId).replace(/^\d+-/,''))}, ${esc(a.agence)} : surtout à ${esc(a.lieuHabituel)}, résidence ${esc(a.residence)})`).join(' · ')}${ail.length>8?' …':''}</div>`:''}
     ${warn.length?`<div class="note"><b>${warn.length} reprise${warn.length>1?'s':''} de service ailleurs que la fin du service précédent</b> :
       ${warn.slice(0,8).map(a=>`${esc(a.nom)} (${esc(a.warnings[0])})`).join(' · ')}${warn.length>8?' …':''}</div>`:''}
   </div></section>`:''}`;
@@ -2193,6 +2212,8 @@ function qualite(){
   const sc=scopeAgents(), hc=sc.reduce((s,a)=>s+a.nbHorsColonne,0), jr=mergeAcrossWeeks(sc).filter(a=>a.jamaisEnResidence).length;
   const open=sc.reduce((s,a)=>s+a.rhr.filter(x=>x.enCours&&!x.fin).length,0);
   out.push({lvl:hc?'mid':'ok',t:`Missions hors colonne : ${nf(hc)}`,d:hc?'Missions dont la date ne correspond pas au jour de la colonne : écartées du calcul, à vérifier dans le fichier source.':'Aucune ligne d’une autre semaine recopiée.'});
+  const ail=sc.filter(a=>a.basAilleurs).length;
+  out.push({lvl:ail?'mid':'ok',t:`Semaines passées surtout hors résidence : ${nf(ail)}`,d:ail?'Le lieu le plus fréquent de l’agent n’est pas la résidence de son agence : détachement ou résidence mal réglée. Voir les Points de vigilance de la Synthèse.':'Chaque conducteur passe surtout par sa résidence.'});
   out.push({lvl:jr?'lo':'ok',t:`Agents jamais en résidence : ${nf(jr)}`,d:jr?'Tous leurs services comptent comme hors résidence : le signe le plus fréquent d’une résidence mal réglée.':'Tous les conducteurs passent au moins une fois par leur résidence.'});
   out.push({lvl:open?'mid':'ok',t:`Coupures sans fin connue : ${nf(open)}`,d:open?'Départs en fin de semaine dont le retour est dans une semaine non importée : comptés, mais sans durée.':'Toutes les coupures ont une durée.'});
   return `<div class="qual">${out.map(q=>`<div class="qi"><div class="qh"><span class="lvl ${q.lvl}"></span>${q.t}</div><p>${q.d}</p></div>`).join('')}</div>`;
