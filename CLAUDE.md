@@ -81,7 +81,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - TTE (temps de travail effectif, anciennement « heures planifiées », renommé à la demande) : amplitude
   moins les pauses « P: » ; une ATCMD compte 5 h de TTE, mais son amplitude reste l'horaire réel inscrit
   dans la case (précisé par l'utilisateur) ; ses paniers se lisent aussi sur cet horaire réel
-  (ATCMD 10h–20h = panier midi + panier soir). Heures sup : TTE au-delà de 35 h par agent et par semaine.
+  (ATCMD 10h–20h = panier midi + panier soir).
+  Mission (hors ATCMD) de moins de 5 h d'amplitude : comptée 5 h d'amplitude et 5 h de TTE, mission par mission
+  (validé par l'utilisateur ; réglable, 0 = désactivé). Nuit, dimanche et paniers restent lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
   Alerte « À vérifier » si une résidence manuelle n'apparaît dans aucune mission d'une semaine.

@@ -1002,6 +1002,7 @@ const DEFAULT_RULES={
   residences:{},
   seuilHebdo:35,              // heures sup au-delà, par agent et par semaine
   heuresATCMD:5,              // une ATCMD compte pour 5 h de travail
+  minMission:5,               // une mission (hors ATCMD) de moins de 5 h d'amplitude compte 5 h d'amplitude et de TTE (0 = désactivé)
   nuitAFR:[22,7],             // heures de nuit des AFR
   nuitCDR:[22,5],             // heures de nuit des conducteurs
   trajetTypes:['VOY','VS'],   // « trajet seul » : mission dont l'intitulé se réduit à l'un de ces types
@@ -1160,6 +1161,13 @@ function setBands(a){
   let n=0, prev=false; for(const c of a.coupures||[]){ if(c.compte){ if(prev) n++; prev=true; } else if(c.statut!=='court') prev=false; }
   a.rhrSuccessifs=n;
 }
+/** Heures comptées d'une mission. ATCMD : TTE fixe (5 h), amplitude = horaire réel de la case.
+    Autre mission de moins de minMission h d'amplitude : amplitude et TTE comptés minMission h (règle de l'utilisateur).
+    Heures de nuit, du dimanche et paniers restent lus sur l'horaire réel. */
+const isATCMD=m=>/ATCMD/i.test(m.label);
+const missionCourte=(m,rules)=>!isATCMD(m)&&rules.minMission>0&&m.amplitude<rules.minMission;
+const missionAmp=(m,rules)=>missionCourte(m,rules)?rules.minMission:m.amplitude;
+const missionTTE=(m,rules)=>isATCMD(m)?rules.heuresATCMD:missionCourte(m,rules)?rules.minMission:Math.max(0,m.amplitude-(m.pauseMin||0)/60);
 function computeAgent(a,days,rules,residence,weekId){
   const pk=personKey(a), corr=rules.corrections||{}, cR=corr.rhr||{}, cJ=corr.jb||{};
   // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
@@ -1186,18 +1194,19 @@ function computeAgent(a,days,rules,residence,weekId){
     if(j.kind==='CODE') codeCounts[j.family]=(codeCounts[j.family]||0)+1;
     else if(j.kind==='SERVICE'){
       joursService++; if(j.d>=5) wk++;
-      j.amplitude=r2(j.missions.reduce((s,m)=>s+m.amplitude,0));
+      j.amplitude=r2(j.missions.reduce((s,m)=>s+missionAmp(m,rules),0));
       let hj=0;
       for(const m of j.missions){
         const S=new Date(m.start), E=new Date(m.end), Sm=S.getTime(), Em=E.getTime();
         const atcmd=/ATCMD/i.test(m.label), segs=workSegments(m);
         if(m.pauseMin>0&&!(m.pauses&&m.pauses.length&&Array.isArray(m.pauses[0]))) pausesInconnues++;
-        const hPlan=atcmd?rules.heuresATCMD:Math.max(0,m.amplitude-(m.pauseMin||0)/60);
+        const hPlan=missionTTE(m,rules);
         const hNuit=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
         const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H;
         all.push({...m,S,E,segs,atcmd,d:j.d});
-        nbMissions++; amp+=m.amplitude; pauseMin+=m.pauseMin||0; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
-        if(m.amplitude>ampMax) ampMax=m.amplitude;
+        const mAmp=missionAmp(m,rules);
+        nbMissions++; amp+=mAmp; pauseMin+=m.pauseMin||0; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
+        if(mAmp>ampMax) ampMax=mAmp;
         const sh=S.getUTCHours()+S.getUTCMinutes()/60, eh=E.getUTCHours()+E.getUTCMinutes()/60;
         if(priseMin===null||sh<priseMin) priseMin=sh;
         if(finMax===null||eh>finMax) finMax=eh;
@@ -2202,7 +2211,7 @@ function rosterBand(a){
     let cls='bd', body='';
     if(j.kind==='SERVICE'){ cls+=' bd-svc';
       body=j.missions.map(m=>`<div class="ml">${esc(m.label)}</div><div class="od">${esc(m.from)} → ${esc(m.to)}</div>
-        <div class="hr">${hm(m.start)}–${hm(m.end)} · ${fmtH(m.amplitude)}</div>`).join('<div class="sep"></div>');
+        <div class="hr">${hm(m.start)}–${hm(m.end)} · ${fmtH(m.amplitude)}${missionCourte(m,{...DEFAULT_RULES,...S.rules})?` <span title="mission de moins de ${nf(S.rules.minMission??5)} h : comptée ${nf(S.rules.minMission??5)} h">→ ${fmtH(S.rules.minMission??5)}</span>`:''}</div>`).join('<div class="sep"></div>');
     } else if(j.kind==='CODE'){ cls+=' bd-code'; body=j.family==='HORS'?'<div class="cd">Non compté</div>':`<div class="cd">${esc(j.code)}</div><div class="od mut">${esc(CODEL[j.family]||'')}</div>`; }
     else if(j.blanche){ cls+=' bd-blanche'; body=`<div class="cd">Journée blanche</div>${j.horsResidence?'<div class="od">hors résidence</div>':''}`; }
     else { cls+=' bd-vide'; body=`<div class="cd" style="font-size:11px;margin-top:6px">Case vide</div><div class="od mut">${esc(j.jbRaison||'—')}</div>`; }
@@ -2501,7 +2510,7 @@ function rulesDiff(a,b){
   const L={rhrMinHours:'Durée minimale d’un RHR (h)',rhrMaxAbsence:'Seuil d’alerte d’absence (h)',rhrCoupeParRepos:'Un jour de repos interrompt le RHR',
     rhrCountPending:'Coupure ouverte en fin de semaine comptée',jbExcludeNightOverlap:'Lendemain de nuit exclu des journées blanches',
     jbRequireFramed:'Journée blanche encadrée par deux services',jbExcludeHorsResidence:'Pas de journée blanche hors résidence',panierRHR:'Panier en RHR',
-    horsColonne:'Missions hors colonne',seuilHebdo:'Seuil des heures sup (h)',heuresATCMD:'Heures d’une ATCMD',nuitAFR:'Nuit AFR',nuitCDR:'Nuit conducteurs',
+    horsColonne:'Missions hors colonne',seuilHebdo:'Seuil des heures sup (h)',heuresATCMD:'Heures d’une ATCMD',minMission:'Minimum compté par mission (h)',nuitAFR:'Nuit AFR',nuitCDR:'Nuit conducteurs',
     trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',lieuxResidence:'Lieux reconnus comme résidence'};
   const v=x=>typeof x==='boolean'?(x?'oui':'non'):Array.isArray(x)?x.join(', '):x&&typeof x==='object'?Object.entries(x).map(([k,y])=>`${k} → ${Array.isArray(y)?y.join('/'):y}`).join(' ; ')||'—':String(x);
   return Object.keys(L).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).map(k=>`${L[k]} : ${v(a[k])} → ${v(b[k])}`);
@@ -2682,7 +2691,7 @@ function explain(k){
   } else if(k==='heuresSup'||k==='heuresPlanifiees'){
     const l=sc.filter(a=>a.joursService).sort((p,q)=>q.heuresPlanifiees-p.heuresPlanifiees);
     title=k==='heuresSup'?'Heures sup':'TTE — temps de travail effectif';
-    rule=`TTE = amplitude de chaque mission moins ses pauses « P: » ; une ATCMD compte ${nfa(r.heuresATCMD)} h. Heures sup = TTE au-delà de ${nfa(r.seuilHebdo)} h, agent par agent et semaine par semaine.`;
+    rule=`TTE = amplitude de chaque mission moins ses pauses « P: » ; une ATCMD compte ${nfa(r.heuresATCMD)} h ; une autre mission de moins de ${nfa(r.minMission??5)} h d’amplitude compte ${nfa(r.minMission??5)} h (amplitude et TTE). Heures sup = TTE au-delà de ${nfa(r.seuilHebdo)} h, agent par agent et semaine par semaine.`;
     html=tbl([['Agent','l'],['Sem.','l'],['Jours'],['Amplitude'],['Pauses'],['ATCMD'],['TTE'],['Heures sup']],(k==='heuresSup'?l.filter(a=>a.heuresSup>0):l).slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td>
       <td>${a.joursService}</td><td>${fmtH(a.amplitudeTotale)}</td><td>${nf(a.pauseTotaleMin)} min</td><td>${a.nbATCMD||'<span class="z">0</span>'}</td><td><b>${fmtH(a.heuresPlanifiees)}</b></td><td>${a.heuresSup?`<b>${fmtH(a.heuresSup)}</b>`:'<span class="z">—</span>'}</td></tr>`));
   } else if(k==='heuresNuit'){
@@ -2916,7 +2925,7 @@ function viewGuide(){
     ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR (repos journalier hors résidence) s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case${r.rhrCoupeParRepos?', et s’il ne contient aucun jour de repos':''}. Un changement de train n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
     ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}${r.jbExcludeHorsResidence?'Une journée passée hors résidence non plus. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
     ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui touche la plage du midi et/ou du soir donne un panier par plage touchée':''}.`)}
-    ${card('TTE et heures sup','par agent et par semaine',dgHeures(r),`TTE (temps de travail effectif) = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
+    ${card('TTE et heures sup','par agent et par semaine',dgHeures(r),`TTE (temps de travail effectif) = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Une autre mission de moins de ${nf(r.minMission??5)} h d’amplitude compte ${nf(r.minMission??5)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
   </div>`;
 }
 
@@ -3301,6 +3310,7 @@ function viewComparer(){
 
 /* ---------- 13. export détaillé : une ligne par RHR, par arrêt, par case vide, par mission ---------- */
 function detailSheets(){
+  const R0={...DEFAULT_RULES,...S.rules};
   const sc=scopeAgents().slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr')||String(a.weekId).localeCompare(String(b.weekId)));
   const id=a=>[a.matricule,a.nom,a.prenom,a.agence,a.metier,String(a.weekId).replace(/^\d+-/,'')];
   const idc=[{t:'Matricule',w:10},{t:'Nom',w:18},{t:'Prénom',w:13},{t:'Agence',w:18},{t:'Métier',w:12},{t:'Semaine',w:8}];
@@ -3312,7 +3322,7 @@ function detailSheets(){
     for(const c of a.coupures||[]) arr.push([...id(a),c.lieu||'',d(c.debut),d(c.fin),c.dureeH,ST[c.statut]||c.statut,c.compte?'oui':'non',c.long?'oui':'',c.aller,c.retour||'',c.manuel?'oui':'']);
     for(const c of a.casesVides||[]) vides.push([...id(a),`${JN[c.d]} ${dFull(c.date)}`,c.compte?'oui':'non',c.raison||'',c.avant?`${c.avant.label} (fin ${d(c.avant.end)})`:'',c.apres?`${c.apres.label} (début ${d(c.apres.start)})`:'',c.horsResidence?'oui':'',c.manuel?'oui':'']);
     for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions)
-      mis.push([...id(a),`${JN[j.d]} ${dFull(j.date)}`,m.label,m.note||'',missionType(m.label),m.from||'',m.to||'',d(m.start),d(m.end),m.amplitude,m.pauseMin,/ATCMD/i.test(m.label)?S.rules.heuresATCMD:m.travail]);
+      mis.push([...id(a),`${JN[j.d]} ${dFull(j.date)}`,m.label,m.note||'',missionType(m.label),m.from||'',m.to||'',d(m.start),d(m.end),missionAmp(m,R0),m.pauseMin,missionTTE(m,R0)]);
   }
   return [
     {name:'RHR',cols:[...idc,{t:'Résidence',w:10},{t:'Lieu',w:10},{t:'Fin de mission',w:17},{t:'Reprise',w:17},{t:'Durée (h)',w:9,fmt:'dec'},{t:'Nuits',w:6,fmt:'int'},{t:'Tranche (annexe 1)',w:12},{t:'Mission aller',w:16},{t:'Mission retour',w:16},{t:'Corrigé',w:8}],rows:rhr},
@@ -3699,7 +3709,8 @@ function viewReglages(){
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures supplémentaires et ATCMD</span>
           <span class="rd">Heures sup : TTE hors pauses au-delà du seuil, par agent et par semaine. Une ATCMD compte pour un nombre d'heures fixe.</span>
           <span class="inl">au-delà de <input type="text" id="rSeuil" value="${r.seuilHebdo}" inputmode="decimal"> <span class="mut">h / semaine</span></span>
-          <span class="inl">une ATCMD = <input type="text" id="rATCMD" value="${r.heuresATCMD}" inputmode="decimal"> <span class="mut">h</span></span></span></div>
+          <span class="inl">une ATCMD = <input type="text" id="rATCMD" value="${r.heuresATCMD}" inputmode="decimal"> <span class="mut">h</span></span>
+          <span class="inl">mission de moins de <input type="text" id="rMinM" value="${r.minMission??5}" inputmode="decimal"> <span class="mut">h d'amplitude comptée ce minimum (0 = non)</span></span></span></div>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures de nuit (hors pauses)</span>
           <span class="rd">Temps réellement travaillé dans la plage de nuit, pauses déduites.</span>
           <span class="inl">AFR de <input type="text" id="rNA0" value="${r.nuitAFR[0]}"> h à <input type="text" id="rNA1" value="${r.nuitAFR[1]}"> h</span>
@@ -3734,7 +3745,7 @@ function viewReglages(){
       <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR (repos journalier hors résidence, accord d'entreprise art. 18), de jour comme de nuit — même si les deux missions sont dans la même case${r.rhrCoupeParRepos?'. Un arrêt qui contient un jour de repos ou d’absence n’en est pas un : le repos périodique se prend à résidence (art. 19)':''}. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
       <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
-      <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
+      <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h (son amplitude reste l’horaire réel) ; une autre mission de moins de ${nf(r.minMission??5)} h d’amplitude compte ${nf(r.minMission??5)} h d’amplitude et de TTE. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
       <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
       <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage)':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
@@ -4124,7 +4135,7 @@ document.addEventListener('click',async e=>{
       panierRHR: el('rPRHR').checked,
       horsColonne: el('rHC').checked?'ecarter':'garder',
       rhrMinHours: Math.max(0,num('rMin',8)), rhrMaxAbsence: Math.max(1,num('rMax',44)), rhrCoupeParRepos: el('rCRP').checked,
-      seuilHebdo: num('rSeuil',35), heuresATCMD: num('rATCMD',5),
+      seuilHebdo: num('rSeuil',35), heuresATCMD: num('rATCMD',5), minMission: num('rMinM',5),
       nuitAFR:[num('rNA0',22),num('rNA1',7)], nuitCDR:[num('rNC0',22),num('rNC1',5)],
       trajetTypes: String(el('rTraj').value).split(/[,;]/).map(x=>x.trim().toUpperCase()).filter(Boolean),
       // une résidence déduite automatiquement reste automatique (elle peut s'écrire BX une semaine, BORDEAUX une autre) :

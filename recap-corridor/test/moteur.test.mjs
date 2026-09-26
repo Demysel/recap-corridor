@@ -96,6 +96,19 @@ test('ATCMD : les paniers se lisent sur la plage horaire réelle, pas sur les 5 
   assert.equal(a.nbPaniers, 2);
 });
 
+test('mission de moins de 5 h d’amplitude : comptée 5 h (amplitude et TTE), chaque mission à part, ATCMD à part', () => {
+  const j = [svc(['T1', 'HENDAYE', 'BAYONNE', 7, '06:00', 7, '09:00'], ['T2', 'BAYONNE', 'HENDAYE', 7, '12:00', 7, '14:00']),
+    svc(['T3', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '14:00', [[8, '10:00', 8, '10:30']]]),
+    svc(['ATCMD', 'HENDAYE', 'HENDAYE', 9, '10:00', 9, '12:00']), 'RP', 'RP', 'RP', 'RP'];
+  const a = one(j, {}, RES);
+  // lundi : 2 missions courtes = 5 + 5 ; mardi : 8 h d'amplitude, 7h30 de TTE ; mercredi : ATCMD 2 h réelles, 5 h de TTE
+  assert.equal(a.amplitudeTotale, 5 + 5 + 8 + 2);
+  assert.equal(a.heuresPlanifiees, 5 + 5 + 7.5 + 5);
+  const b = one(j, {}, { ...RES, minMission: 0 });
+  assert.equal(b.amplitudeTotale, 3 + 2 + 8 + 2);
+  assert.equal(b.heuresPlanifiees, 3 + 2 + 7.5 + 5);
+});
+
 test('mission sans horaire : signalée, puis comptée une fois l’horaire saisi', () => {
   const cell = 'TRAIN X\nHENDAYE - BORDEAUX';
   const rows = week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]);
