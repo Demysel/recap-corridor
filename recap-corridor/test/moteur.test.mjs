@@ -295,3 +295,22 @@ test('vitrine : un trajet n’est publié que si au moins 5 agents différents l
   assert.equal(e, 'BORDEAUX-HENDAYE');
   assert.equal(v.flux[0].rhr.map((x) => x.l).join(','), 'BORDEAUX');
 });
+
+test('agent exclu des chiffres : signalé, et retiré de la vitrine', () => {
+  const agents = [1, 2, 3, 4, 5, 6].map((i) => ({ mat: '4' + i, nom: 'Y' + i, j: [svc(['T', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), null, 'RP', 'RP', 'RP', 'RP'] }));
+  const rules = E.loadRules({ residences: { Hendaye: 'HENDAYE' }, corrections: { exclus: { 'm:41': { motif: 'test' }, 'm:42|2026-S37': { motif: 'semaine' } } } });
+  const v = E.applyRules(E.parseWeek(week([2026, 9, 7], agents)), rules);
+  assert.equal(v.agents.filter((a) => a.exclu).length, 2);
+  const vit = E.vitrineData([E.parseWeek(week([2026, 9, 7], agents))], rules);
+  assert.equal(vit.cells.length, 0);                    // 4 agents restants : sous le seuil de 5
+  assert.equal(vit.ecartes, 4);
+});
+
+test('résidence propre à l’agent à partir d’une semaine (mouvement d’agence)', () => {
+  const j = [svc(['T', 'LILLE', 'LILLE', 7, '06:00', 7, '14:00']), svc(['T', 'LILLE', 'LILLE', 8, '06:00', 8, '14:00']), null, null, null, null, null];
+  assert.equal(one(j, {}, RES).nbRHR, 2);
+  const a = one(j, {}, { ...RES, corrections: { residenceAgent: { 'm:1|2026-S37': 'LILLE' } } });
+  assert.equal(a.nbRHR, 0);
+  assert.equal(a.residence, 'LILLE');
+  assert.equal(one(j, {}, { ...RES, corrections: { residenceAgent: { 'm:1|2026-S38': 'LILLE' } } }).nbRHR, 2);   // à partir de la semaine suivante seulement
+});

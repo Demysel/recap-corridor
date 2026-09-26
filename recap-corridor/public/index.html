@@ -430,6 +430,9 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
   body.presenting .sl{zoom:1;box-shadow:none;border-radius:0;break-after:page;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   @page{size:1280px 720px;margin:0}
 }
+.gst-r{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
+.gst-r .rt{font-weight:700}.gst-r .rs{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.card.excl{opacity:.72;border-style:dashed}
 .lnk{border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit}
 .lnk:hover .nm{color:var(--accent);text-decoration:underline}
 .sub-h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 8px}
@@ -1098,8 +1101,14 @@ function computeAgent(a,days,rules,residence,weekId){
   const pk=personKey(a), corr=rules.corrections||{}, cR=corr.rhr||{}, cJ=corr.jb||{};
   // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
   const ratt=(corr.residenceSemaine||{})[pk+'|'+weekId]||null;
-  if(ratt) residence=normLieu(ratt);
-  const resSet=new Set(ratt?[residence]:[residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
+  // résidence propre à l'agent à partir d'une semaine (mouvement d'agence), saisie dans sa fiche
+  const perso=Object.entries(corr.residenceAgent||{}).filter(([k])=>k.startsWith(pk+'|')&&k.slice(pk.length+1)<=String(weekId))
+    .sort((x,y)=>x[0].localeCompare(y[0])).pop();
+  const resPerso=perso?{lieu:perso[1],depuis:perso[0].slice(pk.length+1)}:null;
+  if(ratt) residence=normLieu(ratt); else if(resPerso) residence=normLieu(resPerso.lieu);
+  const resSet=new Set(ratt||resPerso?[residence]:[residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
+  // agent écarté des chiffres (incohérence) : calculé quand même, pour rester consultable et réintégrable
+  const exclu=(corr.exclus||{})[pk]||(corr.exclus||{})[pk+'|'+weekId]||null;
   const isRes=l=>resSet.has(normLieu(l));
   const rhrOk=rules.rhrMetiers.includes(a.metier);
   const nuitW=isAFR(a.metier)?rules.nuitAFR:rules.nuitCDR;
@@ -1249,7 +1258,7 @@ function computeAgent(a,days,rules,residence,weekId){
     paniersMidi:paniers.filter(p=>p.plage==='midi').length, paniersSoir:paniers.filter(p=>p.plage==='soir').length,
     paniersNuit:paniers.filter(p=>p.plage==='nuit').length, paniersRHR:paniers.filter(p=>p.source==='RHR').length,
     priseServicePlusTot:priseMin===null?null:r2(priseMin), finServicePlusTard:finMax===null?null:r2(finMax),
-    rattachement:ratt, nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
+    rattachement:ratt, residencePerso:resPerso, exclu, nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
     rhrNuits:rhr.reduce((s,x)=>s+(x.nuits||0),0), rhrLieux:[...new Set(rhr.map(x=>x.lieu))], rhr,
     warnings:warn, typesMission:types, destinations:dests, pausesInconnues, coupures, casesVides,
     nbHorsColonne:jours.reduce((s,j)=>s+(j.horsColonne?j.horsColonne.length:0),0),
@@ -1513,6 +1522,7 @@ function vitrineData(weeks,rulesIn,K=VITRINE_K){
   const cells=[], flux=[]; let ecartes=0;
   for(const [id,v] of map){
     const autres=[];
+    v.agents=v.agents.filter(a=>!a.exclu);
     for(const [ag,l] of groupBy(v.agents,a=>a.agence)){
       if(l.length<K){ autres.push(...l); continue; }
       const byMe=[...groupBy(l,a=>a.metier)], big=byMe.filter(([,x])=>x.length>=K), small=byMe.filter(([,x])=>x.length<K).flatMap(([,x])=>x);
@@ -1739,6 +1749,7 @@ function scopeAgents(opts={}){
   for(const id of (opts.allWeeks?S.weeks.map(w=>w.weekId):activeWeeks())){
     const w=S.loaded.get(id); if(!w) continue;
     for(const a of w.agents){
+      if(a.exclu&&!opts.exclus) continue;
       if(S.selAgences&&!S.selAgences.includes(a.agence)) continue;
       if(S.selMetiers&&!S.selMetiers.includes(a.metier)) continue;
       if(S.search&&!deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(deacc(S.search).toLowerCase())) continue;
@@ -1980,6 +1991,8 @@ function viewSynthese(){
   const fus=sc.filter(a=>a.fusion), hc=sc.filter(a=>a.nbHorsColonne>0), nHC=hc.reduce((s,a)=>s+a.nbHorsColonne,0);
   return `
   ${nW>1?`<div class="note">Périmètre cumulé sur <b>${nW} semaines</b>. Chaque agent n'apparaît qu'une fois ; les moyennes par agent sont calculées par agent et par semaine.</div>`:''}
+  ${(()=>{ const n=new Set(scopeAgents({exclus:true}).filter(a=>a.exclu).map(personKey)).size;
+      return n?`<div class="note w"><b>${n} agent${n>1?'s':''} exclu${n>1?'s':''} des chiffres</b> sur ce périmètre (incohérence signalée) — liste et réintégration dans Réglages, « Corrections mémorisées ».</div>`:''; })()}
   ${enBref()}
   ${kpiRow(g)}
   <section class="card">
@@ -2370,9 +2383,9 @@ async function saveCorrection(msg,detail){
 /** Chiffres clés de toutes les semaines chargées : le journal note leur valeur avant et après chaque changement */
 /** Nom d'une personne d'après sa clé (m:matricule ou n:NOM|PRENOM), pour le journal */
 function nmPk(pk){ for(const w of S.loaded.values()){ const a=w.agents.find(x=>personKey(x)===pk); if(a) return `${a.nom} ${a.prenom}`; } return pk.replace(/^[mn]:/,''); }
-function corrDetail(key){ const [pk,a,b]=key.split('|'); return `${nmPk(pk)} · ${a&&a.length>10?dtISO(a):a?dFull(a):''}${b?' → '+dtISO(b):''}`; }
+function corrDetail(key){ const [pk,a,b]=key.split('|'); const d=!a?'toutes les semaines':/^\d{4}-S\d{2}$/.test(a)?a:a.length>10?dtISO(a):dFull(a); return `${nmPk(pk)} · ${d}${b?' → '+dtISO(b):''}`; }
 function totaux(){
-  const all=[...S.loaded.values()].flatMap(v=>v.agents), g=agg(all);
+  const all=[...S.loaded.values()].flatMap(v=>v.agents).filter(a=>!a.exclu), g=agg(all);
   return {rhr:g.nbRHR,jb:g.journeesBlanches,sup:g.heuresSup,tte:g.heuresPlanifiees,nuit:g.heuresNuit,paniers:g.nbPaniers};
 }
 const TOT_L={rhr:['RHR',nf],jb:['Journées blanches',nf],sup:['Heures sup',fmtH],tte:['TTE',fmtH],nuit:['Heures de nuit',fmtH],paniers:['Paniers',nf]};
@@ -2447,7 +2460,7 @@ function collectAlertes(){
   let prevR=null;
   for(const id of ids){ const v=S.loaded.get(id), w=W(id);
     for(const h of v.meta.horsColonne||[]) add({key:`hc|${id}|${h.agent}|${h.start}`,type:'horscol',niv:'moyenne',w:id,ag:h.agence,titre:`${h.agent} · ${h.jour}`,detail:`${h.label} daté du ${dtISO(h.start)} : écartée du calcul`});
-    for(const a of v.agents){ const pk=personKey(a), nm=`${a.nom} ${a.prenom}`;
+    for(const a of v.agents){ if(a.exclu) continue; const pk=personKey(a), nm=`${a.nom} ${a.prenom}`;
       for(const c of a.coupures||[]) if(c.long) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`});
       if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`});
       else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`}); }
@@ -2463,7 +2476,7 @@ function collectAlertes(){
     for(const m of suspicions(cur,prevW)) add({key:`susp|${id}|${m.replace(/\d+/g,'#')}`,type:'fichier',niv:'moyenne',w:id,titre:w?weekLabel(w):id,detail:m});
     prevR=cur; }
   // écarts inhabituels : chaque agent comparé à ses propres semaines, chaque agence à ses propres semaines
-  const rows=[...S.loaded.entries()].flatMap(([id,v])=>v.agents.map(a=>({id,a})));
+  const rows=[...S.loaded.entries()].flatMap(([id,v])=>v.agents.filter(a=>!a.exclu).map(a=>({id,a})));
   for(const [pk,l] of groupBy(rows,x=>personKey(x.a))) for(const [k,lab,minD,f] of ECARTS){
     if(k==='nbRHR'&&!l[0].a.rhrApplicable) continue;
     for(const e of ecartsDe(l.map(x=>({w:x.id,v:x.a[k]||0,a:x.a})),k,lab,minD,f))
@@ -2625,6 +2638,27 @@ function enBref(){
   P.push(`Heure la plus chargée : ${String(pk).padStart(2,'0')}h–${String(pk+1).padStart(2,'0')}h ; ${nf(100*g.heuresNuit/(g.heuresPlanifiees||1),0)} % du temps de travail se fait de nuit.`);
   if(S.alN) P.push(`<a href="#" data-goto="verifier">${nf(S.alN)} alerte${S.alN>1?'s':''} à vérifier</a>.`);
   return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`;
+}
+
+/* ---------- fiche agent : exclusion des chiffres et résidence propre ---------- */
+function gestionAgent(a,weeks){
+  if(!admin()) return a.exclu?`<div class="note w"><b>Agent exclu des chiffres</b>${a.exclu.motif?` : ${esc(a.exclu.motif)}`:''}.</div>`:'';
+  const pk=personKey(a), c=S.rules.corrections||{}, ex=(c.exclus||{})[pk];
+  const exW=Object.entries(c.exclus||{}).filter(([k])=>k.startsWith(pk+'|'));
+  const resE=Object.entries(c.residenceAgent||{}).filter(([k])=>k.startsWith(pk+'|')).sort();
+  const lieux=[...new Set([...weeks.flatMap(x=>(x.missions||[]).flatMap(m=>[m.from,m.to])),...weeks.map(x=>x.residence)].filter(Boolean).map(normLieu))].sort();
+  const ids=S.weeks.map(w=>w.weekId).sort(), W=id=>S.weeks.find(w=>w.weekId===id);
+  const cur=weeks[0], src=cur?.rattachement?`rattachement temporaire (${esc(cur.weekId)})`:cur?.residencePerso?`propre à l’agent depuis ${esc(weekLabel(W(cur.residencePerso.depuis)||{week:'?',year:''}))}`:'celle de l’agence';
+  return `<section class="card gst"><div class="card-h"><div><h2>Gestion de l’agent</h2><p class="card-s">mémorisé pour tous, noté au journal</p></div></div>
+    <div class="card-b stack" style="padding-top:0;gap:14px">
+      <div class="gst-r"><div><div class="rt">Chiffres</div><div class="rs">${ex?`<span class="pill pill-c">exclu de toutes les semaines</span> ${ex.motif?esc(ex.motif)+' · ':''}${ex.le?dFull(ex.le):''}`:exW.length?`<span class="pill pill-w">exclu ${exW.length} semaine${exW.length>1?'s':''}</span> ${exW.map(([k])=>esc(k.split('|')[1])).join(', ')}`:'compté normalement'}</div></div>
+        <div class="btns">${ex?`<button class="btn btn-sm" data-excl="${esc(pk)}" data-v="">Réintégrer dans les chiffres</button>`:`<button class="btn btn-sm dgr" data-excl="${esc(pk)}" data-v="1">Exclure de toutes les semaines…</button>`}</div></div>
+      <div class="gst-r"><div><div class="rt">Résidence</div><div class="rs">${cur?`<b class="mono">${esc(cur.residence||'—')}</b> · ${src}`:'—'}${resE.length?`<br>${resE.map(([k,v])=>`depuis ${esc(k.split('|')[1])} : <b class="mono">${esc(v)}</b> <button class="lnk" data-resagdel="${esc(k)}" title="Supprimer">×</button>`).join(' · ')}`:''}</div></div>
+        <div class="btns" style="align-items:center"><input type="text" id="raL" list="raList" placeholder="lieu (ex. HE)" class="mono" style="width:120px"><datalist id="raList">${lieux.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+          <select id="raW">${ids.slice().reverse().map(id=>`<option value="${id}"${id===cur?.weekId?' selected':''}>à partir de ${weekLabel(W(id))}</option>`).join('')}</select>
+          <button class="btn btn-sm btn-pri" data-resag="${esc(pk)}">Changer la résidence</button></div></div>
+      <p class="hint">Mouvement d’agence : la nouvelle résidence s’applique à partir de la semaine choisie et aux suivantes ; les semaines d’avant gardent l’ancienne. Le rattachement temporaire (une seule semaine) se règle plus bas, semaine par semaine.</p>
+    </div></section>`;
 }
 
 /* ---------- guide de lecture : schémas générés à partir des règles en vigueur ---------- */
@@ -3466,7 +3500,9 @@ function correctionsCard(){
   const rows=[...rh.map(([k,v])=>{const [pk,a,b]=k.split('|');return {t:v==='oui'?'Coupure comptée en RHR':'Coupure écartée',q:nm(pk),d:`${when(a)} → ${when(b)}`,del:['rhr',k]};}),
     ...li.map((l,i)=>({t:'Missions liées',q:nm(l.p),d:`${dtISO(l.a)} → ${dtISO(l.b)}`,del:['liens',i]})),
     ...jb.map(([k,v])=>{const [pk,d]=k.split('|');return {t:v==='oui'?'Journée blanche ajoutée':'Journée blanche écartée',q:nm(pk),d:dFull(d),del:['jb',k]};}),
-    ...Object.entries(c.residenceSemaine||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Rattachement temporaire à ${v}`,q:nm(pk),d:w,del:['residenceSemaine',k]};})];
+    ...Object.entries(c.residenceSemaine||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Rattachement temporaire à ${v}`,q:nm(pk),d:w,del:['residenceSemaine',k]};}),
+    ...Object.entries(c.residenceAgent||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Résidence propre : ${v}`,q:nm(pk),d:'à partir de '+w,del:['residenceAgent',k]};}),
+    ...Object.entries(c.exclus||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Exclu des chiffres${v.motif?' — '+v.motif:''}`,q:nm(pk),d:w||'toutes les semaines',del:['exclus',k]};})];
   return `<section class="card"><div class="card-h"><div><h2>Corrections mémorisées</h2>
     <p class="card-s">${nf(rows.length)} correction${rows.length>1?'s':''} — rejouées à chaque affichage, même après un réimport</p></div></div>
     <div class="card-b">${rows.length?`<div class="tw"><table><thead><tr><th class="l">Correction</th><th class="l">Agent</th><th class="l">Quand</th>${admin()?'<th></th>':''}</tr></thead><tbody>
@@ -3648,7 +3684,7 @@ function closeDrawer(){
 function renderDrawer(){
   if(!S.drawer) return;
   // après une correction, la fiche est reconstruite à partir des chiffres recalculés
-  const pk0=personKey(S.drawer), upd=mergeAcrossWeeks(scopeAgents()).find(p=>personKey(p)===pk0);
+  const pk0=personKey(S.drawer), upd=mergeAcrossWeeks([...S.loaded.values()].flatMap(v=>v.agents).filter(x=>personKey(x)===pk0)).find(Boolean);
   if(upd) S.drawer=upd;
   const a=S.drawer;
   const weeks=(a.parSemaine||[a]).slice().sort((x,y)=>String(y.weekId).localeCompare(String(x.weekId)));
@@ -3657,6 +3693,7 @@ function renderDrawer(){
     <div class="dw-h"><div><h2>${esc(a.nom)} ${esc(a.prenom)}</h2>
       <div class="s">${esc(a.matricule)} · ${esc((a.agences||[a.agence]).join(' → '))} · ${esc(a.metier)} · ${nf(weeks.length)} semaine${weeks.length>1?'s':''}${a.residence?` · résidence ${esc(a.residence)}`:''}</div></div>
       <button class="x" id="dwx" aria-label="Fermer">×</button></div>
+    ${gestionAgent(a,weeks)}
     <div class="ml2">
       <div><div class="k">Jours de service</div><div class="v">${a.joursService}</div></div>
       <div><div class="k">RHR</div><div class="v">${a.rhrApplicable?a.nbRHR:'n/a'}</div></div>
@@ -3672,8 +3709,9 @@ function renderDrawer(){
       <div><div class="k">Fin la + tard</div><div class="v">${fmtHour(a.finServicePlusTard)}</div></div>
     </div>
     ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
-      return `<section class="card"><div class="card-h"><div><h2>${w?weekLabel(w)+' · '+weekRange(w):esc(String(x.weekId))}</h2>
-        <p class="card-s">${esc(x.agence)} · ${fmtH(x.heuresPlanifiees)} de TTE${x.heuresSup?` · <b>${fmtH(x.heuresSup)} sup</b>`:''} · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.nbPaniers} panier${x.nbPaniers>1?'s':''}${x.fusion?` · <span class="pill pill-n">${x.fusion.lignes} lignes fusionnées</span>`:''}</p></div></div>
+      const xk=personKey(x)+'|'+x.weekId, xe=(S.rules.corrections.exclus||{})[xk];
+      return `<section class="card${x.exclu?' excl':''}"><div class="card-h"><div><h2>${w?weekLabel(w)+' · '+weekRange(w):esc(String(x.weekId))}${x.exclu?' <span class="pill pill-c">exclue des chiffres</span>':''}</h2>
+        <p class="card-s">${esc(x.agence)} · ${fmtH(x.heuresPlanifiees)} de TTE${x.heuresSup?` · <b>${fmtH(x.heuresSup)} sup</b>`:''} · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.nbPaniers} panier${x.nbPaniers>1?'s':''}${x.fusion?` · <span class="pill pill-n">${x.fusion.lignes} lignes fusionnées</span>`:''}</p></div>${admin()&&!(S.rules.corrections.exclus||{})[personKey(x)]?`<button class="btn btn-sm${xe?'':' dgr'}" data-excl="${esc(xk)}" data-v="${xe?'':'1'}">${xe?'Réintégrer cette semaine':'Exclure cette semaine…'}</button>`:''}</div>
         <div class="card-b">${weekTimeline(x)}
           <div class="sub-h">Coupures entre missions</div>${coupuresView(x)}
           <div class="sub-h">Cases vides</div>${videsView(x)}
@@ -3786,7 +3824,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -3836,6 +3874,17 @@ document.addEventListener('click',async e=>{
     if(!(ib>ia)){ S.msg={m:'Choisissez une seconde mission postérieure à la première.',t:'w'}; render(); return; }
     S.rules.corrections.liens=[...(S.rules.corrections.liens||[]).filter(l=>!(l.p===pk&&l.a===ms[ia].start)),{p:pk,a:ms[ia].start,b:ms[ib].start}];
     return saveCorrection(`Missions liées : ${ms[ia].label} → ${ms[ib].label}`,`${nmPk(pk)} · ${dtISO(ms[ia].end)} → ${dtISO(ms[ib].start)}`); }
+  if(t.dataset.excl!=null&&admin()){ const k=t.dataset.excl, c=S.rules.corrections; c.exclus=c.exclus||{};
+    if(t.dataset.v){ const m=prompt('Motif de l’exclusion (visible au journal et dans la fiche) :',''); if(m==null) return;
+      c.exclus[k]={motif:m.trim(),le:new Date().toISOString(),auteur:S.auteur||''}; }
+    else delete c.exclus[k];
+    return saveCorrection(t.dataset.v?(k.includes('|')?'Agent exclu des chiffres pour une semaine':'Agent exclu des chiffres'):'Agent réintégré dans les chiffres',corrDetail(k)); }
+  if(t.dataset.resag!=null&&admin()){ const pk=t.dataset.resag, l=el('raL').value.trim(), w=el('raW').value;
+    if(!l){ S.msg={m:'Indiquez le lieu de la nouvelle résidence.',t:'w'}; render(); return; }
+    const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=normLieu(l);
+    return saveCorrection(`Résidence de l’agent : ${normLieu(l)} à partir de ${w}`,nmPk(pk)); }
+  if(t.dataset.resagdel!=null&&admin()){ const k=t.dataset.resagdel; delete S.rules.corrections.residenceAgent[k];
+    return saveCorrection('Résidence propre à l’agent supprimée',corrDetail(k)); }
   if(t.dataset.ratt!=null&&admin()){ const k=t.dataset.ratt, c=S.rules.corrections; c.residenceSemaine=c.residenceSemaine||{};
     const v=t.dataset.sel?el(t.dataset.sel)?.value:'';
     if(v) c.residenceSemaine[k]=v; else delete c.residenceSemaine[k];

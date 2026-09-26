@@ -50,8 +50,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Lieux comparés sans majuscules, accents ni ponctuation (fautes de frappe des fichiers).
 - Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
-  résidence d'une agence. Mémorisées dans `recap.config` (clé `regles`, champs `corrections`,
-  `lieuxResidence`) et rejouées à chaque affichage, même après réimport.
+  résidence d'une agence, agent exclu des chiffres (toutes les semaines ou une seule, avec motif ;
+  calculé mais retiré de tous les chiffres et de la vitrine, réintégrable), résidence propre à un agent
+  à partir d'une semaine (mouvement d'agence ; prioritaire sur celle de l'agence, le rattachement
+  temporaire d'une semaine restant prioritaire). Mémorisées dans `recap.config` (clé `regles`, champs
+  `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, exclus ; `lieuxResidence`) et rejouées
+  à chaque affichage, même après réimport.
 - Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit, et
   pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
   minuit compte si l'agent est à sa résidence.
