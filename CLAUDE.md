@@ -60,6 +60,10 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   importée ; clos avec la première mission de S+1 ; supprimé si S+1 est importée sans mission mais avec un code.
   Statut « en ce moment » (heure de l'appareil, comme les horaires du fichier) : « en service » pendant une mission,
   « en RHR · lieu » pendant un RHR — pastille dans Agents, RHR et la fiche ; note « En ce moment » dans la Synthèse.
+- Agences hors production (`agencesExclues`, défaut ['Paris'], demandé par l'utilisateur) : l'agence et tous ses agents
+  sont retirés dès la lecture (applyRules), donc de tous les chiffres, listes, exports et de la vitrine, pour les anciens
+  comme les futurs fichiers ; nom comparé sans majuscules ni accents, « Agence Paris » = « Paris ». Réglages → « Agences hors
+  production » (cocher / décocher, noté au journal). Un agent n'est retiré que les semaines où il est dans l'agence exclue.
 - Lieux comparés sans majuscules, accents ni ponctuation (fautes de frappe des fichiers).
 - Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme

@@ -500,3 +500,13 @@ test('RHR de fin de semaine : semaine suivante importée avec seulement des code
   assert.equal(w1.agents[0].rhrEnCours, 0);
   assert.equal(w1.agents[0].nbRHR, 0);
 });
+
+test('agence hors production (Paris) : ses agents sont retirés de tous les chiffres, anciens et nouveaux noms', () => {
+  const rows = week([2026, 9, 7], [
+    { mat: '1', nom: 'A', ag: 'Hendaye', j: Array(7).fill('RP') },
+    { mat: '2', nom: 'B', ag: 'Paris', j: Array(7).fill('RP') },
+    { mat: '3', nom: 'C', ag: 'Agence Paris', j: Array(7).fill('RP') },
+    { mat: '4', nom: 'D', ag: 'PARIS', j: Array(7).fill('RP') }]);
+  assert.equal(JSON.stringify(run(rows, RES).agents.map((a) => a.matricule)), '["1"]');
+  assert.equal(run(rows, { ...RES, agencesExclues: [] }).agents.length, 4);
+});

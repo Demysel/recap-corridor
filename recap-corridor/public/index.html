@@ -1040,6 +1040,7 @@ const DEFAULT_RULES={
   rhrMaxAbsence:44,            // au-delà, l'arrêt est signalé : 44 h d'absence du domicile au plus (art. 18)
   lieuxResidence:{},          // par agence : autres écritures de la résidence (HE, HENDAYE…) apprises à la correction
   agencesAlias:{},            // nom d'agence du fichier -> nom retenu (anciens fichiers : « Agence Bordeaux »)
+  agencesExclues:['Paris'],   // agences hors production : leurs agents sont retirés de tous les chiffres (demandé par l'utilisateur)
   corrections:{rhr:{},jb:{},liens:[]},   // corrections manuelles, mémorisées et rejouées à chaque affichage
   rulesVersion:4,
   rhrCountPending:true,
@@ -1134,11 +1135,18 @@ function deduceResidences(agents,rules){
   }
   return {residences:res, residenceSource:src, locCounts:cnt};
 }
+/** Agence hors production (Réglages) : comparée sans majuscules, accents ni ponctuation ; « Agence Paris » = « Paris » */
+function agenceExclue(ag,rules){
+  const L=(rules.agencesExclues||[]).map(normLieu); if(!L.length) return false;
+  const n=normLieu(ag), m=n.replace(/^AGENCE /,'');
+  return L.includes(n)||L.includes(m);
+}
 function applyRules(parsed, rulesIn){
   const rules={...DEFAULT_RULES,...rulesIn};
   const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
   const al=rules.agencesAlias||{};
-  const src=parsed.agents.map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};});
+  const src=parsed.agents.map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};})
+    .filter(a=>!agenceExclue(a.agence,rules));   // agences hors production : jamais comptées, anciens comme nouveaux fichiers
   const cM=(rules.corrections||{}).metierAgent||{};
   const src1=Object.keys(cM).length?src.map(a=>{const c=correctionPeriode(cM,personKey(a),parsed.meta.weekId,isoD(days[3]));
     return c&&c.v!==a.metier?{...a,metierFichier:a.metier,metier:c.v}:a;}):src;
@@ -1907,7 +1915,7 @@ function autoAlias(extra=[]){ return autoAliasFrom([...S.weeks.flatMap(w=>w.agen
 /** Règles effectivement appliquées : réglages + correspondances d'agences automatiques */
 const effRules=(extra)=>({...S.rules,agencesAlias:{...autoAlias(extra),...(S.rules.agencesAlias||{})}});
 const agName=a=>effRules().agencesAlias[a]||a;
-const allAgences=()=>{const al=effRules().agencesAlias;return [...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].sort();};
+const allAgences=()=>{const R=effRules(), al=R.agencesAlias;return [...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].filter(a=>!agenceExclue(a,{...DEFAULT_RULES,...R})).sort();};
 const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMetier(m)||m))].sort();
 /* Périodes : une semaine, un mois, une année, ou un échantillon glissant compté depuis la dernière semaine enregistrée.
    Une semaine appartient au mois et à l'année de son jeudi (règle ISO : c'est là qu'elle a le plus de jours). */
@@ -2671,7 +2679,7 @@ function rulesDiff(a,b){
     rhrCountPending:'Coupure ouverte en fin de semaine comptée',jbExcludeNightOverlap:'Lendemain de nuit exclu des journées blanches',
     jbRequireFramed:'Journée blanche encadrée par deux services',jbExcludeHorsResidence:'Pas de journée blanche hors résidence',panierRHR:'Panier en RHR',
     horsColonne:'Missions hors colonne',seuilHebdo:'Seuil des heures sup (h)',heuresATCMD:'Heures d’une ATCMD',minMission:'Minimum compté par mission (h)',nuitAFR:'Nuit AFR',nuitCDR:'Nuit conducteurs',
-    trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',lieuxResidence:'Lieux reconnus comme résidence'};
+    trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',agencesExclues:'Agences hors production',lieuxResidence:'Lieux reconnus comme résidence'};
   const v=x=>typeof x==='boolean'?(x?'oui':'non'):Array.isArray(x)?x.join(', '):x&&typeof x==='object'?Object.entries(x).map(([k,y])=>`${k} → ${Array.isArray(y)?y.join('/'):y}`).join(' ; ')||'—':String(x);
   return Object.keys(L).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).map(k=>`${L[k]} : ${v(a[k])} → ${v(b[k])}`);
 }
@@ -3829,6 +3837,15 @@ function queueView(){
       <button class="btn" id="clearQ"${S.busy?' disabled':''}>Tout retirer</button></div>`:''}</div>`;
 }
 
+/** Agences hors production : cochées = retirées de tous les chiffres (et de la vitrine) */
+function exclusCard(){
+  const al=effRules().agencesAlias, R={...DEFAULT_RULES,...S.rules};
+  const all=[...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].sort();
+  return `<section class="card"><div class="card-h"><div><h2>Agences hors production</h2>
+    <p class="card-s">cochée = l’agence et tous ses agents sont retirés de tous les chiffres, des exports et de la vitrine — anciens comme futurs fichiers</p></div></div>
+    <div class="card-b"><div class="frow">${all.map(a=>{const x=agenceExclue(a,R);return `<button class="chip" data-agexcl="${esc(a)}" aria-pressed="${x}"${admin()?'':' disabled'}>${x?'✕ ':''}${esc(a)}</button>`;}).join('')}</div>
+    <p class="hint">Aujourd’hui exclues : ${(R.agencesExclues||[]).length?R.agencesExclues.map(esc).join(', '):'aucune'}. Un agent qui change d’agence n’est retiré que pour les semaines où il est dans une agence exclue.</p></div></section>`;
+}
 /** Correspondance des noms d'agence (anciens fichiers) */
 function agencesCard(){
   const raw=[...new Set(S.weeks.flatMap(w=>w.agences||[]))].sort(), auto=autoAlias(), man=S.rules.agencesAlias||{};
@@ -3932,6 +3949,7 @@ function viewReglages(){
           <td class="l">${top||'<span class="z">aucune mission</span>'}</td></tr>`;}).join('')}
       </tbody></table></div>
       <p class="hint">« Aussi reconnus » : écritures apprises depuis la fiche d'un agent (bouton « … = résidence »). Majuscules et accents sont toujours ignorés.</p></div></section>
+  ${exclusCard()}
   ${agencesCard()}
   ${correctionsCard()}
   ${journalCard()}
@@ -4204,7 +4222,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4268,6 +4286,11 @@ document.addEventListener('click',async e=>{
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
   if(t.dataset.dwreset){ S.dwPer=null; renderDrawer(); return; }
   if(t.dataset.dwcode){ S.dwCode=S.dwCode===t.dataset.dwcode?null:t.dataset.dwcode; renderDrawer(); return; }
+  if(t.dataset.agexcl!=null&&admin()){ const a=t.dataset.agexcl, R={...DEFAULT_RULES,...S.rules};
+    let L=(R.agencesExclues||[]).slice(); const on=agenceExclue(a,R);
+    L=on?L.filter(x=>!agenceExclue(a,{agencesExclues:[x]})):[...L,a];
+    S.rules.agencesExclues=L; S.vit=null;
+    return saveCorrection(on?`Agence réintégrée dans les chiffres : ${a}`:`Agence hors production, retirée des chiffres : ${a}`); }
   if(t.dataset.metag!=null&&admin()){ const pk=t.dataset.metag, m=el('mtM').value, w=el('mtW').value;
     const c=S.rules.corrections; c.metierAgent=c.metierAgent||{}; c.metierAgent[pk+'|'+w]=m;
     return saveCorrection(`Métier de l’agent : ${m} (${perLab(w)})`,nmPk(pk)); }
