@@ -1114,7 +1114,10 @@ function applyRules(parsed, rulesIn){
   const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
   const al=rules.agencesAlias||{};
   const src=parsed.agents.map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};});
-  const src2=applyHoraires(src,days,rules);
+  const cM=(rules.corrections||{}).metierAgent||{};
+  const src1=Object.keys(cM).length?src.map(a=>{const c=correctionPeriode(cM,personKey(a),parsed.meta.weekId,isoD(days[3]));
+    return c&&c.v!==a.metier?{...a,metierFichier:a.metier,metier:c.v}:a;}):src;
+  const src2=applyHoraires(src1,days,rules);
   const hc=rules.horsColonne==='garder'?{agents:src2,liste:[]}:splitHorsColonne(src2,days.map(d=>d.getTime()),rules);
   const merged=mergeDuplicates(hc.agents);
   const {residences,residenceSource,locCounts}=deduceResidences(merged,rules);
@@ -1204,14 +1207,29 @@ function isTrajetSeul(label,types){
       re.lastIndex=i+1; } }
   return false;
 }
+/** Correction propre à un agent pour une période : clé personne|w:2026-S38 (une semaine), |m:2026-09 (un mois),
+    |y:2026 (une année) — la plus précise l'emporte — ou ancienne clé personne|2026-S38 (« à partir de »).
+    Une semaine appartient au mois et à l'année de son jeudi. */
+function correctionPeriode(map,pk,weekId,jeudiIso){
+  let best=null, rank=-1;
+  for(const [k,v] of Object.entries(map||{})){
+    if(!k.startsWith(pk+'|')) continue;
+    const P=k.slice(pk.length+1); let r=-1;
+    if(P.startsWith('w:')) r=P.slice(2)===String(weekId)?4:-1;
+    else if(P.startsWith('m:')) r=P.slice(2)===jeudiIso.slice(0,7)?3:-1;
+    else if(P.startsWith('y:')) r=P.slice(2)===jeudiIso.slice(0,4)?2:-1;
+    else if(/^\d{4}-S\d{2}$/.test(P)&&P<=String(weekId)) r=1;   // « à partir de » : la plus récente l'emporte
+    if(r>rank||r===rank&&best&&P>best.P){ rank=r; best={v,P}; }
+  }
+  return rank>=0?best:null;
+}
 function computeAgent(a,days,rules,residence,weekId){
   const pk=personKey(a), corr=rules.corrections||{}, cR=corr.rhr||{}, cJ=corr.jb||{};
   // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
   const ratt=(corr.residenceSemaine||{})[pk+'|'+weekId]||null;
   // résidence propre à l'agent à partir d'une semaine (mouvement d'agence), saisie dans sa fiche
-  const perso=Object.entries(corr.residenceAgent||{}).filter(([k])=>k.startsWith(pk+'|')&&k.slice(pk.length+1)<=String(weekId))
-    .sort((x,y)=>x[0].localeCompare(y[0])).pop();
-  const resPerso=perso?{lieu:perso[1],depuis:perso[0].slice(pk.length+1)}:null;
+  const perso=correctionPeriode(corr.residenceAgent,pk,weekId,isoD(days[3]));
+  const resPerso=perso?{lieu:perso.v,periode:perso.P,depuis:/^\d{4}-S/.test(perso.P)?perso.P:null}:null;
   if(ratt) residence=normLieu(ratt); else if(resPerso) residence=normLieu(resPerso.lieu);
   const resSet=new Set(ratt||resPerso?[residence]:[residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
   // agent écarté des chiffres (incohérence) : calculé quand même, pour rester consultable et réintégrable
@@ -1354,7 +1372,7 @@ function computeAgent(a,days,rules,residence,weekId){
   const lieuHabituel=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
   const heuresPlanifiees=rM(plan);
   const out={
-    matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
+    matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,metierFichier:a.metierFichier||null,corridor:a.corridor,
     residence:residence||null, rhrApplicable:rhrOk, jours, fusion:a.fusion||null,
     joursService, nbMissions,
     joursRepos:FAM_REPOS.reduce((s,k)=>s+(codeCounts[k]||0),0),
@@ -2085,7 +2103,6 @@ function renderFilters(){
       <div class="sgrp"><span class="flabel">Agences</span><div class="frow">
         ${ags.map(a=>`<button class="chip" data-ag="${esc(a)}" aria-pressed="${selA.includes(a)}">${esc(a)}</button>`).join('')}
         <button class="chip chip-mini ghost" id="agAll">Toutes</button>
-        ${['Hendaye','Bordeaux-St-Jean'].every(x=>ags.includes(x))?'<button class="chip chip-mini ghost" id="agHeBx">Hendaye + Bordeaux</button>':''}
       </div></div>
       <div class="sgrp"><span class="flabel">Métiers</span><div class="frow">
         ${mets.map(m=>`<button class="chip" data-me="${esc(m)}" aria-pressed="${selM.includes(m)}">${esc(m)}</button>`).join('')}
@@ -2211,8 +2228,6 @@ const COLS=[
   {g:'temps',k:'pauseTotaleMin',l:'Pauses',f:a=>{const v=pv(a,'pauseTotaleMin');return v?nf(v)+' min':'<span class="z">—</span>';}},
   {g:'temps',k:'heuresNuit',l:'H. nuit',f:numF('heuresNuit',fmtH)},
   {g:'temps',k:'heuresDimanche',l:'H. dimanche',f:numF('heuresDimanche',fmtH)},
-  {g:'temps',k:'priseServicePlusTot',l:'Prise +tôt',f:a=>fmtHour(a.priseServicePlusTot),t:a=>a.priseServicePlusTot},
-  {g:'temps',k:'finServicePlusTard',l:'Fin +tard',f:a=>fmtHour(a.finServicePlusTard),t:a=>a.finServicePlusTard},
   {g:'paniers',k:'nbPaniers',l:'Paniers'},
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
   {g:'absences',k:'journeesBlanches',l:'J. blanches',f:a=>a.journeesBlanches?`<b>${nfa(pv(a,'journeesBlanches'))}</b>`:'<span class="z">0</span>'},
@@ -2389,8 +2404,8 @@ function viewBlanches(){
   const parJour=JS.map((j,i)=>({l:j,v:rows.filter(x=>x.b.d===i).length}));
   // toutes les cases vides du périmètre, pour vérifier et corriger
   const all=[]; sc.forEach(a=>(a.casesVides||[]).forEach(c=>all.push({a,c})));
-  const F=[['comptees','Journées blanches',x=>x.c.compte],['manuelles','Corrigées à la main',x=>!!x.c.manuel],
-    ['non','Cases vides non comptées',x=>!x.c.compte],['toutes','Toutes les cases vides',()=>true]];
+  // une seule liste : journées blanches comptées et cases vides non comptées (à valider ou corriger), plus les corrections
+  const F=[['comptees','Journées blanches',()=>true],['manuelles','Corrigées à la main',x=>!!x.c.manuel]];
   const fl=F.find(f=>f[0]===S.jbFiltre)||F[0];
   const list=all.filter(fl[2]).sort((x,y)=>x.a.nom.localeCompare(y.a.nom,'fr')||String(x.c.date).localeCompare(String(y.c.date)));
   S.rows_jbl=list;
@@ -2835,23 +2850,44 @@ function paniersView(x){
   </tbody></table></div><p class="hint">${P.length} panier${P.length>1?'s':''} · un panier nuit est daté du jour où la plage de nuit commence.</p>`;
 }
 /* ---------- fiche agent : exclusion des chiffres et résidence propre ---------- */
+/** Période exclusive d'une correction : libellé et choix (semaines, mois, années enregistrés) */
+function perLab(P){ const W=id=>S.weeks.find(w=>w.weekId===id);
+  if(!P) return '';
+  if(P.startsWith('w:')){ const w=W(P.slice(2)); return 'semaine '+(w?weekLabel(w):P.slice(2)); }
+  if(P.startsWith('m:')) return MOISF[+P.slice(7)-1]+' '+P.slice(2,6);
+  if(P.startsWith('y:')) return 'année '+P.slice(2);
+  const w=W(P); return 'depuis '+(w?weekLabel(w):P); }
+function perExclOptions(curWeek){
+  const L=S.weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId));
+  const ms=[...new Set(L.map(w=>jeudi(w).slice(0,7)))], ys=[...new Set(L.map(w=>jeudi(w).slice(0,4)))];
+  return `<optgroup label="Une semaine">${L.map(w=>`<option value="w:${w.weekId}"${w.weekId===curWeek?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</optgroup>
+    <optgroup label="Un mois">${ms.map(m=>`<option value="m:${m}">${MOISF[+m.slice(5)-1]} ${m.slice(0,4)}</option>`).join('')}</optgroup>
+    <optgroup label="Une année">${ys.map(y=>`<option value="y:${y}">${y}</option>`).join('')}</optgroup>`;
+}
 function gestionAgent(a,weeks){
   if(!admin()) return a.exclu?`<div class="note w"><b>Agent exclu des chiffres</b>${a.exclu.motif?` : ${esc(a.exclu.motif)}`:''}.</div>`:'';
   const pk=personKey(a), c=S.rules.corrections||{}, ex=(c.exclus||{})[pk];
   const exW=Object.entries(c.exclus||{}).filter(([k])=>k.startsWith(pk+'|'));
   const resE=Object.entries(c.residenceAgent||{}).filter(([k])=>k.startsWith(pk+'|')).sort();
+  const metE=Object.entries(c.metierAgent||{}).filter(([k])=>k.startsWith(pk+'|')).sort();
+  const mets=[...new Set(['CONDUCTEUR','AFR','COORDO AFR',...allMetiers()])];
   const lieux=[...new Set([...weeks.flatMap(x=>(x.missions||[]).flatMap(m=>[m.from,m.to])),...weeks.map(x=>x.residence)].filter(Boolean).map(normLieu))].sort();
   const ids=S.weeks.map(w=>w.weekId).sort(), W=id=>S.weeks.find(w=>w.weekId===id);
-  const cur=weeks[0], src=cur?.rattachement?`rattachement temporaire (${esc(cur.weekId)})`:cur?.residencePerso?`propre à l’agent depuis ${esc(weekLabel(W(cur.residencePerso.depuis)||{week:'?',year:''}))}`:'celle de l’agence';
+  const cur=weeks[0], src=cur?.rattachement?`rattachement temporaire (${esc(cur.weekId)})`:cur?.residencePerso?`propre à l’agent (${esc(perLab(cur.residencePerso.periode))})`:'celle de l’agence';
+  const pSel=(id)=>`<select id="${id}">${perExclOptions(cur?.weekId)}</select>`;
   return `<section class="card gst"><div class="card-h"><div><h2>Gestion de l’agent</h2><p class="card-s">mémorisé pour tous, noté au journal</p></div></div>
     <div class="card-b stack" style="padding-top:0;gap:14px">
       <div class="gst-r"><div><div class="rt">Chiffres</div><div class="rs">${ex?`<span class="pill pill-c">exclu de toutes les semaines</span> ${ex.motif?esc(ex.motif)+' · ':''}${ex.le?dFull(ex.le):''}`:exW.length?`<span class="pill pill-w">exclu ${exW.length} semaine${exW.length>1?'s':''}</span> ${exW.map(([k])=>esc(k.split('|')[1])).join(', ')}`:'compté normalement'}</div></div>
         <div class="btns">${ex?`<button class="btn btn-sm" data-excl="${esc(pk)}" data-v="">Réintégrer dans les chiffres</button>`:`<button class="btn btn-sm dgr" data-excl="${esc(pk)}" data-v="1">Exclure de toutes les semaines…</button>`}</div></div>
-      <div class="gst-r"><div><div class="rt">Résidence</div><div class="rs">${cur?`<b class="mono">${esc(cur.residence||'—')}</b> · ${src}`:'—'}${resE.length?`<br>${resE.map(([k,v])=>`depuis ${esc(k.split('|')[1])} : <b class="mono">${esc(v)}</b> <button class="lnk" data-resagdel="${esc(k)}" title="Supprimer">×</button>`).join(' · ')}`:''}</div></div>
+      <div class="gst-r"><div><div class="rt">Résidence</div><div class="rs">${cur?`<b class="mono">${esc(cur.residence||'—')}</b> · ${src}`:'—'}${resE.length?`<br>${resE.map(([k,v])=>`${esc(perLab(k.slice(pk.length+1)))} : <b class="mono">${esc(v)}</b> <button class="lnk" data-resagdel="${esc(k)}" title="Supprimer">×</button>`).join(' · ')}`:''}</div></div>
         <div class="btns" style="align-items:center"><input type="text" id="raL" list="raList" placeholder="lieu (ex. HE)" class="mono" style="width:120px"><datalist id="raList">${lieux.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
-          <select id="raW">${ids.slice().reverse().map(id=>`<option value="${id}"${id===cur?.weekId?' selected':''}>à partir de ${weekLabel(W(id))}</option>`).join('')}</select>
+          ${pSel('raW')}
           <button class="btn btn-sm btn-pri" data-resag="${esc(pk)}">Changer la résidence</button></div></div>
-      <p class="hint">Mouvement d’agence : la nouvelle résidence s’applique à partir de la semaine choisie et aux suivantes ; les semaines d’avant gardent l’ancienne. Le rattachement temporaire (une seule semaine) se règle plus bas, semaine par semaine.</p>
+      <div class="gst-r"><div><div class="rt">Métier</div><div class="rs">${cur?`<b>${esc(cur.metier)}</b>${cur.metierFichier?` · corrigé (fichier : ${esc(cur.metierFichier)})`:' · celui du fichier'}`:'—'}${metE.length?`<br>${metE.map(([k,v])=>`${esc(perLab(k.slice(pk.length+1)))} : <b>${esc(v)}</b> <button class="lnk" data-metagdel="${esc(k)}" title="Supprimer">×</button>`).join(' · ')}`:''}</div></div>
+        <div class="btns" style="align-items:center"><select id="mtM">${mets.map(m=>`<option${m===cur?.metier?' selected':''}>${esc(m)}</option>`).join('')}</select>
+          ${pSel('mtW')}
+          <button class="btn btn-sm btn-pri" data-metag="${esc(pk)}">Changer le métier</button></div></div>
+      <p class="hint">Résidence et métier s’appliquent uniquement à la période choisie : une semaine, un mois ou une année (une semaine compte dans le mois et l’année de son jeudi). Si plusieurs corrections se recouvrent, la plus précise l’emporte (semaine, puis mois, puis année). Le rattachement temporaire se règle aussi plus bas, semaine par semaine.</p>
     </div></section>`;
 }
 
@@ -3704,7 +3740,8 @@ function correctionsCard(){
     ...li.map((l,i)=>({t:'Missions liées',q:nm(l.p),d:`${dtISO(l.a)} → ${dtISO(l.b)}`,del:['liens',i]})),
     ...jb.map(([k,v])=>{const [pk,d]=k.split('|');return {t:v==='oui'?'Journée blanche ajoutée':'Journée blanche écartée',q:nm(pk),d:dFull(d),del:['jb',k]};}),
     ...Object.entries(c.residenceSemaine||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Rattachement temporaire à ${v}`,q:nm(pk),d:w,del:['residenceSemaine',k]};}),
-    ...Object.entries(c.residenceAgent||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Résidence propre : ${v}`,q:nm(pk),d:'à partir de '+w,del:['residenceAgent',k]};}),
+    ...Object.entries(c.residenceAgent||{}).map(([k,v])=>{const i=k.lastIndexOf('|'), pk=k.slice(0,i);return {t:`Résidence propre : ${v}`,q:nm(pk),d:perLab(k.slice(i+1)),del:['residenceAgent',k]};}),
+    ...Object.entries(c.metierAgent||{}).map(([k,v])=>{const i=k.lastIndexOf('|'), pk=k.slice(0,i);return {t:`Métier corrigé : ${v}`,q:nm(pk),d:perLab(k.slice(i+1)),del:['metierAgent',k]};}),
     ...Object.entries(c.exclus||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Exclu des chiffres${v.motif?' — '+v.motif:''}`,q:nm(pk),d:w||'toutes les semaines',del:['exclus',k]};}),
     ...Object.entries(c.horaires||{}).map(([k,v])=>{const p=k.split('|'), i=p.findIndex(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)), pk=p.slice(0,i).join('|'), d=p[i], l=p.slice(i+1);return {t:`Horaire saisi : ${l.join('|')} ${v.debut}–${v.fin}`,q:nm(pk),d:dFull(d),del:['horaires',k]};})];
   return `<section class="card"><div class="card-h"><div><h2>Corrections mémorisées</h2>
@@ -3910,8 +3947,6 @@ function renderDrawer(){
       <div><div class="k">Heures du dimanche</div><div class="v">${fmtH(a.heuresDimanche)}</div></div>
       <div><div class="k">Paniers</div><div class="v">${nf(a.nbPaniers)} <small class="mut">${nf(a.ratioPanierJS,2)}/JS</small></div></div>
       <div><div class="k">MHIS · DISPO · ATCMD</div><div class="v">${a.nbMHIS} · ${a.nbDISPO} · ${a.nbATCMD}</div></div>
-      <div><div class="k">Prise la + tôt</div><div class="v">${fmtHour(a.priseServicePlusTot)}</div></div>
-      <div><div class="k">Fin la + tard</div><div class="v">${fmtHour(a.finServicePlusTard)}</div></div>
     </div>
     ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
       const xk=personKey(x)+'|'+x.weekId, xe=(S.rules.corrections.exclus||{})[xk];
@@ -4030,7 +4065,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4090,7 +4125,12 @@ document.addEventListener('click',async e=>{
   if(t.dataset.resag!=null&&admin()){ const pk=t.dataset.resag, l=el('raL').value.trim(), w=el('raW').value;
     if(!l){ S.msg={m:'Indiquez le lieu de la nouvelle résidence.',t:'w'}; render(); return; }
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=normLieu(l);
-    return saveCorrection(`Résidence de l’agent : ${normLieu(l)} à partir de ${w}`,nmPk(pk)); }
+    return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
+  if(t.dataset.metag!=null&&admin()){ const pk=t.dataset.metag, m=el('mtM').value, w=el('mtW').value;
+    const c=S.rules.corrections; c.metierAgent=c.metierAgent||{}; c.metierAgent[pk+'|'+w]=m;
+    return saveCorrection(`Métier de l’agent : ${m} (${perLab(w)})`,nmPk(pk)); }
+  if(t.dataset.metagdel!=null&&admin()){ const k=t.dataset.metagdel; delete S.rules.corrections.metierAgent[k];
+    return saveCorrection('Métier corrigé supprimé',nmPk(k.slice(0,k.lastIndexOf('|')))); }
   if(t.dataset.resagv!=null&&admin()){ const pk=t.dataset.resagv, l=normLieu(t.dataset.lieu), w=t.dataset.w;
     if(!confirm(`${nmPk(pk)} : résidence ${l} à partir de ${w.replace(/^\d+-/,'')} et pour les semaines suivantes (mouvement d’agence) ?`)) return;
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=l;

@@ -51,10 +51,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
   résidence d'une agence, agent exclu des chiffres (toutes les semaines ou une seule, avec motif ;
-  calculé mais retiré de tous les chiffres et de la vitrine, réintégrable), résidence propre à un agent
-  à partir d'une semaine (mouvement d'agence ; prioritaire sur celle de l'agence, le rattachement
-  temporaire d'une semaine restant prioritaire). Mémorisées dans `recap.config` (clé `regles`, champs
-  `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, exclus, horaires ; `lieuxResidence`) et rejouées
+  calculé mais retiré de tous les chiffres et de la vitrine, réintégrable), résidence propre à un agent et
+  métier corrigé d'un agent, pour une période exclusive choisie dans la fiche : une semaine (clé …|w:2026-S38),
+  un mois (…|m:2026-09) ou une année (…|y:2026), la plus précise l'emportant (`correctionPeriode`) ; les anciennes
+  résidences saisies « à partir de » (…|2026-S38) restent valables. Résidence propre prioritaire sur celle de
+  l'agence, le rattachement temporaire d'une semaine restant prioritaire. Mémorisées dans `recap.config` (clé `regles`, champs
+  `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, metierAgent, exclus, horaires ; `lieuxResidence`) et rejouées
   à chaque affichage, même après réimport. `horaires` : horaire saisi pour une mission sans horaire lisible
   (clé personne|date|intitulé ; les missions sans horaire sont gardées à part dans la case, `sansHoraire`).
 - « À vérifier » propose de réparer selon le type d'alerte (en réutilisant ces corrections) : saisir l'horaire
@@ -66,6 +68,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   minuit compte si l'agent est à sa résidence.
   En début ou fin de semaine, la case est encadrée par la semaine voisine si elle est importée
   (validé par l'utilisateur). Un repos entre la case vide et le service ne l'empêche pas.
+  Onglet Journées blanches : une seule liste « Journées blanches » (comptées et cases vides non comptées, avec
+  leur statut) + « Corrigées à la main » (demandé par l'utilisateur).
   Chaque case vide non comptée affiche sa raison (avant le premier / après le dernier service, fin
   de service de nuit à hh:mm).
 - Classement des codes (validé) : Repos = RP, RF, JF, RCL, RCC ; Congés = CP, CPAT, CFAM, CSS/CPAR ;

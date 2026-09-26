@@ -469,3 +469,20 @@ test('trajet seul : VOY- / -VOY / VS- / -VS oui ; collé à un + non', () => {
   for (const l of ['CSE+VOY-541-BX', 'VOY+PREPA CSE-341-BX', 'VS+MHIS', 'MHIS+VS', 'CSE + VOY-12', 'VOY +PREPA', 'VOYAGE-12', 'VSX-12', 'TRAIN 4512', 'DISPO'])
     assert.equal(lab(l), 0, l);
 });
+
+/* ---- corrections propres à un agent sur une période exclusive (semaine, mois, année) ---- */
+test('métier corrigé pour une semaine, un mois ou une année ; le plus précis l’emporte ; résidence exclusive', () => {
+  const j = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'];
+  const C = (c) => ({ ...RES, corrections: { rhr: {}, jb: {}, liens: [], ...c } });
+  // semaine du 07/09/2026 = 2026-S37, jeudi 10/09 → septembre 2026
+  assert.equal(one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|w:2026-S37': 'CONDUCTEUR' } })).metier, 'CONDUCTEUR');
+  assert.equal(one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|w:2026-S38': 'CONDUCTEUR' } })).metier, 'AFR');
+  const a = one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|y:2026': 'CONDUCTEUR' } }));
+  assert.equal(a.metier, 'CONDUCTEUR'); assert.equal(a.metierFichier, 'AFR'); assert.equal(a.nbRHR, 1);
+  assert.equal(one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|y:2026': 'CONDUCTEUR', 'm:1|m:2026-09': 'AFR' } })).metier, 'AFR');
+  // résidence BORDEAUX pour septembre seulement : plus de RHR à Bordeaux
+  assert.equal(one(j, {}, C({ residenceAgent: { 'm:1|m:2026-09': 'BORDEAUX' } })).residence, 'BORDEAUX');
+  assert.equal(one(j, {}, C({ residenceAgent: { 'm:1|m:2026-10': 'BORDEAUX' } })).residence, 'HENDAYE');
+  // ancienne saisie « à partir de » toujours respectée
+  assert.equal(one(j, {}, C({ residenceAgent: { 'm:1|2026-S30': 'BAYONNE' } })).residence, 'BAYONNE');
+});
