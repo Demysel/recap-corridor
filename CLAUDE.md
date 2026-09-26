@@ -76,7 +76,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Classement des codes (validé) : Repos = RP, RF, JF, RCL, RCC ; Congés = CP, CPAT, CFAM, CSS/CPAR ;
   Absences = tout le reste (MAL, AT, CPRCL…).
   Onglet Agents (groupe Repos & absences) : détail RP, RF, JF, RCL, RCC, puis CP sur la période et « CP <année> »
-  (CP de toute l'année civile — jeudi — de la dernière semaine sélectionnée). Fiche agent : tuile « Codes » (acronyme + nombre).
+  (CP de toute l'année civile — jeudi — de la dernière semaine sélectionnée ; année civile validée par l'utilisateur,
+  pas la période de référence mai–mai). Fiche agent : tuile « Codes » (acronyme + nombre).
   Tableau des agents : une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
   « Cases vides » est supprimée (demandé par l'utilisateur). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
   clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
