@@ -109,6 +109,20 @@ test('mission de moins de 5 h d’amplitude : comptée 5 h (amplitude et TTE), c
   assert.equal(b.heuresPlanifiees, 3 + 2 + 7.5 + 5);
 });
 
+test('ATCMD : heures de nuit et du dimanche ramenées aux 5 h, au prorata de l’horaire réel', () => {
+  // dimanche 13/09 20:00 → lundi 14/09 06:00 : 10 h réelles, 7 h dans 22h–5h, 4 h le dimanche
+  const a = one(['RP', 'RP', 'RP', 'RP', 'RP', 'RP', svc(['ATCMD', 'HENDAYE', 'HENDAYE', 13, '20:00', 14, '06:00'])], {}, RES);
+  assert.equal(a.amplitudeTotale, 10);
+  assert.equal(a.heuresPlanifiees, 5);
+  assert.equal(a.heuresNuit, 3.5);
+  assert.equal(a.heuresDimanche, 2);
+});
+
+test('deux missions de 4 h dans la semaine : 10 h au décompte', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '10:00']), 'RP', svc(['T2', 'HENDAYE', 'HENDAYE', 9, '06:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.heuresPlanifiees, 10);
+});
+
 test('mission sans horaire : signalée, puis comptée une fois l’horaire saisi', () => {
   const cell = 'TRAIN X\nHENDAYE - BORDEAUX';
   const rows = week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]);

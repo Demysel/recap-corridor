@@ -1201,7 +1201,9 @@ function computeAgent(a,days,rules,residence,weekId){
         const atcmd=/ATCMD/i.test(m.label), segs=workSegments(m);
         if(m.pauseMin>0&&!(m.pauses&&m.pauses.length&&Array.isArray(m.pauses[0]))) pausesInconnues++;
         const hPlan=missionTTE(m,rules);
-        const hNuit=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
+        // ATCMD : heures de nuit et du dimanche ramenées à ses heures fixes, au prorata de l'horaire réel (validé par l'utilisateur)
+        const hNuitR=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
+        const hNuit=atcmd?(Em>Sm?rules.heuresATCMD*hNuitR*H/(Em-Sm):0):hNuitR;
         const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H;
         all.push({...m,S,E,segs,atcmd,d:j.d});
         const mAmp=missionAmp(m,rules);
@@ -2696,7 +2698,7 @@ function explain(k){
       <td>${a.joursService}</td><td>${fmtH(a.amplitudeTotale)}</td><td>${nf(a.pauseTotaleMin)} min</td><td>${a.nbATCMD||'<span class="z">0</span>'}</td><td><b>${fmtH(a.heuresPlanifiees)}</b></td><td>${a.heuresSup?`<b>${fmtH(a.heuresSup)}</b>`:'<span class="z">—</span>'}</td></tr>`));
   } else if(k==='heuresNuit'){
     const l=sc.filter(a=>a.heuresNuit>0).sort((p,q)=>q.heuresNuit-p.heuresNuit);
-    title='Heures de nuit'; rule=`Temps travaillé hors pauses dans la plage de nuit : AFR ${r.nuitAFR[0]}h–${r.nuitAFR[1]}h, conducteurs ${r.nuitCDR[0]}h–${r.nuitCDR[1]}h.`;
+    title='Heures de nuit'; rule=`Temps travaillé hors pauses dans la plage de nuit : AFR ${r.nuitAFR[0]}h–${r.nuitAFR[1]}h, conducteurs ${r.nuitCDR[0]}h–${r.nuitCDR[1]}h. Une ATCMD est ramenée à ses ${nfa(r.heuresATCMD)} h, au prorata de son horaire.`;
     html=tbl([['Agent','l'],['Sem.','l'],['Métier','l'],['Heures de nuit'],['TTE'],['Part']],l.slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td><td class="l">${esc(a.metier)}</td><td><b>${fmtH(a.heuresNuit)}</b></td><td>${fmtH(a.heuresPlanifiees)}</td><td>${nf(100*a.heuresNuit/(a.heuresPlanifiees||1),0)} %</td></tr>`));
   } else if(k==='nbMissions'){
     const t={}; sc.forEach(a=>Object.entries(a.typesMission||{}).forEach(([x,n])=>t[x]=(t[x]||0)+n));
@@ -3746,7 +3748,7 @@ function viewReglages(){
       <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
       <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h (son amplitude reste l’horaire réel) ; une autre mission de moins de ${nf(r.minMission??5)} h d’amplitude compte ${nf(r.minMission??5)} h d’amplitude et de TTE. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
-      <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
+      <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche. Pour une ATCMD, ces deux compteurs sont ramenés à ses ${nf(r.heuresATCMD)} h, au prorata de l’horaire réel.</p>
       <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
       <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage)':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
       <p><b>Agents en double.</b> Une personne présente sur plusieurs lignes d'un fichier est fusionnée jour par jour : un service l'emporte sur un code, un code sur une case vide. Sur plusieurs semaines, chaque agent n'apparaît qu'une fois dans les tableaux.</p>
