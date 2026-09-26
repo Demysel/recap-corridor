@@ -91,6 +91,13 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Lignes en double d'un fichier fusionnées jour par jour (service > code > case vide). Missions
   datées hors de leur colonne (ligne d'une autre semaine recopiée) : non comptées, signalées.
 
+## Périodes
+
+Sélecteur « Période » en haut (et dans la Vitrine) : échantillons glissants comptés depuis la dernière
+semaine enregistrée (2 et 4 dernières semaines, dernier mois, 3, 6 et 12 derniers mois, toujours),
+années, mois, semaines. Une semaine appartient au mois et à l'année de son jeudi (règle ISO), y compris
+pour les regroupements par mois / trimestre / année de l'onglet Statistiques.
+
 ## Hébergement
 
 - **Render**, service `recap-corridor` (gratuit, Francfort), déployé automatiquement à chaque

@@ -1739,7 +1739,39 @@ const effRules=(extra)=>({...S.rules,agencesAlias:{...autoAlias(extra),...(S.rul
 const agName=a=>effRules().agencesAlias[a]||a;
 const allAgences=()=>{const al=effRules().agencesAlias;return [...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].sort();};
 const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMetier(m)||m))].sort();
-const activeWeeks=()=>S.selWeek==='__all__'?S.weeks.map(w=>w.weekId):[S.selWeek];
+/* Périodes : une semaine, un mois, une année, ou un échantillon glissant compté depuis la dernière semaine enregistrée.
+   Une semaine appartient au mois et à l'année de son jeudi (règle ISO : c'est là qu'elle a le plus de jours). */
+const jeudi=w=>isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+3*DAY));
+const MOISF=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const ECHANT=[['n:2','2 dernières semaines'],['n:4','4 dernières semaines'],['r:1','Dernier mois'],['r:3','3 derniers mois'],['r:6','6 derniers mois'],['r:12','12 derniers mois'],['__all__','Toujours (toutes les semaines)']];
+function periodWeeks(code,weeks){
+  const L=weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), all=L.map(w=>w.weekId);
+  if(!code||code==='__all__') return all;
+  const [t,v]=code.includes(':')?code.split(/:(.*)/):['w',code];
+  if(t==='w') return all.includes(v)?[v]:[];
+  if(t==='m') return L.filter(w=>jeudi(w).slice(0,7)===v).map(w=>w.weekId);
+  if(t==='y') return L.filter(w=>jeudi(w).slice(0,4)===v).map(w=>w.weekId);
+  if(t==='n') return all.slice(-(+v||1));
+  if(t==='r'&&L.length){ const last=new Date(L[L.length-1].sunday+'T00:00:00Z'); const c=new Date(last); c.setUTCMonth(c.getUTCMonth()-(+v||1));
+    return L.filter(w=>Date.parse(w.sunday+'T00:00:00Z')>c.getTime()).map(w=>w.weekId); }
+  return all;
+}
+function periodOptions(code,weeks){
+  const L=weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)), sel=v=>v===code||(!code.includes(':')&&v==='w:'+code)?' selected':'';
+  const ys=[...new Set(L.map(w=>jeudi(w).slice(0,4)))], ms=[...new Set(L.map(w=>jeudi(w).slice(0,7)))];
+  const n=c=>periodWeeks(c,weeks).length;
+  return `<optgroup label="Échantillons">${ECHANT.map(([v,l])=>`<option value="${v}"${sel(v)}>${l} (${n(v)} sem.)</option>`).join('')}</optgroup>
+    <optgroup label="Années">${ys.map(y=>`<option value="y:${y}"${sel('y:'+y)}>${y} (${n('y:'+y)} sem.)</option>`).join('')}</optgroup>
+    <optgroup label="Mois">${ms.map(m=>`<option value="m:${m}"${sel('m:'+m)}>${MOISF[+m.slice(5)-1]} ${m.slice(0,4)} (${n('m:'+m)} sem.)</option>`).join('')}</optgroup>
+    <optgroup label="Semaines">${L.map(w=>`<option value="${w.weekId}"${sel(w.weekId)}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</optgroup>`;
+}
+function periodLabel(code,weeks){
+  const ids=periodWeeks(code,weeks), W=id=>weeks.find(w=>w.weekId===id);
+  if(!ids.length) return 'aucune semaine';
+  const a=W(ids[0]), b=W(ids[ids.length-1]);
+  return ids.length===1?`${weekLabel(a)} · du ${dFull(a.monday)} au ${dFull(a.sunday)}`:`${ids.length} semaines · du ${dFull(a.monday)} au ${dFull(b.sunday)}`;
+}
+const activeWeeks=()=>periodWeeks(S.selWeek,S.weeks);
 const SER=['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
 const agenceColor=ag=>`var(${SER[Math.max(0,allAgences().indexOf(ag))%8]})`;
 
@@ -1902,7 +1934,7 @@ function renderTabs(){
     .map(t=>`${t.k==='import'?'<span class="tsep" aria-hidden="true"></span>':''}<button class="tab${['import','reglages'].includes(t.k)?' adm':''}" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}"><span class="stn" aria-hidden="true"></span><span class="tl">${t.l}</span>${
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt">${nf(cnt[t.k])}</span>`:''}</button>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
-  el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=TAB_CTX[S.tab]||'';
+  el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
   el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}">${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}</span>`:'';
 }
 function renderFilters(){
@@ -1912,11 +1944,8 @@ function renderFilters(){
   const resume=`${selA.length===ags.length?'Toutes les agences':selA.length===1?selA[0]:selA.length+' agences'} · ${selM.length===mets.length?'tous métiers':selM.join(', ')}`;
   el('filters').innerHTML=`
     <div class="fbar">
-      <label class="fld"><span class="flabel">Semaine</span>
-        <select id="fWeek">
-          <option value="__all__"${S.selWeek==='__all__'?' selected':''}>Toutes — ${S.weeks.length} semaine${S.weeks.length>1?'s':''}</option>
-          ${S.weeks.map(w=>`<option value="${w.weekId}"${S.selWeek===w.weekId?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}
-        </select></label>
+      <label class="fld"><span class="flabel">Période</span>
+        <select id="fWeek" title="${esc(periodLabel(S.selWeek,S.weeks))}">${periodOptions(S.selWeek,S.weeks)}</select></label>
       <div class="fld"><span class="flabel">Périmètre</span>
         <button class="sel" id="scopeBtn" aria-expanded="${S.scopeOpen}">${esc(resume)}<span class="car">▾</span></button></div>
       <label class="fld"><span class="flabel">Agent</span>
@@ -2865,7 +2894,7 @@ function statVal(list,k,mode){
 }
 const stGroup=g=>g==='metier'?a=>a.metier:g==='agmet'?a=>a.agence+' · '+a.metier:a=>a.agence;
 function perKey(weekId,e){
-  const w=S.weeks.find(x=>x.weekId===weekId), m=w?w.monday:String(weekId);
+  const w=S.weeks.find(x=>x.weekId===weekId), m=w?jeudi(w):String(weekId);   // semaine rattachée au mois de son jeudi
   return e==='semaine'?weekId:e==='mois'?m.slice(0,7):e==='trimestre'?`${m.slice(0,4)}-T${Math.floor((+m.slice(5,7)-1)/3)+1}`:m.slice(0,4);
 }
 function perLabel(k,e){
@@ -3035,11 +3064,12 @@ function viewVitrine(){
   const AG=[...new Set(V.cells.map(c=>c.ag))].sort((a,b)=>a==='Autres agences'?1:b==='Autres agences'?-1:a.localeCompare(b,'fr'));
   const ME=[...new Set(V.cells.map(c=>c.me))].sort();
   const inAg=c=>!vf.ags||vf.ags.includes(c.ag), inMe=c=>!vf.me||vf.me.includes(c.me);
-  const scopeC=V.cells.filter(c=>inAg(c)&&inMe(c)), cur=scopeC.filter(c=>vf.w==='__all__'||c.w===vf.w);
+  const selW=new Set(periodWeeks(vf.w,sem)), multi=selW.size>1;
+  const scopeC=V.cells.filter(c=>inAg(c)&&inMe(c)), cur=scopeC.filter(c=>selW.has(c.w));
   if(!cur.length) return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Rien à afficher pour ce choix</h3><p>Élargissez les agences ou les métiers.</p></div></section>`;
-  const g=vAgg(cur), perW=sem.map(w=>{const l=scopeC.filter(c=>c.w===w.weekId);return l.length?vAgg(l):null;});
+  const g=vAgg(cur), perW=sem.filter(w=>selW.has(w.weekId)).map(w=>{const l=scopeC.filter(c=>c.w===w.weekId);return l.length?vAgg(l):null;});
   const wl=w=>`S${String(w.week).padStart(2,'0')} ${w.year}`;
-  const periode=vf.w==='__all__'?`${sem.length} semaine${sem.length>1?'s':''} · du ${dFull(sem[0].monday)} au ${dFull(sem[sem.length-1].sunday)}`:(()=>{const w=sem.find(x=>x.weekId===vf.w);return `${wl(w)} · du ${dFull(w.monday)} au ${dFull(w.sunday)}`;})();
+  const periode=periodLabel(vf.w,sem);
   const chips=(attr,list,sel)=>list.map(x=>`<button class="chip" data-${attr}="${esc(x)}" aria-pressed="${!sel||sel.includes(x)}">${esc(x)}</button>`).join('');
   // cartes de chaleur
   const byAg=[...groupBy(cur,c=>c.ag)].sort((a,b)=>AG.indexOf(a[0])-AG.indexOf(b[0]));
@@ -3066,23 +3096,23 @@ function viewVitrine(){
   </section>
   ${(()=>{ const P=[], rh=g.s.nbRHR/g.w, lastW=perW.filter(Boolean), l=lastW[lastW.length-1], pr=lastW[lastW.length-2];
       P.push(`En moyenne <b>${nf(rh,1)} repos hors résidence par semaine</b>, d’une durée moyenne de ${VKPI[2].f(VKPI[2].v(g)||0)}.`);
-      if(vf.w==='__all__'&&l&&pr&&pr.s.nbRHR){ const d=100*(l.s.nbRHR-pr.s.nbRHR)/pr.s.nbRHR; P.push(`La dernière semaine en compte ${nf(l.s.nbRHR)}, soit ${d>=0?'+':''}${nf(d,0)} % par rapport à la précédente.`); }
+      if(multi&&l&&pr&&pr.s.nbRHR){ const d=100*(l.s.nbRHR-pr.s.nbRHR)/pr.s.nbRHR; P.push(`La dernière semaine en compte ${nf(l.s.nbRHR)}, soit ${d>=0?'+':''}${nf(d,0)} % par rapport à la précédente.`); }
       const best=byAg.map(([ag,x])=>{const a=vAgg(x);return [ag,a.rhrApp?a.s.nbRHR/a.rhrApp:0];}).filter(x=>x[0]!=='Autres agences').sort((p,q)=>q[1]-p[1])[0];
       if(best&&best[1]) P.push(`${esc(best[0])} a le plus de RHR par conducteur (${nf(best[1],2)} par semaine).`);
       const pk=g.heat.presence.indexOf(Math.max(...g.heat.presence));
       P.push(`L’activité culmine vers ${String(pk).padStart(2,'0')}h ; ${nf(VKPI[6].v(g)||0,0)} % du temps de travail se fait de nuit, et ${nf(VKPI[3].v(g)||0,1)} journées sur 100 sont blanches.`);
       return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`; })()}
   <section class="card"><div class="card-b vfil">
-    <label class="fld"><span class="flabel">Période</span><select id="vWeek"><option value="__all__">Toutes les semaines</option>${sem.slice().reverse().map(w=>`<option value="${w.weekId}"${vf.w===w.weekId?' selected':''}>${wl(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
+    <label class="fld"><span class="flabel">Période</span><select id="vWeek">${periodOptions(vf.w,sem)}</select></label>
     <div class="fld grow"><span class="flabel">Agences</span><div class="frow">${chips('vag',AG,vf.ags)}<button class="chip chip-mini ghost" data-vag="*">Toutes</button></div></div>
     <div class="fld"><span class="flabel">Métiers</span><div class="frow">${chips('vme',ME,vf.me)}</div></div></div></section>
   <div class="vkpis">${VKPI.map(k=>{const v=k.v(g);return `<div class="kpi vk"><div class="k">${esc(k.l)}${k.u?` <span class="nb" style="text-transform:none;letter-spacing:0">· ${k.u}</span>`:''}</div>
-    <div class="vk-r"><div class="v">${v==null?'—':k.f(v)}</div>${vf.w==='__all__'?spark(perW.map(a=>a?k.v(a):null)):''}</div><div class="n">${k.d(g)}</div></div>`;}).join('')}</div>
+    <div class="vk-r"><div class="v">${v==null?'—':k.f(v)}</div>${multi?spark(perW.map(a=>a?k.v(a):null)):''}</div><div class="n">${k.d(g)}</div></div>`;}).join('')}</div>
   <section class="card"><div class="card-h"><div><h2>Quand le corridor travaille</h2><p class="card-s">${esc(HU)} · heure par heure · cadre = heure de pointe</p></div>
     <div class="seg">${HEAT.map(([k,l])=>`<button class="sg" data-vheat="${k}" aria-pressed="${HT===k}">${l}</button>`).join('')}</div></div>
     <div class="card-b"><div class="ch">Par agence</div>${heatmap(hRows,HU,hf)}
       ${HT==='presence'||HT==='prise'?`<div class="ch" style="margin-top:18px">Par jour de la semaine</div>${heatmap(dRows,pres?'agents en service en moyenne ce jour-là':HU,hf)}`:''}</div></section>
-  ${(()=>{ const fx=(V.flux||[]).filter(f=>vf.w==='__all__'||f.w===vf.w), E=new Map(), R=new Map(), RS=new Set();
+  ${(()=>{ const fx=(V.flux||[]).filter(f=>selW.has(f.w)), E=new Map(), R=new Map(), RS=new Set();
       for(const f of fx){ f.res.forEach(x=>RS.add(x)); for(const e of f.edges){const k=e.a+'|'+e.b; E.set(k,(E.get(k)||0)+e.n);} for(const r of f.rhr) R.set(r.l,(R.get(r.l)||0)+r.n); }
       return `<section class="card"><div class="card-h"><div><h2>Carte des flux</h2><p class="card-s">lieux reliés par les missions · tout le réseau · seuls les trajets et lieux fréquentés par au moins ${V.k} agents différents sont montrés</p></div></div>
       <div class="card-b">${fluxMap([...E].map(([k,n])=>{const [a,b]=k.split('|');return {a,b,n};}),[...R].map(([l,n])=>({l,n})),[...RS],{vide:'Aucun trajet assez fréquenté pour être publié.'})}</div></section>`; })()}
@@ -3381,7 +3411,7 @@ async function dl(name,data,mime){
   setTimeout(()=>URL.revokeObjectURL(u),4000);
 }
 const scopeTag=()=>{
-  const w=S.selWeek==='__all__'?'toutes-semaines':S.selWeek;
+  const w=S.selWeek==='__all__'?'toutes-semaines':slug(S.selWeek.replace(':','-'));
   const a=S.selAgences&&S.selAgences.length<=2?'-'+S.selAgences.map(x=>slug(x)).join('-'):'';
   return w+a;
 };
@@ -3920,7 +3950,7 @@ document.addEventListener('click',async e=>{
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; render(); return; }
   if(t.id==='btnReport'){
-    const wk=S.selWeek==='__all__'?'toutes-semaines':S.selWeek;
+    const wk=S.selWeek==='__all__'?'toutes-semaines':slug(S.selWeek.replace(':','-'));
     dl(`rapport-recap-corridor-${wk}.html`, buildReport(), 'text/html;charset=utf-8'); return; }
   if(t.dataset.xlsx){ exportXlsx(t.dataset.xlsx); return; }
   if(t.dataset.csv){ exportCsv(t.dataset.csv); return; }
