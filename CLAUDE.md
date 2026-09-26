@@ -63,7 +63,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   d'une mission, compter ou écarter un RHR de plus de 44 h, rattacher l'agent à son lieu habituel pour la semaine
   ou changer sa résidence à partir de la semaine, reconnaître un lieu comme résidence de l'agence, ouvrir les
   Réglages ou l'Import. Une alerte réparée disparaît d'elle-même.
-- Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit, et
+- Journée blanche : case vide encadrée par deux services, y compris le lendemain d'un service de nuit (validé par
+  l'utilisateur, quelle que soit l'heure de fin ; ancienne exclusion réactivable dans Réglages, règles v4), et
   pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
   minuit compte si l'agent est à sa résidence.
   En début ou fin de semaine, la case est encadrée par la semaine voisine si elle est importée
@@ -76,8 +77,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Absences = tout le reste (MAL, AT, CPRCL…).
   Onglet Agents (groupe Repos & absences) : détail RP, RF, JF, RCL, RCC, puis CP sur la période et « CP <année> »
   (CP de toute l'année civile — jeudi — de la dernière semaine sélectionnée). Fiche agent : tuile « Codes » (acronyme + nombre).
-  Tableau des agents : une seule colonne « Journées blanches » (nombre, et en petit « / N vides » = cases vides, journées
-  blanches comprises) ; la colonne « Cases vides » est supprimée (demandé par l'utilisateur).
+  Tableau des agents : une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
+  « Cases vides » est supprimée (demandé par l'utilisateur). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
+  clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
   CPAR et CSS congés sans solde ; SUPP (dans un intitulé de mission) = supplémentaire.
