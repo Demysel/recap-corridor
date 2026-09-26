@@ -93,7 +93,7 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 ## Périodes
 
-Sélecteur « Période » en haut (et dans la Vitrine) : échantillons glissants comptés depuis la dernière
+Sélecteur « Période » en haut (et dans la Vitrine, et pour les périodes A et B de l’onglet Comparer, qui gardent aussi le choix « du… au… ») : échantillons glissants comptés depuis la dernière
 semaine enregistrée (2 et 4 dernières semaines, dernier mois, 3, 6 et 12 derniers mois, toujours),
 années, mois, semaines. Une semaine appartient au mois et à l'année de son jeudi (règle ISO), y compris
 pour les regroupements par mois / trimestre / année de l'onglet Statistiques.

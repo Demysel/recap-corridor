@@ -3155,13 +3155,20 @@ function viewComparer(){
   if(c.mode==='periodes'){
     const last=ids[ids.length-1], prev=ids[ids.length-2]||last;
     c.a0=c.a0&&ids.includes(c.a0)?c.a0:prev; c.a1=c.a1&&ids.includes(c.a1)?c.a1:prev; c.b0=c.b0&&ids.includes(c.b0)?c.b0:last; c.b1=c.b1&&ids.includes(c.b1)?c.b1:last;
+    c.pa=c.pa||'perso'; c.pb=c.pb||'perso';
     const inR=(id,x,y)=>id>=(x<y?x:y)&&id<=(x<y?y:x);
-    const la=all.filter(a=>inR(a.weekId,c.a0,c.a1)), lb=all.filter(a=>inR(a.weekId,c.b0,c.b1));
-    const lab=(x,y)=>x===y?weekLabel(W(x)):`${weekLabel(W(x<y?x:y))} → ${weekLabel(W(x<y?y:x))}`;
-    ctrls=`<div class="fld"><span class="flabel">Période A : du</span><select data-cmpf="a0">${wOpt(c.a0)}</select></div><div class="fld"><span class="flabel">au</span><select data-cmpf="a1">${wOpt(c.a1)}</select></div>
-      <div class="fld"><span class="flabel">Période B : du</span><select data-cmpf="b0">${wOpt(c.b0)}</select></div><div class="fld"><span class="flabel">au</span><select data-cmpf="b1">${wOpt(c.b1)}</select></div>`;
-    body=`<section class="card"><div class="card-h"><div><h2>${esc(lab(c.a0,c.a1))} comparée à ${esc(lab(c.b0,c.b1))}</h2><p class="card-s">périmètre d’agences et de métiers sélectionné · ${nf(new Set(la.map(a=>a.weekId)).size)} et ${nf(new Set(lb.map(a=>a.weekId)).size)} semaine(s)</p></div></div>
-      <div class="card-b">${la.length&&lb.length?cmpTable(lab(c.a0,c.a1),lab(c.b0,c.b1),la,lb,c.val):'<p class="mut">Une des deux périodes est vide sur ce périmètre.</p>'}</div></section>`;
+    const wsOf=(p,x,y)=>p==='perso'?ids.filter(id=>inR(id,x,y)):periodWeeks(p,S.weeks);
+    const wa=new Set(wsOf(c.pa,c.a0,c.a1)), wb=new Set(wsOf(c.pb,c.b0,c.b1));
+    const la=all.filter(a=>wa.has(a.weekId)), lb=all.filter(a=>wb.has(a.weekId));
+    const lab0=(x,y)=>x===y?weekLabel(W(x)):`${weekLabel(W(x<y?x:y))} → ${weekLabel(W(x<y?y:x))}`;
+    const labP=(p,x,y)=>p==='perso'?lab0(x,y):(p==='__all__'||/^[nr]:/.test(p))?(ECHANT.find(e=>e[0]===p)||[,''])[1]:p.startsWith('y:')?p.slice(2):p.startsWith('m:')?`${MOISF[+p.slice(7)-1]} ${p.slice(2,6)}`:weekLabel(W(p.replace(/^w:/,'')));
+    const la_=labP(c.pa,c.a0,c.a1), lb_=labP(c.pb,c.b0,c.b1);
+    const pSel=(f,v)=>`<select data-cmpf="${f}"><option value="perso"${v==='perso'?' selected':''}>Du… au… (semaines au choix)</option>${periodOptions(v,S.weeks)}</select>`;
+    const du=(p,f0,f1)=>p==='perso'?`<div class="fld"><span class="flabel">du</span><select data-cmpf="${f0}">${wOpt(c[f0])}</select></div><div class="fld"><span class="flabel">au</span><select data-cmpf="${f1}">${wOpt(c[f1])}</select></div>`:'';
+    ctrls=`<div class="fld"><span class="flabel">Période A</span>${pSel('pa',c.pa)}</div>${du(c.pa,'a0','a1')}
+      <div class="fld"><span class="flabel">Période B</span>${pSel('pb',c.pb)}</div>${du(c.pb,'b0','b1')}`;
+    body=`<section class="card"><div class="card-h"><div><h2>${esc(la_)} comparée à ${esc(lb_)}</h2><p class="card-s">périmètre d’agences et de métiers sélectionné · ${nf(new Set(la.map(a=>a.weekId)).size)} et ${nf(new Set(lb.map(a=>a.weekId)).size)} semaine(s)</p></div></div>
+      <div class="card-b">${la.length&&lb.length?cmpTable(la_,lb_,la,lb,c.val):'<p class="mut">Une des deux périodes est vide sur ce périmètre.</p>'}</div></section>`;
   } else if(c.mode==='agences'){
     const ags=[...new Set(all.map(a=>a.agence))].sort();
     c.gA=ags.includes(c.gA)?c.gA:ags[0]; c.gB=ags.includes(c.gB)&&c.gB!==c.gA?c.gB:(ags.find(x=>x!==c.gA)||ags[0]);
