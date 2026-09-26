@@ -82,6 +82,28 @@ test('heures planifiées, pauses, heures sup et ATCMD', () => {
   assert.equal(a.pauseTotaleMin, 150);
 });
 
+test('ATCMD : 5 h de TTE, mais l’amplitude reste l’horaire réel de la case', () => {
+  const a = one([svc(['ATCMD', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '14:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.heuresPlanifiees, 5);
+  assert.equal(a.amplitudeTotale, 8);
+});
+
+test('mission sans horaire : signalée, puis comptée une fois l’horaire saisi', () => {
+  const cell = 'TRAIN X\nHENDAYE - BORDEAUX';
+  const rows = week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]);
+  const p = E.parseWeek(rows);
+  const an = p.anomalies.find((x) => /sans horaire/.test(x.message));
+  assert.equal(an.pk, 'm:1');
+  assert.equal(an.date, '2026-09-07');
+  assert.equal(E.applyRules(p, RES).agents[0].nbRHR, 0);
+  const corr = { corrections: { rhr: {}, jb: {}, liens: [], horaires: { 'm:1|2026-09-07|TRAIN X': { debut: '18:00', fin: '22:00' } } } };
+  const a = E.applyRules(p, { ...RES, ...corr }).agents[0];
+  assert.equal(a.nbMissions, 2);
+  assert.equal(a.nbRHR, 1);
+  assert.equal(a.rhr[0].lieu, 'BORDEAUX');
+  assert.equal(a.rhr[0].dureeH, 8);
+});
+
 test('heures de nuit hors pauses : conducteurs 22h–5h, AFR 22h–7h', () => {
   const j = [svc(['N', 'HENDAYE', 'HENDAYE', 7, '21:00', 8, '07:00', [[8, '01:00', 8, '02:00']]]), null, null, null, null, null, null];
   assert.equal(one(j, {}, RES).heuresNuit, 6);

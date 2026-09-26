@@ -432,7 +432,12 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .fx svg{display:block;width:100%;height:auto;max-height:520px}
 .fx-l{font-family:var(--mono);font-size:11px;fill:var(--ink-2);font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
 .pngb{opacity:.6;border-color:transparent;background:none;transition:opacity .15s}.card:hover .pngb{opacity:1}.pngb:hover{border-color:var(--line-2)}
-.tw .btn{border-color:transparent;background:var(--surface-3)}.tw .btn:hover{border-color:var(--line-2);background:var(--surface)}
+.tw .btn{border-color:transparent;background:var(--surface-3)}
+.alx{display:flex;flex-direction:column;gap:5px;align-items:flex-start;min-width:200px}
+.alk{display:flex;gap:2px;flex-wrap:wrap}
+.alx .btns{flex-wrap:nowrap}
+.lk{border:0;background:none;padding:2px 6px;border-radius:6px;font-size:12px;font-weight:600;color:var(--ink-3)}
+.lk:hover{color:var(--ink);background:var(--surface-3)}.tw .btn.fix{background:var(--accent-soft);color:var(--accent)}.tw .btn.fix:hover{border-color:var(--accent-line)}.tw .btn:hover{border-color:var(--line-2);background:var(--surface)}
 .rap{white-space:pre-wrap;font-family:var(--sans);font-size:13px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;color:var(--ink-2)}
 .ov.pres{justify-content:center;align-items:stretch;padding:0}
 .pres-b{width:100%;height:100%;display:flex;flex-direction:column;background:var(--ground)}
@@ -857,8 +862,11 @@ function parseDayCell(raw,mon){
   }
   for(const m of ms) if(!m.start||!m.end) anom.push(`mission sans horaire « ${m.label} »`);
   const ok=ms.filter(m=>m.start&&m.end).sort((a,b)=>a.start-b.start);
-  if(!ok.length) return {kind:'CODE',code:lines[0],family:'AUTRE',anom};
-  return {kind:'SERVICE', anom, missions: ok.map(m=>{
+  // missions sans horaire gardées à part : l'horaire peut être saisi depuis « À vérifier »
+  const sh=ms.filter(m=>!m.start||!m.end).map(m=>({label:m.label,from:m.from,to:m.to}));
+  const SH=sh.length?{sansHoraire:sh}:{};
+  if(!ok.length) return {kind:'CODE',code:lines[0],family:'AUTRE',anom,...SH};
+  return {kind:'SERVICE', anom, ...SH, missions: ok.map(m=>{
     const amp=(m.end-m.start)/H;
     const ps=m.pauses.map(([s,e])=>[new Date(Math.max(s,m.start)),new Date(Math.min(e,m.end))]).filter(([s,e])=>e>s);
     const pm=Math.round(ps.reduce((acc,[s,e])=>acc+(e-s),0)/6e4);
@@ -953,7 +961,8 @@ function parseWeek(rows){
     const jours=[];
     for(let d=0;d<7;d++){
       const c=parseDayCell(r[cLun+d],mon);
-      (c.anom||[]).forEach(a=>anomalies.push({agent:`${nom??''} ${r[cPre]??''}`.trim(),jour:JN[d],message:a}));
+      const pkA=personKey({matricule:mat==null?'':String(mat).trim(),nom:String(nom??'').trim(),prenom:String(r[cPre]??'').trim()});
+      (c.anom||[]).forEach(a=>anomalies.push({agent:`${nom??''} ${r[cPre]??''}`.trim(),jour:JN[d],message:a,pk:pkA,date:isoD(days[d])}));
       delete c.anom; jours.push(c);
     }
     agents.push({
@@ -1082,12 +1091,41 @@ function applyRules(parsed, rulesIn){
   const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
   const al=rules.agencesAlias||{};
   const src=parsed.agents.map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};});
-  const hc=rules.horsColonne==='garder'?{agents:src,liste:[]}:splitHorsColonne(src,days.map(d=>d.getTime()),rules);
+  const src2=applyHoraires(src,days,rules);
+  const hc=rules.horsColonne==='garder'?{agents:src2,liste:[]}:splitHorsColonne(src2,days.map(d=>d.getTime()),rules);
   const merged=mergeDuplicates(hc.agents);
   const {residences,residenceSource,locCounts}=deduceResidences(merged,rules);
   const agents=merged.map(a=>computeAgent(a,days,rules,residences[a.agence],parsed.meta.weekId));
   return {meta:{...parsed.meta,residences,residenceSource,locCounts,rules,horsColonne:hc.liste,
     fusions:merged.filter(a=>a.fusion).length}, agents, anomalies:parsed.anomalies||[]};
+}
+/** Horaire saisi à la main pour une mission sans horaire lisible (onglet À vérifier) :
+    clé personne|date|intitulé → {debut:'HH:MM', fin:'HH:MM'} ; fin avant le début = le lendemain. */
+const kHoraire=(pk,date,label)=>pk+'|'+date+'|'+label;
+function applyHoraires(agents,days,rules){
+  const cH=(rules.corrections||{}).horaires||{};
+  if(!Object.keys(cH).length) return agents;
+  return agents.map(a=>{
+    const pk=personKey(a); let chg=false;
+    const jours=a.jours.map((j,d)=>{
+      if(!j.sansHoraire) return j;
+      const date=isoD(days[d]), add=[], reste=[];
+      for(const m of j.sansHoraire){ const h=cH[kHoraire(pk,date,m.label)];
+        if(!h){ reste.push(m); continue; }
+        const t=x=>{const [hh,mm]=String(x).split(':').map(Number);return days[d].getTime()+hh*H+(mm||0)*6e4;};
+        const st=t(h.debut); let en=t(h.fin); if(en<=st) en+=DAY;
+        const amp=(en-st)/H;
+        add.push({label:m.label,type:missionType(m.label),from:m.from,to:m.to,start:new Date(st).toISOString(),end:new Date(en).toISOString(),
+          amplitude:r2(amp),pauseMin:0,travail:r2(amp),nbPauses:0,pauses:[],manuel:true}); }
+      if(!add.length) return j;
+      chg=true;
+      const base=j.kind==='SERVICE'?j.missions:[];
+      const {sansHoraire,code,family,...rest}=j;
+      return {...rest,kind:'SERVICE',...(reste.length?{sansHoraire:reste}:{}),
+        missions:[...base,...add].sort((x,y)=>Date.parse(x.start)-Date.parse(y.start))};
+    });
+    return chg?{...a,jours}:a;
+  });
 }
 function dayIndexOf(t,days){for(let i=0;i<7;i++)if(t>=days[i].getTime()&&t<days[i].getTime()+864e5)return i;return t<days[0].getTime()?-1:7;}
 function nights(a,b){
@@ -2522,27 +2560,34 @@ function suspicions(cur,prev){
   return out;
 }
 function collectAlertes(){
-  const out=[], add=a=>out.push(a);
+  const out=[], add=a=>out.push(a), cH=(S.rules.corrections||{}).horaires||{};
   const ids=[...S.loaded.keys()].sort(), W=id=>S.weeks.find(w=>w.weekId===id);
   for(const w of S.weeks){ const c=w.controle; if(!c||!c.anomalies) continue;
-    for(const a of c.anomalies) add({key:`lec|${w.weekId}|${a.agent}|${a.jour}|${a.message}`,type:'lecture',niv:'moyenne',w:w.weekId,titre:`${a.agent} · ${a.jour}`,detail:a.message}); }
+    for(const a of c.anomalies){
+      const lab=(/^mission sans horaire « (.*) »$/.exec(a.message)||[])[1];
+      // réparé : horaire saisi pour cette mission (ou, pour un horaire illisible, pour une mission de la même case)
+      if(a.pk&&Object.keys(cH).some(k=>lab!=null?k===kHoraire(a.pk,a.date,lab):k.startsWith(a.pk+'|'+a.date+'|'))) continue;
+      add({key:`lec|${w.weekId}|${a.agent}|${a.jour}|${a.message}`,type:'lecture',niv:'moyenne',w:w.weekId,titre:`${a.agent} · ${a.jour}`,detail:a.message,
+        fix:a.pk&&lab!=null&&!/\d{1,2}\s*\/\s*\S*:\S*\d/.test(lab)?{hor:{pk:a.pk,date:a.date,label:lab,agent:a.agent,jour:a.jour}}:{reimport:!a.pk}}); } }
   let prevR=null;
   for(const id of ids){ const v=S.loaded.get(id), w=W(id);
     for(const h of v.meta.horsColonne||[]) add({key:`hc|${id}|${h.agent}|${h.start}`,type:'horscol',niv:'moyenne',w:id,ag:h.agence,titre:`${h.agent} · ${h.jour}`,detail:`${h.label} daté du ${dtISO(h.start)} : écartée du calcul`});
     for(const a of v.agents){ if(a.exclu) continue; const pk=personKey(a), nm=`${a.nom} ${a.prenom}`;
-      for(const c of a.coupures||[]) if(c.long) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`});
-      if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`});
-      else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`}); }
+      // un arrêt déjà tranché à la main (compté ou écarté) ne remonte plus
+      for(const c of a.coupures||[]) if(c.long&&!c.manuel) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`,fix:{coupure:c.key}});
+      const fr=a.lieuHabituel&&!a.rattachement?{res:{pk,w:id,lieu:a.lieuHabituel}}:null;
+      if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`,fix:fr});
+      else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`,fix:fr}); }
     for(const [ag,src] of Object.entries(v.meta.residenceSource||{})) if(src==='manuel'){
       // résidence saisie à la main mais absente des missions de cette semaine (ex. « BORDEAUX » saisi, fichier écrit « BX »)
       const lc=(v.meta.locCounts||{})[ag]||{}, res=[v.meta.residences[ag],...((S.rules.lieuxResidence||{})[ag]||[])].map(normLieu);
       const top=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0];
-      if(top&&!res.some(r=>lc[r])) add({key:`resman|${ag}|${id}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:`la résidence saisie « ${v.meta.residences[ag]} » n’apparaît dans aucune mission de la semaine ; le lieu le plus fréquent est « ${top[0]} » : s’il s’agit de la même résidence, ajoutez cette écriture (fiche d’un agent, bouton « … = résidence ») ; sinon corrigez la résidence dans les Réglages. D’ici là, les RHR de cette agence sont surestimés.`}); }
-    for(const [ag,src] of Object.entries(v.meta.residenceSource||{})) if(src==='indéterminée') add({key:`res|${ag}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:'aucune résidence connue : aucun RHR ne peut être compté'});
+      if(top&&!res.some(r=>lc[r])) add({key:`resman|${ag}|${id}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:`la résidence saisie « ${v.meta.residences[ag]} » n’apparaît dans aucune mission de la semaine ; le lieu le plus fréquent est « ${top[0]} » : s’il s’agit de la même résidence, ajoutez cette écriture (fiche d’un agent, bouton « … = résidence ») ; sinon corrigez la résidence dans les Réglages. D’ici là, les RHR de cette agence sont surestimés.`,fix:{lieures:{ag,lieu:top[0]},reglages:1}}); }
+    for(const [ag,src] of Object.entries(v.meta.residenceSource||{})) if(src==='indéterminée') add({key:`res|${ag}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:'aucune résidence connue : aucun RHR ne peut être compté',fix:{reglages:1}});
     const cur={...(w||{}),nbAgents:v.agents.length,agences:[...new Set(v.agents.map(a=>a.agence))],fusions:v.meta.fusions,
       vides:v.agents.filter(a=>a.jours.every(j=>j.kind==='VIDE')).length,extractDate:v.meta.extractDate,monday:v.meta.monday};
     const prevW=prevR&&Date.parse(cur.monday)-Date.parse(prevR.monday)===7*DAY?prevR:null;
-    for(const m of suspicions(cur,prevW)) add({key:`susp|${id}|${m.replace(/\d+/g,'#')}`,type:'fichier',niv:'moyenne',w:id,titre:w?weekLabel(w):id,detail:m});
+    for(const m of suspicions(cur,prevW)) add({key:`susp|${id}|${m.replace(/\d+/g,'#')}`,type:'fichier',niv:'moyenne',w:id,titre:w?weekLabel(w):id,detail:m,fix:{import:1}});
     prevR=cur; }
   // écarts inhabituels : chaque agent comparé à ses propres semaines, chaque agence à ses propres semaines
   const rows=[...S.loaded.entries()].flatMap(([id,v])=>v.agents.filter(a=>!a.exclu).map(a=>({id,a})));
@@ -2576,14 +2621,28 @@ function viewVerifier(){
         <td class="l">${esc(AL_TYPES[a.type])}</td><td class="l nm">${esc(a.titre)}${a.ag&&a.titre!==a.ag?` <span class="mut nb">${esc(a.ag)}</span>`:''}</td>
         <td class="l" style="white-space:normal;min-width:280px">${esc(a.detail)}${a.suivi&&a.suivi.note?`<div class="hint">Note : ${esc(a.suivi.note)}</div>`:''}</td>
         <td class="l">${a.suivi?`<span class="pill ${a.suivi.statut==='corrige'?'pill-g':a.suivi.statut==='vu'?'pill-a':'pill-n'}">${{vu:'vue',corrige:'corrigée',rouvert:'rouverte'}[a.suivi.statut]||''}</span> <span class="mut sm">${dISO(a.suivi.le)}${a.suivi.auteur?' · '+esc(a.suivi.auteur):''}</span>`:'<span class="z">—</span>'}</td>
-        <td class="l"><span class="btns" style="gap:4px;flex-wrap:nowrap">${a.pk?`<button class="btn btn-sm" data-alopen="${i}">Fiche</button>`:''}
-          ${!a.suivi||a.suivi.statut==='rouvert'?`<button class="btn btn-sm" data-alset="${i}" data-v="vu">Vu</button><button class="btn btn-sm" data-alset="${i}" data-v="corrige">Corrigé</button>`:`<button class="btn btn-sm" data-alset="${i}" data-v="rouvert">Rouvrir</button>`}
-          <button class="btn btn-sm" data-alnote="${i}" title="Ajouter une note">Note</button></span></td></tr>`).join('')}
+        <td class="l"><div class="alx">${alFix(a,i)?`<span class="btns" style="gap:4px">${alFix(a,i)}</span>`:''}<span class="alk">${a.pk?`<button class="lk" data-alopen="${i}">Fiche</button>`:''}${!a.suivi||a.suivi.statut==='rouvert'?`<button class="lk" data-alset="${i}" data-v="vu">Vu</button><button class="lk" data-alset="${i}" data-v="corrige">Corrigé</button>`:`<button class="lk" data-alset="${i}" data-v="rouvert">Rouvrir</button>`}<button class="lk" data-alnote="${i}" title="Ajouter une note">Note</button></span></div></td></tr>`).join('')}
     </tbody></table></div>${list.length>600?`<p class="hint">600 premières sur ${nf(list.length)} — filtrez par type.</p>`:''}`:'<p class="mut">Rien à afficher pour ce filtre.</p>'}</div></section>
   <section class="card"><div class="card-h"><div><h2>Historique du suivi</h2><p class="card-s">40 derniers changements</p></div></div>
     <div class="card-b">${hist.length?`<div class="tw"><table><thead><tr><th class="l">Quand</th><th class="l">Qui</th><th class="l">Alerte</th><th class="l">Nouveau statut</th></tr></thead><tbody>
       ${hist.map(h=>`<tr><td class="l mono">${dtISO(h.le)}</td><td class="l">${esc(h.auteur||'—')}</td><td class="l">${esc(h.titre||h.key)}</td><td class="l">${esc({vu:'vue',corrige:'corrigée',rouvert:'rouverte',note:'note ajoutée'}[h.statut]||h.statut)}</td></tr>`).join('')}
     </tbody></table></div>`:'<p class="mut">Aucun changement pour l’instant.</p>'}</div></section>`;
+}
+/** Réparations proposées selon le type d'alerte : elles réutilisent les corrections manuelles existantes
+    (mémorisées, notées au journal, rejouées à chaque affichage) ; l'alerte disparaît une fois réparée. */
+function alFix(a,i){
+  if(!admin()||!a.fix||a.suivi&&a.suivi.statut!=='rouvert'&&a.suivi.statut) return '';
+  const f=a.fix, B=(attrs,l,pri)=>`<button class="btn btn-sm${pri?' fix':''}" ${attrs}>${l}</button>`;
+  if(f.hor) return B(`data-alhor="${i}"`,'Saisir l’horaire',1);
+  if(f.reimport) return `<span class="hint" style="margin:0 6px 0 0" title="Les semaines importées avant cette version ne gardent pas la mission : réimportez le fichier pour pouvoir saisir son horaire ici.">réimporter pour réparer</span>`;
+  if(f.coupure) return B(`data-crhr="${esc(f.coupure)}" data-v="oui"`,'Compter en RHR',1)+B(`data-crhr="${esc(f.coupure)}" data-v="non"`,'Pas un RHR');
+  if(f.res) return B(`data-ratt="${esc(f.res.pk+'|'+f.res.w)}" data-val="${esc(f.res.lieu)}" title="Rattachement temporaire (accord art. 8), pour cette semaine seulement"`,`Rattacher à ${esc(f.res.lieu)} cette semaine`,1)
+    +B(`data-resagv="${esc(f.res.pk)}" data-w="${esc(f.res.w)}" data-lieu="${esc(f.res.lieu)}" title="Mouvement d’agence : cette semaine et les suivantes"`,`Résidence ${esc(f.res.lieu)} dès ${esc(String(f.res.w).replace(/^\d+-/,''))}`);
+  let h='';
+  if(f.lieures) h+=B(`data-lieures="${esc(f.lieures.ag)}" data-lieu="${esc(f.lieures.lieu)}"`,`« ${esc(f.lieures.lieu)} » = résidence`,1);
+  if(f.reglages) h+=B('data-goto="reglages"','Réglages');
+  if(f.import) h+=B('data-goto="import"','Remplacer le fichier');
+  return h;
 }
 function setSuivi(a,statut,note){
   const al=S.suivi.alertes=S.suivi.alertes||{}, le=new Date().toISOString(), cur=al[a.key]||{};
@@ -3590,7 +3649,8 @@ function correctionsCard(){
     ...jb.map(([k,v])=>{const [pk,d]=k.split('|');return {t:v==='oui'?'Journée blanche ajoutée':'Journée blanche écartée',q:nm(pk),d:dFull(d),del:['jb',k]};}),
     ...Object.entries(c.residenceSemaine||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Rattachement temporaire à ${v}`,q:nm(pk),d:w,del:['residenceSemaine',k]};}),
     ...Object.entries(c.residenceAgent||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Résidence propre : ${v}`,q:nm(pk),d:'à partir de '+w,del:['residenceAgent',k]};}),
-    ...Object.entries(c.exclus||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Exclu des chiffres${v.motif?' — '+v.motif:''}`,q:nm(pk),d:w||'toutes les semaines',del:['exclus',k]};})];
+    ...Object.entries(c.exclus||{}).map(([k,v])=>{const [pk,w]=k.split('|');return {t:`Exclu des chiffres${v.motif?' — '+v.motif:''}`,q:nm(pk),d:w||'toutes les semaines',del:['exclus',k]};}),
+    ...Object.entries(c.horaires||{}).map(([k,v])=>{const p=k.split('|'), i=p.findIndex(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)), pk=p.slice(0,i).join('|'), d=p[i], l=p.slice(i+1);return {t:`Horaire saisi : ${l.join('|')} ${v.debut}–${v.fin}`,q:nm(pk),d:dFull(d),del:['horaires',k]};})];
   return `<section class="card"><div class="card-h"><div><h2>Corrections mémorisées</h2>
     <p class="card-s">${nf(rows.length)} correction${rows.length>1?'s':''} — rejouées à chaque affichage, même après un réimport</p></div></div>
     <div class="card-b">${rows.length?`<div class="tw"><table><thead><tr><th class="l">Correction</th><th class="l">Agent</th><th class="l">Quand</th>${admin()?'<th></th>':''}</tr></thead><tbody>
@@ -3913,7 +3973,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -3974,10 +4034,22 @@ document.addEventListener('click',async e=>{
     if(!l){ S.msg={m:'Indiquez le lieu de la nouvelle résidence.',t:'w'}; render(); return; }
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=normLieu(l);
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} à partir de ${w}`,nmPk(pk)); }
+  if(t.dataset.resagv!=null&&admin()){ const pk=t.dataset.resagv, l=normLieu(t.dataset.lieu), w=t.dataset.w;
+    if(!confirm(`${nmPk(pk)} : résidence ${l} à partir de ${w.replace(/^\d+-/,'')} et pour les semaines suivantes (mouvement d’agence) ?`)) return;
+    const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=l;
+    return saveCorrection(`Résidence de l’agent : ${l} à partir de ${w}`,nmPk(pk)); }
+  if(t.dataset.alhor!=null&&admin()){ const a=S.rows_al[+t.dataset.alhor], h=a&&a.fix&&a.fix.hor; if(!h) return;
+    const r=prompt(`Horaire de la mission « ${h.label} » de ${h.agent}, ${h.jour} ${dFull(h.date)}\n(début-fin, ex. 06:00-14:00 ; une fin avant le début = le lendemain) :`,'');
+    if(r==null) return;
+    const m=/^\s*(\d{1,2})[:h](\d{2})\s*[-–à]+\s*(\d{1,2})[:h](\d{2})\s*$/i.exec(r);
+    if(!m||+m[1]>23||+m[3]>23||+m[2]>59||+m[4]>59){ S.msg={m:'Horaire non reconnu : écrivez par exemple 06:00-14:00.',t:'w'}; render(); return; }
+    const p2=x=>String(x).padStart(2,'0'), c=S.rules.corrections; c.horaires=c.horaires||{};
+    c.horaires[kHoraire(h.pk,h.date,h.label)]={debut:`${p2(m[1])}:${m[2]}`,fin:`${p2(m[3])}:${m[4]}`};
+    return saveCorrection(`Horaire saisi : ${h.label} ${p2(m[1])}:${m[2]}–${p2(m[3])}:${m[4]}`,`${h.agent} · ${h.jour} ${dFull(h.date)}`); }
   if(t.dataset.resagdel!=null&&admin()){ const k=t.dataset.resagdel; delete S.rules.corrections.residenceAgent[k];
     return saveCorrection('Résidence propre à l’agent supprimée',corrDetail(k)); }
   if(t.dataset.ratt!=null&&admin()){ const k=t.dataset.ratt, c=S.rules.corrections; c.residenceSemaine=c.residenceSemaine||{};
-    const v=t.dataset.sel?el(t.dataset.sel)?.value:'';
+    const v=t.dataset.val??(t.dataset.sel?el(t.dataset.sel)?.value:'');
     if(v) c.residenceSemaine[k]=v; else delete c.residenceSemaine[k];
     return saveCorrection(v?`Rattachement temporaire à ${v} pour la semaine`:'Rattachement temporaire annulé',`${nmPk(k.split('|')[0])} · ${k.split('|')[1]}`); }
   if(t.dataset.lienDel!=null&&admin()){ const L=JSON.parse(t.dataset.lienDel);

@@ -54,8 +54,13 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   calculé mais retiré de tous les chiffres et de la vitrine, réintégrable), résidence propre à un agent
   à partir d'une semaine (mouvement d'agence ; prioritaire sur celle de l'agence, le rattachement
   temporaire d'une semaine restant prioritaire). Mémorisées dans `recap.config` (clé `regles`, champs
-  `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, exclus ; `lieuxResidence`) et rejouées
-  à chaque affichage, même après réimport.
+  `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, exclus, horaires ; `lieuxResidence`) et rejouées
+  à chaque affichage, même après réimport. `horaires` : horaire saisi pour une mission sans horaire lisible
+  (clé personne|date|intitulé ; les missions sans horaire sont gardées à part dans la case, `sansHoraire`).
+- « À vérifier » propose de réparer selon le type d'alerte (en réutilisant ces corrections) : saisir l'horaire
+  d'une mission, compter ou écarter un RHR de plus de 44 h, rattacher l'agent à son lieu habituel pour la semaine
+  ou changer sa résidence à partir de la semaine, reconnaître un lieu comme résidence de l'agence, ouvrir les
+  Réglages ou l'Import. Une alerte réparée disparaît d'elle-même.
 - Journée blanche : case vide encadrée par deux services, hors lendemain de service de nuit, et
   pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
   minuit compte si l'agent est à sa résidence.
@@ -74,7 +79,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   CONDUCTEUR, Coordo = COORDO AFR. Agences « Agence X » rattachées automatiquement au nom récent
   qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP.
 - TTE (temps de travail effectif, anciennement « heures planifiées », renommé à la demande) : amplitude
-  moins les pauses « P: » ; une ATCMD compte 5 h. Heures sup : TTE au-delà de 35 h par agent et par semaine.
+  moins les pauses « P: » ; une ATCMD compte 5 h de TTE, mais son amplitude reste l'horaire réel inscrit
+  dans la case (précisé par l'utilisateur). Heures sup : TTE au-delà de 35 h par agent et par semaine.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
   Alerte « À vérifier » si une résidence manuelle n'apparaît dans aucune mission d'une semaine.
