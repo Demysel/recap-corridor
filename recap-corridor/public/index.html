@@ -277,6 +277,9 @@ tbody tr.clk td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-
 tbody tr.clk:hover td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .tot td{font-weight:700;background:var(--surface-3)!important;border-top:1px solid var(--line-2)}
 .nm{font-weight:700}
+.vddb{display:none}
+@media (max-width:640px){.vfil{flex-direction:column;align-items:stretch}.vfil>.fld{width:100%}.vddb{display:inline-flex;width:100%;max-width:none;justify-content:space-between;white-space:normal;text-align:left}
+  .vddp{display:none}.vddp.open{display:block;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}}
 .agchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
 .agc{border:0;background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:3px 9px;font-size:12.5px;font-weight:600}
 .agc:hover{background:var(--accent-line)}
@@ -617,7 +620,7 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
   .crumb h2{font-size:20px}
   .fbar{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .fbar>.fld:nth-child(3){grid-column:1/-1}
-  .fld.grow,.fbar .btn-pri{display:none}
+  .fbar .fld.grow,.fbar .btn-pri{display:none}
   .fbar>.fld:last-child:not(:nth-child(-n+3)){display:none}
   .srch input,.sel,select{width:100%;max-width:none}
   .tl-w svg{min-width:620px}
@@ -1961,6 +1964,7 @@ const scopeMetiers=()=>S.selMetiers||allMetiers();
 const nbWeeksLoaded=()=>activeWeeks().filter(id=>S.loaded.has(id)).length;
 
 async function ensureLoaded(ids){
+  if(backend.mode!=='artifact'&&S.role!=='admin') return;   // visiteur : statistiques anonymes uniquement, jamais le détail
   for(const id of ids){
     if(S.loaded.has(id)) continue;
     const {docs}=await withLoad(api.semaine(id));
@@ -3392,9 +3396,13 @@ function viewVitrine(){
       return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`; })()}
   <section class="card"><div class="card-b vfil">
     <label class="fld"><span class="flabel">Période</span><select id="vWeek">${periodOptions(vf.w,sem)}</select></label>
-    <div class="fld grow"><span class="flabel">Agences à comparer</span><div class="frow">${AG.map(x=>`<button class="chip" data-vag="${esc(x)}" aria-pressed="${!!(vf.ags&&vf.ags.includes(x))}">${esc(x)}</button>`).join('')}<button class="chip chip-mini ghost" data-vag="*" aria-pressed="${!vf.ags}">Toutes</button></div>
-      <span class="hint" style="margin-top:2px">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} choisie${vf.ags.length>1?'s':''} : tous les chiffres portent sur elles ; touchez une agence pour l’ajouter ou la retirer.`:'Touchez une agence pour ne garder qu’elle, puis ajoutez-en d’autres pour les comparer.'}</span></div>
-    <div class="fld"><span class="flabel">Métiers</span><div class="frow">${chips('vme',ME,vf.me)}</div></div></div></section>
+    <div class="fld grow vdd"><span class="flabel">Agences à comparer</span>
+      <button class="sel vddb" data-vdd="ag" aria-expanded="${S.vdd==='ag'}">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} : ${vf.ags.map(esc).join(', ')}`:'Toutes les agences'}<span class="car">▾</span></button>
+      <div class="vddp${S.vdd==='ag'?' open':''}"><div class="frow">${AG.map(x=>`<button class="chip" data-vag="${esc(x)}" aria-pressed="${!!(vf.ags&&vf.ags.includes(x))}">${esc(x)}</button>`).join('')}<button class="chip chip-mini ghost" data-vag="*" aria-pressed="${!vf.ags}">Toutes</button></div>
+      <span class="hint" style="margin-top:2px">${choix?`${vf.ags.length} agence${vf.ags.length>1?'s':''} choisie${vf.ags.length>1?'s':''} : tous les chiffres portent sur elles ; touchez une agence pour l’ajouter ou la retirer.`:'Touchez une agence pour ne garder qu’elle, puis ajoutez-en d’autres pour les comparer.'}</span></div></div>
+    <div class="fld vdd"><span class="flabel">Métiers</span>
+      <button class="sel vddb" data-vdd="me" aria-expanded="${S.vdd==='me'}">${vf.me?vf.me.map(esc).join(', '):'Tous les métiers'}<span class="car">▾</span></button>
+      <div class="vddp${S.vdd==='me'?' open':''}"><div class="frow">${chips('vme',ME,vf.me)}</div></div></div></div></section>
   ${choix?cmpBlock:''}
   <div class="vkpis">${VKPI.map(k=>{const v=k.v(g);return `<div class="kpi vk"><div class="k">${esc(k.l)}${k.u?` <span class="nb" style="text-transform:none;letter-spacing:0">· ${k.u}</span>`:''}</div>
     <div class="vk-r"><div class="v">${v==null?'—':k.f(v)}</div>${multi?spark(perW.map(a=>a?k.v(a):null)):''}</div><div class="n">${k.d(g)}</div></div>`;}).join('')}</div>
@@ -4192,7 +4200,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4220,6 +4228,7 @@ document.addEventListener('click',async e=>{
   if(t.dataset.alopen!=null){ const a=S.rows_al[+t.dataset.alopen]; const x=a&&[...S.loaded.values()].flatMap(v=>v.agents).find(y=>personKey(y)===a.pk); if(x){ S.drawer=x; renderDrawer(); } return; }
   if(t.dataset.alset!=null&&admin()){ const a=S.rows_al[+t.dataset.alset]; if(a) setSuivi(a,t.dataset.v); return; }
   if(t.dataset.alnote!=null&&admin()){ const a=S.rows_al[+t.dataset.alnote]; if(!a) return; const n=prompt('Note sur cette alerte :',a.suivi?.note||''); if(n!=null) setSuivi(a,'note',n.trim()); return; }
+  if(t.dataset.vdd){ S.vdd=S.vdd===t.dataset.vdd?null:t.dataset.vdd; render(); return; }
   if(t.dataset.vheat){ S.vf.heat=t.dataset.vheat; render(); return; }
   if(t.dataset.vag!=null){ const all=[...new Set(S.vit.cells.map(c=>c.ag))], v=t.dataset.vag;
     if(v==='*') S.vf.ags=null; else if(!S.vf.ags) S.vf.ags=[v]; else { let c=S.vf.ags; c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.ags=c.length&&c.length<all.length?c:null; }
