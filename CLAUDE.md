@@ -85,6 +85,10 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   de l'horaire réel (ATCMD dim. 20h–lun. 6h : 10 h d'amplitude, 5 h de TTE, 3h30 de nuit, 2 h de dimanche ; validé).
   Mission (hors ATCMD) de moins de 5 h d'amplitude : comptée 5 h d'amplitude et 5 h de TTE, mission par mission
   (validé par l'utilisateur : deux missions de 4 h = 10 h ; réglable, 0 = désactivé). Nuit, dimanche et paniers restent lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
+  Calcul blindé : durées recalculées en minutes entières depuis les horaires (`missionMinutes`), pauses = réunion des
+  pauses ramenées dans la mission (jamais déduites deux fois), totaux gardés en minutes exactes (`rM`, aucune dérive
+  d'arrondi). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
+  Test aléatoire de 400 semaines contre un calcul de référence indépendant.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
   Alerte « À vérifier » si une résidence manuelle n'apparaît dans aucune mission d'une semaine.
@@ -92,7 +96,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   22h–6h : réglable).
 - Heures du dimanche : temps travaillé hors pauses le dimanche.
 - MHIS, DISPO, ATCMD : intitulé qui contient ces lettres (non exclusif). DISPO et ATCMD comptés à part.
-- Trajet seul : intitulé réduit à VOY ou VS (hypothèse à confirmer par l'utilisateur).
+- Trajet seul : l'intitulé contient VOY ou VS comme mot à part (VOY-541-BX, 541-VOY, VS 12), jamais collé à un « + »
+  (CSE+VOY, VOY+PREPA, VS+MHIS : pas un trajet seul) — précisé par l'utilisateur (`isTrajetSeul`).
 - Paniers : 1 h en service entre 11h30 et 13h30 ; 1 h entre 18h30 et 20h30 ; 3 h entre 22h et 5h, lus sur
   l'horaire de la mission, pauses comprises (12:30–19:30 avec pause vers 18h45 = midi + soir ; précisé par l'utilisateur) ;
   ou RHR qui touche la plage (validé : dès que le RHR chevauche la plage, même brièvement) — un panier

@@ -827,6 +827,23 @@ const H=36e5, DAY=864e5;
 function resolveDay(d,mon){for(let o=-2;o<=9;o++){const x=new Date(mon.getTime()+o*864e5);if(x.getUTCDate()===d)return x;}return null;}
 function mk(d,h,mi,mon){const x=resolveDay(d,mon);return x?new Date(x.getTime()+h*H+mi*6e4):null;}
 const r2=n=>Math.round(n*100)/100;
+/** Durées d'une mission en minutes entières, recalculées depuis les horaires (jamais depuis une valeur arrondie) :
+    amplitude = fin − début ; pauses = réunion des pauses « P: » ramenées dans la mission (deux pauses qui se
+    chevauchent ne sont pas déduites deux fois). Semaines importées sans le détail des pauses : pauseMin enregistré. */
+const hhmm=s=>{const d=new Date(s);return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;};
+function missionMinutes(m){
+  const S=Date.parse(m.start), E=Date.parse(m.end);
+  const amp=Math.max(0,Math.round((E-S)/6e4));
+  const P=(m.pauses||[]).filter(Array.isArray);
+  if(!P.length) return {amp,pause:Math.min(amp,Math.max(0,Math.round(m.pauseMin||0)))};
+  const iv=P.map(([a,b])=>[Math.max(S,Date.parse(a)),Math.min(E,Date.parse(b))]).filter(([a,b])=>b>a).sort((x,y)=>x[0]-y[0]);
+  let t=0,cs=null,ce=null;
+  for(const [a,b] of iv){ if(cs===null||a>ce){ if(cs!==null) t+=ce-cs; cs=a; ce=b; } else ce=Math.max(ce,b); }
+  if(cs!==null) t+=ce-cs;
+  return {amp,pause:Math.min(amp,Math.round(t/6e4))};
+}
+/** Heures arrondies à la minute : les totaux restent des minutes exactes, sans dérive d'arrondi */
+const rM=h=>Math.round(h*60)/60;
 function missionType(l){const s=String(l).trim();const m=/^(.*?)[-_]\s*\d{2,4}\b/.exec(s);return ((m?m[1]:s).trim().replace(/\s+/g,' '))||s;}
 
 /** Une cellule jour -> {kind:'VIDE'|'CODE'|'SERVICE'}
@@ -841,10 +858,12 @@ function parseDayCell(raw,mon){
   const ms=[]; let cur=null; const anom=[];
   for(const line of lines){
     if(RE_P.test(line)){
-      if(!cur) continue;
+      if(!cur){ anom.push(`pause sans mission « ${line} »`); continue; }
       const m=RE_PF.exec(line);
       if(m){const s=mk(+m[1],+m[2],+m[3],mon); let e=mk(+m[4],+m[5],+m[6],mon);
-        if(s&&e){ if(e<s)e=new Date(e.getTime()+864e5); cur.pauses.push([s,e]); }}
+        if(s&&e){ if(e<s)e=new Date(e.getTime()+864e5); cur.pauses.push([s,e]); }
+        else anom.push(`pause illisible « ${line} » : non déduite du TTE`); }
+      else anom.push(`pause illisible « ${line} » : non déduite du TTE`);
       continue;
     }
     const h=RE_H.exec(line);
@@ -866,13 +885,16 @@ function parseDayCell(raw,mon){
   const sh=ms.filter(m=>!m.start||!m.end).map(m=>({label:m.label,from:m.from,to:m.to}));
   const SH=sh.length?{sansHoraire:sh}:{};
   if(!ok.length) return {kind:'CODE',code:lines[0],family:'AUTRE',anom,...SH};
+  for(const m of ok){
+    if(m.end-m.start>=DAY) anom.push(`mission « ${m.label} » de 24 h ou plus : horaire à vérifier`);
+    for(const [ps,pe] of m.pauses) if(pe<=m.start||ps>=m.end||ps<m.start||pe>m.end) anom.push(`pause ${hhmm(ps.toISOString())}–${hhmm(pe.toISOString())} en dehors de la mission « ${m.label} » : seule la partie comprise dans la mission est déduite`);
+  }
   return {kind:'SERVICE', anom, ...SH, missions: ok.map(m=>{
-    const amp=(m.end-m.start)/H;
     const ps=m.pauses.map(([s,e])=>[new Date(Math.max(s,m.start)),new Date(Math.min(e,m.end))]).filter(([s,e])=>e>s);
-    const pm=Math.round(ps.reduce((acc,[s,e])=>acc+(e-s),0)/6e4);
+    const mm=missionMinutes({start:m.start.toISOString(),end:m.end.toISOString(),pauses:ps.map(([s,e])=>[s.toISOString(),e.toISOString()])});
     return {label:m.label,type:missionType(m.label),from:m.from,to:m.to,...(m.note?{note:m.note}:{}),
       start:m.start.toISOString(),end:m.end.toISOString(),
-      amplitude:r2(amp),pauseMin:pm,travail:r2(amp-pm/60),nbPauses:ps.length,
+      amplitude:mm.amp/60,pauseMin:mm.pause,travail:(mm.amp-mm.pause)/60,nbPauses:ps.length,
       pauses:ps.map(([s,e])=>[s.toISOString(),e.toISOString()])};
   })};
 }
@@ -1005,7 +1027,7 @@ const DEFAULT_RULES={
   minMission:5,               // une mission (hors ATCMD) de moins de 5 h d'amplitude compte 5 h d'amplitude et de TTE (0 = désactivé)
   nuitAFR:[22,7],             // heures de nuit des AFR
   nuitCDR:[22,5],             // heures de nuit des conducteurs
-  trajetTypes:['VOY','VS'],   // « trajet seul » : mission dont l'intitulé se réduit à l'un de ces types
+  trajetTypes:['VOY','VS'],   // « trajet seul » : l'un de ces mots à part dans l'intitulé, sans « + » collé (isTrajetSeul)
   panierMidi:[11.5,13.5,1],   // plage horaire, heures en service minimum (horaire de la mission, pauses comprises)
   panierSoir:[18.5,20.5,1],
   panierNuit:[22,5,3],
@@ -1165,9 +1187,23 @@ function setBands(a){
     Autre mission de moins de minMission h d'amplitude : amplitude et TTE comptés minMission h (règle de l'utilisateur).
     Heures de nuit, du dimanche et paniers restent lus sur l'horaire réel. */
 const isATCMD=m=>/ATCMD/i.test(m.label);
-const missionCourte=(m,rules)=>!isATCMD(m)&&rules.minMission>0&&m.amplitude<rules.minMission;
-const missionAmp=(m,rules)=>missionCourte(m,rules)?rules.minMission:m.amplitude;
-const missionTTE=(m,rules)=>isATCMD(m)?rules.heuresATCMD:missionCourte(m,rules)?rules.minMission:Math.max(0,m.amplitude-(m.pauseMin||0)/60);
+const missionCourte=(m,rules)=>!isATCMD(m)&&rules.minMission>0&&missionMinutes(m).amp<Math.round(rules.minMission*60);
+const missionAmp=(m,rules)=>missionCourte(m,rules)?rules.minMission:missionMinutes(m).amp/60;
+const missionTTE=(m,rules)=>{ if(isATCMD(m)) return rules.heuresATCMD; if(missionCourte(m,rules)) return rules.minMission;
+  const x=missionMinutes(m); return (x.amp-x.pause)/60; };
+/** Trajet seul : l'intitulé contient VOY ou VS (types réglables) comme mot à part — encadré par le début, la fin,
+    un tiret, un espace, un point… — et jamais collé à un « + » (« CSE+VOY », « VOY+PREPA » : pas un trajet seul).
+    VOY-541-BX, 541-VOY, VS 12 : trajet seul. (Règle précisée par l'utilisateur.) */
+function isTrajetSeul(label,types){
+  const L=deacc(String(label||'')).toUpperCase();
+  for(const t0 of types||[]){ const t=deacc(String(t0)).toUpperCase().trim(); if(!t) continue;
+    const re=new RegExp('(^|[^A-Z0-9])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Z0-9])','g'); let m;
+    while((m=re.exec(L))){ const i=m.index+m[1].length, j=i+t.length;
+      const before=L.slice(0,i).trimEnd().slice(-1), after=L.slice(j).trimStart().charAt(0);
+      if(before!=='+'&&after!=='+') return true;
+      re.lastIndex=i+1; } }
+  return false;
+}
 function computeAgent(a,days,rules,residence,weekId){
   const pk=personKey(a), corr=rules.corrections||{}, cR=corr.rhr||{}, cJ=corr.jb||{};
   // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
@@ -1183,7 +1219,7 @@ function computeAgent(a,days,rules,residence,weekId){
   const isRes=l=>resSet.has(normLieu(l));
   const rhrOk=rules.rhrMetiers.includes(a.metier);
   const nuitW=isAFR(a.metier)?rules.nuitAFR:rules.nuitCDR;
-  const reTrajet=new Set((rules.trajetTypes||[]).map(x=>String(x).toUpperCase().trim()));
+  const trajTypes=rules.trajetTypes||[];
   const jours=a.jours.map((j,d)=>({...j,d,date:isoD(days[d])}));
   const all=[];
   let joursService=0,nbMissions=0,amp=0,pauseMin=0,plan=0,nuit=0,dim=0,ampMax=0,wk=0,priseMin=null,finMax=null;
@@ -1194,7 +1230,7 @@ function computeAgent(a,days,rules,residence,weekId){
     if(j.kind==='CODE') codeCounts[j.family]=(codeCounts[j.family]||0)+1;
     else if(j.kind==='SERVICE'){
       joursService++; if(j.d>=5) wk++;
-      j.amplitude=r2(j.missions.reduce((s,m)=>s+missionAmp(m,rules),0));
+      j.amplitude=rM(j.missions.reduce((s,m)=>s+missionAmp(m,rules),0));
       let hj=0;
       for(const m of j.missions){
         const S=new Date(m.start), E=new Date(m.end), Sm=S.getTime(), Em=E.getTime();
@@ -1207,7 +1243,7 @@ function computeAgent(a,days,rules,residence,weekId){
         const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H;
         all.push({...m,S,E,segs,atcmd,d:j.d});
         const mAmp=missionAmp(m,rules);
-        nbMissions++; amp+=mAmp; pauseMin+=m.pauseMin||0; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
+        nbMissions++; amp+=mAmp; pauseMin+=missionMinutes(m).pause; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
         if(mAmp>ampMax) ampMax=mAmp;
         const sh=S.getUTCHours()+S.getUTCMinutes()/60, eh=E.getUTCHours()+E.getUTCMinutes()/60;
         if(priseMin===null||sh<priseMin) priseMin=sh;
@@ -1217,12 +1253,16 @@ function computeAgent(a,days,rules,residence,weekId){
         if(/MHIS/i.test(m.label)) nbMHIS++;
         if(/DISPO/i.test(m.label)) nbDISPO++;
         if(atcmd) nbATCMD++;
-        if(reTrajet.has(String(m.type||missionType(m.label)).toUpperCase().trim())) nbTrajetsSeuls++;
+        if(isTrajetSeul(m.label,trajTypes)) nbTrajetsSeuls++;
       }
-      j.heures=r2(hj);
+      j.heures=rM(hj);
     }
   }
   all.sort((x,y)=>x.S-y.S);
+  // missions qui se chevauchent (ligne recopiée, doublon) : leur recouvrement serait compté deux fois en amplitude et en TTE
+  const chevauchements=[];
+  for(let i=1;i<all.length;i++) if(all[i].S<all[i-1].E) chevauchements.push({a:all[i-1].label,b:all[i].label,debut:all[i].start,fin:new Date(Math.min(all[i].E,all[i-1].E)).toISOString(),
+    min:Math.round((Math.min(all[i].E,all[i-1].E)-all[i].S)/6e4)});
 
   /* --- RHR : chaque arrêt hors résidence entre deux missions, d'au moins rhrMinHours heures (jour ou nuit).
          Les corrections manuelles l'emportent : coupure comptée / écartée, ou deux missions liées. --- */
@@ -1240,8 +1280,8 @@ function computeAgent(a,days,rules,residence,weekId){
       const lk=inLien(i);
       if(lk){
         if(i===lk.ia){ const b=all[lk.ib], dur=(b.S-m.E)/H;
-          rhr.push({lieu:m.to||'?',debut:m.end,fin:b.start,dureeH:r2(dur),nuits:nights(m.E,b.S),jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:b.label,enCours:false,manuel:'lien'});
-          coupures.push({key,lien:lk.l,debut:m.end,fin:b.start,lieu:m.to,dureeH:r2(dur),aller:m.label,retour:b.label,statut:'lien',compte:true}); }
+          rhr.push({lieu:m.to||'?',debut:m.end,fin:b.start,dureeH:rM(dur),nuits:nights(m.E,b.S),jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:b.label,enCours:false,manuel:'lien'});
+          coupures.push({key,lien:lk.l,debut:m.end,fin:b.start,lieu:m.to,dureeH:rM(dur),aller:m.label,retour:b.label,statut:'lien',compte:true}); }
         continue;
       }
       if(!m.to&&!man) continue;
@@ -1251,10 +1291,10 @@ function computeAgent(a,days,rules,residence,weekId){
         let compte=!atRes&&!court&&!repos, statut=atRes?'residence':court?'court':repos?'repos':'rhr';
         if(man==='oui'){compte=true;statut='force';} else if(man==='non'){compte=false;statut='ecarte';}
         const long=compte&&dur>(rules.rhrMaxAbsence||44);
-        coupures.push({key,debut:m.end,fin:nx.start,lieu:m.to,dureeH:r2(dur),aller:m.label,retour:nx.label,statut,compte,manuel:man||null,long});
+        coupures.push({key,debut:m.end,fin:nx.start,lieu:m.to,dureeH:rM(dur),aller:m.label,retour:nx.label,statut,compte,manuel:man||null,long});
         if(!compte) continue;
         if(nx.from&&normLieu(nx.from)!==normLieu(m.to)) warn.push(`reprise à ${nx.from} après une fin de service à ${m.to}`);
-        rhr.push({lieu:m.to,debut:m.end,fin:nx.start,dureeH:r2(dur),nuits:nights(m.E,nx.S),
+        rhr.push({lieu:m.to,debut:m.end,fin:nx.start,dureeH:rM(dur),nuits:nights(m.E,nx.S),
           jourDebut:dayIndexOf(m.E.getTime(),days),aller:m.label,retour:nx.label,enCours:false,manuel:man||null});
       }else{
         const repos=!atRes&&reposDans(m.E.getTime(),wEnd);
@@ -1312,7 +1352,7 @@ function computeAgent(a,days,rules,residence,weekId){
   // lieu où l'agent passe le plus : s'il n'est pas la résidence, ses RHR reposent sur une résidence peut-être fausse
   const lc={}; for(const m of all) for(const x of [m.from,m.to]) if(x){const k=normLieu(x); lc[k]=(lc[k]||0)+1;}
   const lieuHabituel=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0]?.[0]||null;
-  const heuresPlanifiees=r2(plan);
+  const heuresPlanifiees=rM(plan);
   const out={
     matricule:a.matricule,nom:a.nom,prenom:a.prenom,agence:a.agence,metier:a.metier,corridor:a.corridor,
     residence:residence||null, rhrApplicable:rhrOk, jours, fusion:a.fusion||null,
@@ -1323,18 +1363,18 @@ function computeAgent(a,days,rules,residence,weekId){
     codeCounts, joursVides:jours.filter(j=>j.kind==='VIDE').length,
     journeesBlanches:blanches.length, blanches,
     weekendTravaille:wk,
-    amplitudeTotale:r2(amp), amplitudeMoyenne:joursService?r2(amp/joursService):0, amplitudeMax:r2(ampMax),
+    amplitudeTotale:rM(amp), amplitudeMoyenne:joursService?r2(amp/joursService):0, amplitudeMax:rM(ampMax),
     pauseTotaleMin:pauseMin,
-    heuresPlanifiees, heuresSup:r2(Math.max(0,heuresPlanifiees-rules.seuilHebdo)),
-    heuresNuit:r2(nuit), heuresDimanche:r2(dim),
+    heuresPlanifiees, heuresSup:rM(Math.max(0,heuresPlanifiees-rules.seuilHebdo)),
+    heuresNuit:rM(nuit), heuresDimanche:rM(dim),
     nbMHIS, nbDISPO, nbATCMD, nbTrajetsSeuls,
     paniers, nbPaniers:paniers.length,
     paniersMidi:paniers.filter(p=>p.plage==='midi').length, paniersSoir:paniers.filter(p=>p.plage==='soir').length,
     paniersNuit:paniers.filter(p=>p.plage==='nuit').length, paniersRHR:paniers.filter(p=>p.source==='RHR').length,
     priseServicePlusTot:priseMin===null?null:r2(priseMin), finServicePlusTard:finMax===null?null:r2(finMax),
-    rattachement:ratt, residencePerso:resPerso, exclu, nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:r2(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
+    rattachement:ratt, residencePerso:resPerso, exclu, nbRHR:rhr.length, rhrEnCours:pending, rhrHeures:rM(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
     rhrNuits:rhr.reduce((s,x)=>s+(x.nuits||0),0), rhrLieux:[...new Set(rhr.map(x=>x.lieu))], rhr,
-    warnings:warn, typesMission:types, destinations:dests, pausesInconnues, coupures, casesVides,
+    warnings:warn, chevauchements, typesMission:types, destinations:dests, pausesInconnues, coupures, casesVides,
     nbHorsColonne:jours.reduce((s,j)=>s+(j.horsColonne?j.horsColonne.length:0),0),
     jamaisEnResidence: rhrOk&&!!residence&&all.length>0&&!toucheRes,
     lieuHabituel, basAilleurs: rhrOk&&!!residence&&!!lieuHabituel&&!isRes(lieuHabituel),
@@ -1382,7 +1422,7 @@ function reconcile(weeks,rulesIn){
       if(!pm) continue;
       const fin=new Date(pm.start), deb=new Date(p.debut);
       if(fin<=deb) continue;
-      p.fin=pm.start; p.dureeH=r2((fin-deb)/H); p.nuits=nights(deb,fin); p.retour=pm.label; p.cloturee=true;
+      p.fin=pm.start; p.dureeH=rM((fin-deb)/H); p.nuits=nights(deb,fin); p.retour=pm.label; p.cloturee=true;
       a.rhrEnCours=0;
       const cp=(a.coupures||[]).find(x=>x.fin==null&&x.debut===p.debut);
       if(cp){ cp.fin=pm.start; cp.dureeH=p.dureeH; cp.retour=pm.label; if(cp.statut==='ouvert') cp.statut='rhr'; }
@@ -1394,7 +1434,7 @@ function reconcile(weeks,rulesIn){
       if(court||repos){ a.rhr.splice(a.rhr.indexOf(p),1); a.nbRHR=a.rhr.length; a.rhrLieux=[...new Set(a.rhr.map(x=>x.lieu))]; if(cp){cp.statut=court?'court':'repos';cp.compte=false;} }
       else if(cp) cp.long=p.dureeH>(rules.rhrMaxAbsence||44);
       setBands(a);
-      a.rhrHeures=r2(a.rhr.reduce((s,x)=>s+(x.dureeH||0),0));
+      a.rhrHeures=rM(a.rhr.reduce((s,x)=>s+(x.dureeH||0),0));
       a.rhrNuits=a.rhr.reduce((s,x)=>s+(x.nuits||0),0);
       if(court||repos) continue;
       if(rules.panierRHR){   // paniers pris pendant la partie du RHR qui déborde sur la semaine suivante
@@ -1514,7 +1554,8 @@ function agg(list){
   for(const f of FIELDS){
     const v=list.map(a=>a[f.k]||0), t=v.reduce((s,x)=>s+x,0);
     const den=RHR_KEYS.has(f.k)?withRHR.length:list.length;
-    o[f.k]=r2(t); o[f.k+'_moy']=den?r2(t/den):0; o[f.k+'_max']=v.length?r2(Math.max(...v)):0;
+    const R=f.u==='h'?rM:r2;   // heures : totaux gardés en minutes exactes
+    o[f.k]=R(t); o[f.k+'_moy']=den?r2(t/den):0; o[f.k+'_max']=v.length?R(Math.max(...v)):0;
     o[f.k+'_sem']=r2(t/o.nbSemaines);
   }
   const svc=list.filter(a=>a.joursService>0);
@@ -1538,11 +1579,11 @@ function mergeAcrossWeeks(rows){
       rhrLieux:[...new Set(list.flatMap(a=>a.rhrLieux))],
       rhrApplicable:list.some(a=>a.rhrApplicable), fusion:list.some(a=>a.fusion)?list.find(a=>a.fusion).fusion:null,
       jamaisEnResidence:list.every(a=>a.jamaisEnResidence), warnings:list.flatMap(a=>a.warnings)};
-    for(const f of FIELDS) p[f.k]=r2(list.reduce((s,a)=>s+(a[f.k]||0),0));
+    for(const f of FIELDS) p[f.k]=(f.u==='h'?rM:r2)(list.reduce((s,a)=>s+(a[f.k]||0),0));
     for(const k of ['pauseTotaleMin','joursVides','nbHorsColonne','pausesInconnues']) p[k]=list.reduce((s,a)=>s+(a[k]||0),0);
     p.rhrEnCours=p.rhr.filter(x=>x.enCours&&!x.fin).length;
     p.amplitudeMoyenne=p.joursService?r2(p.amplitudeTotale/p.joursService):0;
-    p.amplitudeMax=r2(Math.max(0,...list.map(a=>a.amplitudeMax||0)));
+    p.amplitudeMax=rM(Math.max(0,...list.map(a=>a.amplitudeMax||0)));
     const pr=list.map(a=>a.priseServicePlusTot).filter(x=>x!=null), fi=list.map(a=>a.finServicePlusTard).filter(x=>x!=null);
     p.priseServicePlusTot=pr.length?Math.min(...pr):null; p.finServicePlusTard=fi.length?Math.max(...fi):null;
     const sumObj=k=>list.reduce((o,a)=>{for(const [x,v] of Object.entries(a[k]||{})) o[x]=(o[x]||0)+v; return o;},{});
@@ -2550,7 +2591,7 @@ function sauvegardeCard(){
 
 /* ---------- à vérifier : toutes les alertes au même endroit, avec leur suivi ---------- */
 const AL_TYPES={lecture:'Lecture du fichier',horscol:'Mission hors colonne',long:'RHR de plus de 44 h',ailleurs:'Agent basé ailleurs',
-  jamais:'Jamais en résidence',residence:'Résidence à confirmer',ecart:'Écart inhabituel (agent)',ecartag:'Écart inhabituel (agence)',fichier:'Fichier suspect'};
+  jamais:'Jamais en résidence',chevauche:'Missions qui se chevauchent',residence:'Résidence à confirmer',ecart:'Écart inhabituel (agent)',ecartag:'Écart inhabituel (agence)',fichier:'Fichier suspect'};
 const AL_NIV={haute:['Haute','pill-c'],moyenne:['Moyenne','pill-w'],info:['Info','pill-n']};
 /** Écarts à sa propre habitude : valeur d'une semaine à plus de 2 écarts-types de la moyenne, avec un écart minimal */
 const ECARTS=[['nbRHR','RHR',2,nf],['heuresSup','Heures sup',4,fmtH],['heuresPlanifiees','TTE',8,fmtH],['journeesBlanches','Journées blanches',2,nf]];
@@ -2587,6 +2628,8 @@ function collectAlertes(){
     for(const a of v.agents){ if(a.exclu) continue; const pk=personKey(a), nm=`${a.nom} ${a.prenom}`;
       // un arrêt déjà tranché à la main (compté ou écarté) ne remonte plus
       for(const c of a.coupures||[]) if(c.long&&!c.manuel) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`,fix:{coupure:c.key}});
+      for(const c of a.chevauchements||[]) add({key:`chev|${pk}|${c.debut}`,type:'chevauche',niv:'haute',w:id,ag:a.agence,pk,titre:nm,
+        detail:`« ${c.a} » et « ${c.b} » se chevauchent de ${fmtH(c.min/60)} (${dtISO(c.debut)} → ${hm(c.fin)}) : ce temps est compté deux fois en amplitude et en TTE ; vérifiez le fichier`});
       const fr=a.lieuHabituel&&!a.rattachement?{res:{pk,w:id,lieu:a.lieuHabituel}}:null;
       if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`,fix:fr});
       else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`,fix:fr}); }
@@ -2703,7 +2746,7 @@ function explain(k){
     html=tbl([['Agent','l'],['Sem.','l'],['Métier','l'],['Heures de nuit'],['TTE'],['Part']],l.slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td><td class="l">${esc(a.metier)}</td><td><b>${fmtH(a.heuresNuit)}</b></td><td>${fmtH(a.heuresPlanifiees)}</td><td>${nf(100*a.heuresNuit/(a.heuresPlanifiees||1),0)} %</td></tr>`));
   } else if(k==='nbMissions'){
     const t={}; sc.forEach(a=>Object.entries(a.typesMission||{}).forEach(([x,n])=>t[x]=(t[x]||0)+n));
-    title='Missions'; rule=`Chaque intitulé d’une case de service est une mission. Trajet seul : intitulé réduit à ${esc((r.trajetTypes||[]).join(' ou '))}. MHIS, DISPO et ATCMD : intitulé qui contient ces lettres.`;
+    title='Missions'; rule=`Chaque intitulé d’une case de service est une mission. Trajet seul : l’intitulé contient ${esc((r.trajetTypes||[]).join(' ou '))} comme mot à part (VOY-541, 541-VOY, VS 12), jamais collé à un « + » (CSE+VOY, VOY+PREPA : pas un trajet seul). MHIS, DISPO et ATCMD : intitulé qui contient ces lettres.`;
     html=barChart(Object.entries(t).sort((p,q)=>q[1]-p[1]).slice(0,40).map(([l,v])=>({l,v})),{label:'Missions'});
   } else if(k==='joursRepos'){
     const c={}; sc.forEach(a=>Object.entries(a.codeCounts||{}).forEach(([x,n])=>c[x]=(c[x]||0)+n));
@@ -3719,7 +3762,7 @@ function viewReglages(){
           <span class="inl">AFR de <input type="text" id="rNA0" value="${r.nuitAFR[0]}"> h à <input type="text" id="rNA1" value="${r.nuitAFR[1]}"> h</span>
           <span class="inl">conducteurs de <input type="text" id="rNC0" value="${r.nuitCDR[0]}"> h à <input type="text" id="rNC1" value="${r.nuitCDR[1]}"> h</span></span></div>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Trajet seul</span>
-          <span class="rd">Mission dont l'intitulé se réduit à l'un de ces types, séparés par des virgules.</span>
+          <span class="rd">L'intitulé contient l'un de ces mots (séparés par des virgules) comme mot à part — VOY-541, 541-VOY, VS 12 — et jamais collé à un « + » (CSE+VOY, VOY+PREPA ne sont pas des trajets seuls).</span>
           <span class="inl"><input type="text" id="rTraj" value="${esc((r.trajetTypes||[]).join(', '))}" style="width:160px"></span></span></div>
       </div>
       <div class="btns"><button class="btn btn-pri" id="saveRules">Appliquer et enregistrer</button></div>
@@ -3750,7 +3793,7 @@ function viewReglages(){
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
       <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h (son amplitude reste l’horaire réel) ; une autre mission de moins de ${nf(r.minMission??5)} h d’amplitude compte ${nf(r.minMission??5)} h d’amplitude et de TTE. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche. Pour une ATCMD, ces deux compteurs sont ramenés à ses ${nf(r.heuresATCMD)} h, au prorata de l’horaire réel.</p>
-      <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
+      <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : l’intitulé contient ${esc((r.trajetTypes||[]).join(' ou '))} comme mot à part (VOY-541, 541-VOY, VS 12), jamais collé à un « + » (CSE+VOY, VOY+PREPA : pas un trajet seul).</p>
       <p><b>Paniers repas.</b> Horaire de la mission, pauses comprises : ${nf(r.panierMidi[2])} h en service entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage)':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
       <p><b>Agents en double.</b> Une personne présente sur plusieurs lignes d'un fichier est fusionnée jour par jour : un service l'emporte sur un code, un code sur une case vide. Sur plusieurs semaines, chaque agent n'apparaît qu'une fois dans les tableaux.</p>
       <p><b>Semaine.</b> Identifiée par la date du lundi en ligne 1 du fichier, pas par son nom. Réimporter une semaine déjà présente remplace ses données.</p>

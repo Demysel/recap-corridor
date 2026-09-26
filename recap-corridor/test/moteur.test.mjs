@@ -393,3 +393,79 @@ test('paniers en RHR : un par plage touchée, midi et soir (règle précisée pa
   const c = one([svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '04:00', 7, '14:00'], ['T2', 'BORDEAUX', 'HENDAYE', 7, '22:30', 7, '23:30']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
   assert.equal(c.paniers.filter((p) => p.source === 'RHR').map((p) => p.plage).join(','), 'soir');
 });
+
+/* ---- blindage amplitude / TTE : minutes exactes, sans dérive d'arrondi ---- */
+test('amplitude et TTE : cinq missions de 7h25 = 37h05 exactement (pas 37h06)', () => {
+  const j = [7, 8, 9, 10, 11].map((d) => svc(['T', 'HENDAYE', 'HENDAYE', d, '06:00', d, '13:25']));
+  const a = one([...j, 'RP', 'RP'], {}, RES);
+  assert.equal(Math.round(a.amplitudeTotale * 60), 5 * 445);
+  assert.equal(E.fmtH(a.amplitudeTotale), '37h05');
+  assert.equal(E.fmtH(a.heuresPlanifiees), '37h05');
+  assert.equal(E.fmtH(a.heuresSup), '2h05');
+});
+
+test('pauses : deux pauses qui se chevauchent ne sont déduites qu’une fois ; une pause hors mission est rognée et signalée', () => {
+  const rows = week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [
+    svc(['T', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '14:00', [[7, '10:00', 7, '10:30'], [7, '10:15', 7, '10:45']]]),
+    svc(['T', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '14:00', [[8, '13:30', 8, '14:30']]]),
+    'RP', 'RP', 'RP', 'RP', 'RP'] }]);
+  const p = E.parseWeek(rows), a = E.applyRules(p, RES).agents[0];
+  assert.equal(a.pauseTotaleMin, 45 + 30);
+  assert.equal(Math.round(a.heuresPlanifiees * 60), 8 * 60 - 45 + 8 * 60 - 30);
+  assert.ok(p.anomalies.some((x) => /en dehors de la mission/.test(x.message)));
+});
+
+test('pause illisible : signalée (elle n’est pas déduite du TTE)', () => {
+  const cell = 'T\nHENDAYE - HENDAYE\n07/06:00 - 07/14:00\nP: 10h-10h30';
+  const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  assert.ok(p.anomalies.some((x) => /pause illisible/.test(x.message)));
+});
+
+test('contrôle aléatoire : 400 semaines d’agent, amplitude et TTE identiques au calcul de référence à la minute près', () => {
+  let seed = 12345; const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const hh = (m) => `${p2(Math.floor(m / 60))}:${p2(m % 60)}`;
+  const all = []; let refAmpTot = 0, refTteTot = 0;
+  for (let k = 0; k < 400; k++) {
+    const j = []; let refAmp = 0, refTte = 0;
+    for (let d = 0; d < 7; d++) {
+      if (rnd(4) === 0) { j.push('RP'); continue; }
+      const ms = []; let t = rnd(8 * 60);
+      for (let n = 1 + rnd(3); n > 0 && t < 22 * 60; n--) {
+        const len = 30 + rnd(9 * 60), s = t, e = Math.min(s + len, 23 * 60 + 59), day = 7 + d;
+        const atc = rnd(8) === 0, label = atc ? 'ATCMD' : `T${rnd(900) + 100}`;
+        const ps = []; if (e - s > 90 && rnd(2)) { const a = s + 30 + rnd(e - s - 60), b = Math.min(e + (rnd(4) === 0 ? 20 : 0), a + 10 + rnd(50)); ps.push([day, hh(a), day, hh(Math.min(b, 23 * 60 + 59))]); }
+        if (ps.length && rnd(3) === 0) { const [, a0] = ps[0]; const a = +a0.slice(0, 2) * 60 + +a0.slice(3) + 5; if (a + 20 < e) ps.push([day, hh(a), day, hh(a + 20)]); }
+        ms.push([label, 'HENDAYE', 'HENDAYE', day, hh(s), day, hh(e), ps]);
+        // référence indépendante, en minutes
+        const amp = e - s; const iv = ps.map(([, a, , b]) => [Math.max(s, +a.slice(0, 2) * 60 + +a.slice(3)), Math.min(e, +b.slice(0, 2) * 60 + +b.slice(3))]).filter(([x, y]) => y > x).sort((x, y) => x[0] - y[0]);
+        let pz = 0, cs = null, ce = null; for (const [x, y] of iv) { if (cs === null || x > ce) { if (cs !== null) pz += ce - cs; cs = x; ce = y; } else ce = Math.max(ce, y); } if (cs !== null) pz += ce - cs;
+        if (atc) { refAmp += amp; refTte += 300; } else if (amp < 300) { refAmp += 300; refTte += 300; } else { refAmp += amp; refTte += amp - pz; }
+        t = e + 30 + rnd(120);
+      }
+      j.push(ms.length ? svc(...ms) : 'RP');
+    }
+    const a = one(j, { mat: String(k) }, RES);
+    assert.equal(Math.round(a.amplitudeTotale * 60), refAmp, `amplitude, semaine ${k}`);
+    assert.equal(Math.round(a.heuresPlanifiees * 60), refTte, `TTE, semaine ${k}`);
+    assert.ok(Math.abs(a.amplitudeTotale * 60 - refAmp) < 1e-6 && Math.abs(a.heuresPlanifiees * 60 - refTte) < 1e-6, `minutes exactes, semaine ${k}`);
+    all.push(a); refAmpTot += refAmp; refTteTot += refTte;
+  }
+  const g = E.agg(all);
+  assert.equal(Math.round(g.amplitudeTotale * 60), refAmpTot);
+  assert.equal(Math.round(g.heuresPlanifiees * 60), refTteTot);
+});
+
+test('missions qui se chevauchent : signalées', () => {
+  const a = one([svc(['A', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00'], ['B', 'HENDAYE', 'HENDAYE', 7, '11:00', 7, '15:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  assert.equal(a.chevauchements.length, 1);
+  assert.equal(a.chevauchements[0].min, 60);
+});
+
+/* ---- trajets seuls : VOY / VS comme mot à part, jamais collé à un « + » ---- */
+test('trajet seul : VOY- / -VOY / VS- / -VS oui ; collé à un + non', () => {
+  const lab = (l) => one([svc([l, 'HENDAYE', 'BAYONNE', 7, '06:00', 7, '12:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES).nbTrajetsSeuls;
+  for (const l of ['VOY-541-BX', 'VOY', '541-VOY', 'BX-VOY-541', 'VS-12', 'vs-12', '12-VS', 'VS 12', 'Voy - 541'])
+    assert.equal(lab(l), 1, l);
+  for (const l of ['CSE+VOY-541-BX', 'VOY+PREPA CSE-341-BX', 'VS+MHIS', 'MHIS+VS', 'CSE + VOY-12', 'VOY +PREPA', 'VOYAGE-12', 'VSX-12', 'TRAIN 4512', 'DISPO'])
+    assert.equal(lab(l), 0, l);
+});
