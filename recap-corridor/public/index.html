@@ -548,6 +548,8 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .ml2 .v{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:-.02em}
 .ml2 .v small{font-size:11.5px;font-weight:500}
 .dw>*{flex-shrink:0}
+.dwp{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.dwp select{max-width:320px}
 
 /* messages éphémères */
 .toasts{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
@@ -3917,7 +3919,7 @@ function renderLogin(){
   setTimeout(()=>el('codeIn')?.focus(),30);
 }
 function closeDrawer(){
-  S.drawer=null; document.body.style.overflow='';
+  S.drawer=null; S.dwPer=null; document.body.style.overflow='';   // à la fermeture, le filtre principal reprend la main
   const d=document.querySelector('.ov'); if(!d) return;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){ d.remove(); return; }
   d.classList.add('out'); setTimeout(()=>d.remove(),200);
@@ -3926,16 +3928,24 @@ function closeDrawer(){
 function renderDrawer(){
   if(!S.drawer) return;
   // après une correction, la fiche est reconstruite à partir des chiffres recalculés
-  const pk0=personKey(S.drawer), upd=mergeAcrossWeeks([...S.loaded.values()].flatMap(v=>v.agents).filter(x=>personKey(x)===pk0)).find(Boolean);
+  // période de la fiche : celle du filtre principal, sauf si une autre est choisie dans la fiche (jusqu'à sa fermeture)
+  const per=S.dwPer||S.selWeek, ids=new Set(periodWeeks(per,S.weeks));
+  const pk0=personKey(S.drawer), rows=[...S.loaded.entries()].filter(([id])=>ids.has(id)).flatMap(([,v])=>v.agents).filter(x=>personKey(x)===pk0);
+  const upd=mergeAcrossWeeks(rows).find(Boolean);
+  const vide=!upd;
   if(upd) S.drawer=upd;
   const a=S.drawer;
-  const weeks=(a.parSemaine||[a]).slice().sort((x,y)=>String(y.weekId).localeCompare(String(x.weekId)));
+  const perBar=`<div class="dwp"><label class="fld"><span class="flabel">Période de la fiche</span>
+      <select id="dwPer">${periodOptions(per,S.weeks)}</select></label>
+      <span class="hint" style="margin:0">${S.dwPer?`choisie dans la fiche · filtre principal : ${esc(periodLabel(S.selWeek,S.weeks))} <button class="lnk" data-dwreset="1" style="color:var(--accent);font-weight:600">revenir au filtre principal</button>`:'celle du filtre principal · modifiable ici jusqu’à la fermeture de la fiche'}</span></div>`;
+  const weeks=vide?[]:(a.parSemaine||[a]).slice().sort((x,y)=>String(y.weekId).localeCompare(String(x.weekId)));
   const d=document.createElement('div'); d.className='ov';
   d.innerHTML=`<div class="dw" role="dialog" aria-label="Détail agent">
     <div class="dw-h"><div><h2>${esc(a.nom)} ${esc(a.prenom)}</h2>
       <div class="s">${esc(a.matricule)} · ${esc((a.agences||[a.agence]).join(' → '))} · ${esc(a.metier)} · ${nf(weeks.length)} semaine${weeks.length>1?'s':''}${a.residence?` · résidence ${esc(a.residence)}`:''}</div></div>
       <button class="x" id="dwx" aria-label="Fermer">×</button></div>
-    ${gestionAgent(a,weeks)}
+    ${perBar}
+    ${vide?`<div class="note">Aucune semaine de cet agent sur la période choisie (${esc(periodLabel(per,S.weeks))}).</div>`:gestionAgent(a,weeks)}
     <div class="ml2">
       <div><div class="k">Jours de service</div><div class="v">${a.joursService}</div></div>
       <div><div class="k">RHR</div><div class="v">${a.rhrApplicable?a.nbRHR:'n/a'}</div></div>
@@ -3975,10 +3985,12 @@ function renderDrawer(){
     ${Object.keys(a.typesMission||{}).length?`<section class="card"><div class="card-h"><h2>Types de mission</h2></div>
       <div class="card-b">${barChart(Object.entries(a.typesMission).sort((x,y)=>y[1]-x[1]).map(([l,v])=>({l,v})),{label:'Missions'})}</div></section>`:''}
   </div>`;
-  const fresh=!document.querySelector('.ov');
+  if(vide) [...d.firstElementChild.children].slice(3).forEach(n=>n.remove());
+  const fresh=!document.querySelector('.ov'), top=document.querySelector('.ov .dw')?.scrollTop||0;
   document.querySelector('.ov')?.remove();
   if(!fresh) d.style.animation='none', d.firstElementChild.style.animation='none';
   document.body.appendChild(d); document.body.style.overflow='hidden';
+  if(!fresh) d.firstElementChild.scrollTop=top;
   d.addEventListener('click',e=>{ if(e.target===d||e.target.closest('#dwx')) closeDrawer(); });
   if(fresh) d.querySelector('#dwx')?.focus({preventScroll:true});
 }
@@ -4065,7 +4077,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-resagv],[data-dwreset],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4126,6 +4138,7 @@ document.addEventListener('click',async e=>{
     if(!l){ S.msg={m:'Indiquez le lieu de la nouvelle résidence.',t:'w'}; render(); return; }
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=normLieu(l);
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
+  if(t.dataset.dwreset){ S.dwPer=null; renderDrawer(); return; }
   if(t.dataset.metag!=null&&admin()){ const pk=t.dataset.metag, m=el('mtM').value, w=el('mtW').value;
     const c=S.rules.corrections; c.metierAgent=c.metierAgent||{}; c.metierAgent[pk+'|'+w]=m;
     return saveCorrection(`Métier de l’agent : ${m} (${perLab(w)})`,nmPk(pk)); }
@@ -4240,6 +4253,7 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
+  if(e.target.id==='dwPer'){ S.dwPer=e.target.value; await ensureLoaded(periodWeeks(S.dwPer,S.weeks)); renderDrawer(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
   if(e.target.dataset&&e.target.dataset.cmpf){ S.cmp[e.target.dataset.cmpf]=e.target.value; render(); return; }
   if(e.target.id==='rapW'){ S.rapW=e.target.value; render(); return; }
