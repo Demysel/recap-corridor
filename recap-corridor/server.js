@@ -140,8 +140,10 @@ async function api(req, res, url) {
   if (route === 'etat' && req.method === 'GET') {
     const w = await p.query('select resume from recap.semaines order by week_id desc');
     if (!admin) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
-    const c = await p.query("select valeur from recap.config where cle = 'regles'");
-    return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: c.rows[0]?.valeur || null });
+    const c = await p.query("select cle, valeur from recap.config where cle in ('regles', 'suivi', 'journal')");
+    const cfg = Object.fromEntries(c.rows.map((x) => [x.cle, x.valeur]));
+    return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: cfg.regles || null,
+      suivi: cfg.suivi || { alertes: {} }, journal: (cfg.journal || []).slice(-300) });
   }
   if (route === 'vitrine' && req.method === 'GET') return json(req, res, 200, await vitrine(p));
   if (route === 'semaine' && req.method === 'GET') {
@@ -181,9 +183,21 @@ async function api(req, res, url) {
   }
   if (route === 'regles' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de modifier les règles.' });
-    const body = await readBody(req);
-    await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ ...body, majLe: new Date().toISOString() }]);
+    const { _journal, ...body } = await readBody(req);
+    const le = new Date().toISOString();
+    await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ ...body, majLe: le }]);
+    if (_journal) {   // journal des modifications : qui, quand, quoi, et l'effet sur les chiffres
+      const j = await p.query("select valeur from recap.config where cle = 'journal'");
+      const list = [...(j.rows[0]?.valeur || []), { ..._journal, le }].slice(-500);
+      await p.query("insert into recap.config(cle, valeur) values ('journal', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [JSON.stringify(list)]);
+    }
     vitrineCache = null;
+    return json(req, res, 200, { ok: true });
+  }
+  if (route === 'suivi' && req.method === 'PUT') {   // suivi des alertes « À vérifier » : vu, corrigé, note
+    if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier le suivi.' });
+    const body = await readBody(req);
+    await p.query("insert into recap.config(cle, valeur) values ('suivi', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ alertes: body.alertes || {}, majLe: new Date().toISOString() }]);
     return json(req, res, 200, { ok: true });
   }
   return json(req, res, 404, { error: 'Adresse inconnue.' });

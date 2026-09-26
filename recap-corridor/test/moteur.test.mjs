@@ -286,3 +286,12 @@ test('vitrine : aucune donnée nominative, groupes d’au moins 5 agents, petits
   assert.equal(v.ecartes, 3);
   assert.equal(v.cells[0].s.nbRHR, 6);
 });
+
+test('vitrine : un trajet n’est publié que si au moins 5 agents différents l’empruntent', () => {
+  const ag = (mat, dest) => ({ mat, nom: 'X' + mat, ag: 'Hendaye', met: 'CONDUCTEUR', j: [svc(['T', 'HENDAYE', dest, 7, '06:00', 7, '10:00']), svc(['T', dest, 'HENDAYE', 8, '06:00', 8, '10:00']), null, 'RP', 'RP', 'RP', 'RP'] });
+  const agents = [...[1, 2, 3, 4, 5].map((i) => ag('1' + i, 'BORDEAUX')), ...[1, 2].map((i) => ag('2' + i, 'DAX'))];
+  const v = E.vitrineData([E.parseWeek(week([2026, 9, 7], agents))], E.loadRules({ residences: { Hendaye: 'HENDAYE' } }));
+  const e = v.flux[0].edges.map((x) => x.a + '-' + x.b).join(',');
+  assert.equal(e, 'BORDEAUX-HENDAYE');
+  assert.equal(v.flux[0].rhr.map((x) => x.l).join(','), 'BORDEAUX');
+});

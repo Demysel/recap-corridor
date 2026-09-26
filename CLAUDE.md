@@ -16,16 +16,18 @@ Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean**. Métiers : A
 L'application reprend la structure du zip d'origine : **une seule page** qui contient tout.
 
 - `recap-corridor/public/index.html` — toute l'application : lecture des .xlsx dans le navigateur,
-  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Statistiques, Vitrine, Guide de lecture, Exports,
+  calculs, onglets (Synthèse, Agents, RHR, Journées blanches, Graphiques, Statistiques, Comparer, À vérifier, Vitrine, Guide de lecture, Exports,
   Import, Réglages), graphiques, exports Excel/CSV, rapport autonome. Le fichier Excel n'est jamais envoyé au serveur.
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
-  `GET|PUT|DELETE /api/semaine`, `PUT /api/regles`, `GET /api/ping`, `GET /api/vitrine`.
+  `GET|PUT|DELETE /api/semaine`, `PUT /api/regles` (avec `_journal` : ligne ajoutée au journal, clé `journal`),
+  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET /api/ping`, `GET /api/vitrine`.
 - **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
   nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
   `/api/vitrine` renvoie des agrégats calculés sur le serveur par le moteur de la page
   (`vitrineData`) : chaque cellule semaine × agence × métier réunit au moins 5 agents ; les petits
   groupes sont fusionnés (« Autres métiers », « Tous métiers », « Autres agences ») ou écartés.
+  La carte des flux de la vitrine ne publie un trajet ou un lieu de RHR que s'il concerne au moins 5 agents différents.
   Ne jamais ajouter de donnée individuelle à cette réponse.
 - `recap-corridor/db/schema.sql` — schéma Postgres.
 - `recap-corridor/test/moteur.test.mjs` — tests du moteur de calcul, lus directement dans `index.html`
@@ -67,8 +69,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   « Corridor … » à côté d'une feuille « Extract » ignorée). Métiers : CDR et « CDR + AFR » =
   CONDUCTEUR, Coordo = COORDO AFR. Agences « Agence X » rattachées automatiquement au nom récent
   qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP.
-- Heures planifiées : amplitude moins les pauses « P: » ; une ATCMD compte 5 h.
-  Heures sup : au-delà de 35 h par agent et par semaine.
+- TTE (temps de travail effectif, anciennement « heures planifiées », renommé à la demande) : amplitude
+  moins les pauses « P: » ; une ATCMD compte 5 h. Heures sup : TTE au-delà de 35 h par agent et par semaine.
+- Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
+  (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
+  Alerte « À vérifier » si une résidence manuelle n'apparaît dans aucune mission d'une semaine.
 - Heures de nuit, hors pauses : AFR 22h–7h, conducteurs 22h–5h (l'utilisateur a aussi évoqué
   22h–6h : réglable).
 - Heures du dimanche : temps travaillé hors pauses le dimanche.

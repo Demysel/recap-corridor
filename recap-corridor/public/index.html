@@ -389,6 +389,47 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .vk-r{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
 .spk{width:110px;height:30px;flex:none;overflow:visible}
 .vfoot{font-size:12px;color:var(--ink-3);line-height:1.6;max-width:110ch;padding:4px 2px 0}
+.xk{cursor:pointer}.xk:hover{border-color:var(--accent-line)}.xk:hover .k::after{content:" · détail";color:var(--accent);text-transform:none;letter-spacing:0}
+.bref p{font-size:14.5px;line-height:1.65;margin-top:6px;max-width:120ch}.bref a{color:var(--accent);font-weight:700}
+.srchbtn{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:1px solid var(--line-2);background:var(--surface-2);border-radius:10px;padding:8px 11px;color:var(--ink-3);font-size:13px;transition:border-color .15s}
+.srchbtn:hover{border-color:var(--accent)}
+.ov.pal{align-items:flex-start;justify-content:center;padding-top:12vh}
+.pal-b{width:min(640px,94vw);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden;animation:rise .2s var(--ease)}
+.pal-b input{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:16px 18px;font-size:16px;box-shadow:none!important}
+.pal-r{max-height:52vh;overflow:auto;padding:6px}
+.pal-g{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);padding:10px 12px 4px}
+.pal-i{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:9px;font-size:14px}
+.pal-i.on,.pal-i:hover{background:var(--accent-soft)}
+.pal-f{border-top:1px solid var(--line);padding:8px 14px;font-size:11.5px;color:var(--ink-3);display:flex;gap:6px;align-items:center}
+@media (max-width:1080px){.srchbtn{display:none}}
+.fx svg{display:block;width:100%;height:auto;max-height:520px}
+.fx-l{font-family:var(--mono);font-size:11px;fill:var(--ink-2);font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.pngb{opacity:.55;transition:opacity .15s}.card:hover .pngb{opacity:1}
+.rap{white-space:pre-wrap;font-family:var(--sans);font-size:13px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;color:var(--ink-2)}
+.ov.pres{justify-content:center;align-items:stretch;padding:0}
+.pres-b{width:100%;height:100%;display:flex;flex-direction:column;background:var(--ground)}
+.pres-t{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--surface)}
+.pres-l{flex:1;overflow:auto;padding:24px;display:flex;flex-direction:column;align-items:center;gap:24px}
+.sl{width:1280px;height:720px;flex:none;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:44px 56px 34px;display:flex;flex-direction:column;position:relative;overflow:hidden;zoom:.7}
+.sl-h h2{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:4px}.sl-h p{color:var(--ink-3);font-size:16px;margin-top:4px}
+.sl-k{font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.sl-b{flex:1;margin-top:22px;min-height:0;overflow:hidden}
+.sl-f{position:absolute;left:56px;right:56px;bottom:18px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:8px}
+.sl-t{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent);justify-content:center}
+.sl-t h1{font-size:54px;font-weight:800;letter-spacing:-.035em;line-height:1.05;margin-top:12px}.sl-t p{font-size:22px;margin-top:14px;opacity:.9}.sl-t .sl-s{font-size:16px}
+.sl-t .sl-k{color:var(--on-accent);opacity:.85}.sl-t .sl-f{color:var(--on-accent);border-color:rgba(255,255,255,.3)}
+.sl-txt{font-size:19px;line-height:1.6;margin-bottom:22px}.sl-k4{grid-template-columns:repeat(4,1fr)}
+.sl-2{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.sl .hm-c{height:40px}.sl .hm-l,.sl .bar,.sl .hg-l,.sl .hg-v{font-size:15px}.sl .hm-r{grid-template-columns:200px repeat(24,minmax(18px,1fr))}
+.sl .bt{height:24px}.sl .bars{gap:12px}.sl .hg{height:380px}.sl .ch{font-size:16px}.sl .chart{max-width:none}.sl .kpi .v{font-size:34px}.sl .kpi .k{font-size:12px}
+@media print{
+  body.presenting>*:not(.ov.pres){display:none!important}
+  body.presenting .ov.pres{position:static;display:block!important;background:none;backdrop-filter:none}
+  body.presenting .pres-t{display:none}
+  body.presenting .pres-b,body.presenting .pres-l{display:block;padding:0;overflow:visible;height:auto;background:none}
+  body.presenting .sl{zoom:1;box-shadow:none;border-radius:0;break-after:page;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:1280px 720px;margin:0}
+}
 .lnk{border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit}
 .lnk:hover .nm{color:var(--accent);text-decoration:underline}
 .sub-h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 8px}
@@ -570,6 +611,7 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
         <button class="btn btn-sm" data-act="out">Quitter</button>
       </div>
     </div>
+    <button class="srchbtn" id="btnPal" type="button"><span>Rechercher…</span><kbd>Ctrl K</kbd></button>
     <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
     <div class="side-f">
       <div id="rolebadge"></div>
@@ -1365,7 +1407,7 @@ const FIELDS=[
   {k:'joursAbsence',l:'Jours d’absence',u:''},
   {k:'weekendTravaille',l:'Jours de week-end',u:''},
   {k:'amplitudeTotale',l:'Amplitude',u:'h'},
-  {k:'heuresPlanifiees',l:'Heures planifiées',u:'h'},
+  {k:'heuresPlanifiees',l:'TTE (temps de travail effectif)',u:'h'},
   {k:'heuresSup',l:'Heures sup',u:'h'},
   {k:'heuresNuit',l:'Heures de nuit',u:'h'},
   {k:'heuresDimanche',l:'Heures du dimanche',u:'h'},
@@ -1468,7 +1510,7 @@ function vitrineData(weeks,rulesIn,K=VITRINE_K){
   for(const w of [...weeks].sort((a,b)=>a.meta.weekId.localeCompare(b.meta.weekId))){
     const v=applyRules(w,rules); v.agents.forEach(a=>a.weekId=w.meta.weekId); map.set(w.meta.weekId,v); }
   reconcile(map,rules);
-  const cells=[]; let ecartes=0;
+  const cells=[], flux=[]; let ecartes=0;
   for(const [id,v] of map){
     const autres=[];
     for(const [ag,l] of groupBy(v.agents,a=>a.agence)){
@@ -1479,8 +1521,17 @@ function vitrineData(weeks,rulesIn,K=VITRINE_K){
       else cells.push(cellStats(l,id,ag,'Tous métiers'));
     }
     if(autres.length>=K) cells.push(cellStats(autres,id,'Autres agences','Tous métiers')); else ecartes+=autres.length;
+    // flux entre lieux et lieux de RHR : publiés seulement si au moins K agents différents y passent
+    const E=new Map(), R=new Map(), RS=new Set(Object.values(v.meta.residences||{}).filter(Boolean).map(normLieu));
+    for(const a of v.agents){ const pk=personKey(a);
+      for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions){ if(!m.from||!m.to) continue;
+        const x=normLieu(m.from), y=normLieu(m.to); if(x===y) continue; const k=x<y?x+'|'+y:y+'|'+x;
+        if(!E.has(k)) E.set(k,{n:0,p:new Set()}); const e=E.get(k); e.n++; e.p.add(pk); }
+      for(const x of a.rhr){ const l=normLieu(x.lieu); if(!R.has(l)) R.set(l,{n:0,p:new Set()}); const r=R.get(l); r.n++; r.p.add(pk); } }
+    flux.push({w:id,res:[...RS],edges:[...E].filter(([,e])=>e.p.size>=K).map(([k,e])=>{const [a,b]=k.split('|');return {a,b,n:e.n};}),
+      rhr:[...R].filter(([,r])=>r.p.size>=K).map(([l,r])=>({l,n:r.n}))});
   }
-  return {k:K, ecartes, cells,
+  return {k:K, ecartes, cells, flux,
     semaines:[...map.values()].map(v=>({weekId:v.meta.weekId,year:v.meta.year,week:v.meta.week,monday:v.meta.monday,sunday:v.meta.sunday})),
     regles:{rhrMinHours:rules.rhrMinHours,seuilHebdo:rules.seuilHebdo,heuresATCMD:rules.heuresATCMD,nuitAFR:rules.nuitAFR,nuitCDR:rules.nuitCDR}};
 }
@@ -1609,8 +1660,8 @@ const backend={
     if(backend.mode!=='artifact') return backend.call('etat');
     const s=await ADB.collection('semaines').get();
     const weeks=s.docs.map(d=>d.data()).sort((a,b)=>String(b.weekId).localeCompare(String(a.weekId)));
-    const rg=await ADB.doc('config/regles').get();
-    return {role:'admin',weeks,regles:rg.exists?rg.data():null};
+    const rg=await ADB.doc('config/regles').get(), su=await ADB.doc('config/suivi').get(), jo=await ADB.doc('config/journal').get();
+    return {role:'admin',weeks,regles:rg.exists?rg.data():null,suivi:su.exists?su.data():{alertes:{}},journal:jo.exists?(jo.data().list||[]):[]};
   },
   async semaine(id){
     if(backend.mode!=='artifact') return backend.call('semaine?id='+encodeURIComponent(id));
@@ -1637,8 +1688,14 @@ const backend={
   },
   async saveRegles(r){
     if(backend.mode!=='artifact') return backend.call('regles',{method:'PUT',body:JSON.stringify(r)});
-    await ADB.doc('config/regles').set({...r,majLe:new Date().toISOString()});
+    const {_journal,...x}=r, le=new Date().toISOString();
+    await ADB.doc('config/regles').set({...x,majLe:le});
+    if(_journal){ const jo=await ADB.doc('config/journal').get(); await ADB.doc('config/journal').set({list:[...(jo.exists?jo.data().list||[]:[]),{..._journal,le}].slice(-500)}); }
     return {ok:true};
+  },
+  async saveSuivi(su){
+    if(backend.mode!=='artifact') return backend.call('suivi',{method:'PUT',body:JSON.stringify(su)});
+    await ADB.doc('config/suivi').set({alertes:su.alertes||{},majLe:new Date().toISOString()}); return {ok:true};
   },
 };
 const api=backend;
@@ -1647,6 +1704,7 @@ const api=backend;
    ========================================================================== */
 const S={
   role:null, tab:'synthese', weeks:[], rules:structuredClone(DEFAULT_RULES), jbFiltre:'comptees',
+  suivi:{alertes:{}}, journal:[], auteur:'',
   selWeek:'__all__', selAgences:null, selMetiers:null, search:'',
   loaded:new Map(), parsedCache:new Map(),
   queue:[], busy:false, err:null, msg:null, delAsk:null,
@@ -1655,12 +1713,12 @@ const S={
   mode:'total',
   chart:{metric:'nbRHR',top:25},
   st:{metric:'nbRHR',mode:'total',echelle:'semaine',groupe:'agence',heat:'presence'},
-  vit:null, vf:{w:'__all__',ags:null,me:null,heat:'presence'},
+  cmp:{mode:'periodes',val:'total'}, vit:null, vf:{w:'__all__',ags:null,me:null,heat:'presence'},
 };
 function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
 function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
   code:api.code, selAgences:S.selAgences, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
-  theme:document.documentElement.dataset.theme||'', cols:S.cols, chart:S.chart, st:S.st}));}catch(e){} }
+  theme:document.documentElement.dataset.theme||'', cols:S.cols, chart:S.chart, st:S.st, auteur:S.auteur}));}catch(e){} }
 
 /** Anciens fichiers : « Agence Bordeaux » est rattachée automatiquement à « Bordeaux-St-Jean » quand un seul nom
     connu commence pareil (sans majuscules, accents, ponctuation ; « Saint » = « St »). Sinon « Agence » est retiré.
@@ -1714,7 +1772,7 @@ function recomputeLoaded(){
   reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
 }
 /** L'évolution hebdomadaire et l'historique portent sur toutes les semaines enregistrées */
-const needsAll=()=>['graphiques','exports','stats'].includes(S.tab);
+const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includes(S.tab);
 /** Semaines à charger : celles affichées, plus leurs voisines — un RHR ouvert le dimanche se referme avec la
     semaine suivante, quel que soit l'affichage, pour que les chiffres d'une semaine ne dépendent pas de la vue */
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
@@ -1788,13 +1846,13 @@ const el=id=>document.getElementById(id);
 const TABS=[
   {k:'synthese',l:'Synthèse'},{k:'agents',l:'Agents'},{k:'rhr',l:'RHR'},
   {k:'blanches',l:'Journées blanches'},{k:'graphiques',l:'Graphiques'},
-  {k:'stats',l:'Statistiques'},{k:'vitrine',l:'Vitrine'},{k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
+  {k:'stats',l:'Statistiques'},{k:'comparer',l:'Comparer'},{k:'verifier',l:'À vérifier'},{k:'vitrine',l:'Vitrine'},{k:'lecture',l:'Guide de lecture'},{k:'exports',l:'Exports'},{k:'import',l:'Import'},{k:'reglages',l:'Réglages'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
-  vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
+  comparer:'deux périodes, deux agences ou deux agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
 /** Mesures des statistiques (graphiques) */
@@ -1803,7 +1861,7 @@ const METRICS=[
   {k:'journeesBlanches',l:'Journées blanches',c:'J. blanches',f:nfa},
   {k:'nbMissions',l:'Missions',c:'Missions',f:nfa},
   {k:'nbTrajetsSeuls',l:'Trajets seuls',c:'Trajets seuls',f:nfa},
-  {k:'heuresPlanifiees',l:'Heures planifiées',c:'H. planifiées',f:fmtH},
+  {k:'heuresPlanifiees',l:'TTE (temps de travail effectif)',c:'TTE',f:fmtH},
 ];
 const MODES=[['total','Total'],['agent','Moyenne par agent'],['semaine','Moyenne par semaine']];
 const modeSeg=()=>`<div class="seg">${MODES.map(([k,l])=>`<button class="sg" data-vmode="${k}" aria-pressed="${S.mode===k}">${l}</button>`).join('')}</div>`;
@@ -1828,7 +1886,7 @@ function stable(id,cols,rows,opt={}){
 
 function renderTabs(){
   const sc=scopeAgents();
-  const cnt={agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
+  const cnt={verifier:S.alN,agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
   el('tabs').innerHTML=TABS.filter(t=>S.role==='admin'||['vitrine','lecture'].includes(t.k))
     .map(t=>`${t.k==='import'?'<span class="tsep" aria-hidden="true"></span>':''}<button class="tab${['import','reglages'].includes(t.k)?' adm':''}" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}"><span class="stn" aria-hidden="true"></span><span class="tl">${t.l}</span>${
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt">${nf(cnt[t.k])}</span>`:''}</button>`).join('');
@@ -1851,7 +1909,7 @@ function renderFilters(){
       <div class="fld"><span class="flabel">Périmètre</span>
         <button class="sel" id="scopeBtn" aria-expanded="${S.scopeOpen}">${esc(resume)}<span class="car">▾</span></button></div>
       <label class="fld"><span class="flabel">Agent</span>
-        <span class="srch"><input type="search" id="fSearch" placeholder="Nom ou matricule" value="${esc(S.search)}" autocomplete="off"><kbd>/</kbd></span></label>
+        <span class="srch"><input type="search" id="fSearch" placeholder="Nom ou matricule" value="${esc(S.search)}" autocomplete="off"></span></label>
       <div class="fld grow"></div>
       ${S.role==='admin'&&S.tab!=='import'?`<div class="fld"><button class="btn btn-pri" data-goto="import"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Importer</button></div>`:''}
     </div>
@@ -1869,18 +1927,18 @@ function renderFilters(){
 function kpiRow(g){
   const nW=S.rules.nuitAFR, nC=S.rules.nuitCDR;
   return `<div class="kpis">
-    <div class="kpi"><div class="k">Agents</div><div class="v" data-count="${g.nbAgents}">${nf(g.nbAgents)}</div><div class="n">${nf(g.joursService)} jours de service</div></div>
-    <div class="kpi${g.nbRHR?' hot':''}"><div class="k">Repos hors résidence</div><div class="v" data-count="${g.nbRHR}">${nf(g.nbRHR)}</div>
+    <div class="kpi xk" data-explain="agents" title="Cliquez : règle et détail"><div class="k">Agents</div><div class="v" data-count="${g.nbAgents}">${nf(g.nbAgents)}</div><div class="n">${nf(g.joursService)} jours de service</div></div>
+    <div class="kpi${g.nbRHR?' hot':''} xk" data-explain="nbRHR" title="Cliquez : règle et détail"><div class="k">Repos hors résidence</div><div class="v" data-count="${g.nbRHR}">${nf(g.nbRHR)}</div>
       <div class="n">${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} en cours`:''}</div></div>
-    <div class="kpi"><div class="k">Nuits hors résidence</div><div class="v" data-count="${g.rhrNuits}">${nf(g.rhrNuits)}</div><div class="n">${fmtH(g.rhrHeures)} cumulées</div></div>
-    <div class="kpi${g.journeesBlanches?' hot':''}"><div class="k">Journées blanches</div><div class="v" data-count="${g.journeesBlanches}">${nf(g.journeesBlanches)}</div>
+    <div class="kpi xk" data-explain="rhrNuits" title="Cliquez : règle et détail"><div class="k">Nuits hors résidence</div><div class="v" data-count="${g.rhrNuits}">${nf(g.rhrNuits)}</div><div class="n">${fmtH(g.rhrHeures)} cumulées</div></div>
+    <div class="kpi${g.journeesBlanches?' hot':''} xk" data-explain="journeesBlanches" title="Cliquez : règle et détail"><div class="k">Journées blanches</div><div class="v" data-count="${g.journeesBlanches}">${nf(g.journeesBlanches)}</div>
       <div class="n">${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}</div></div>
-    <div class="kpi${g.heuresSup?' hot':''}"><div class="k">Heures sup</div><div class="v">${fmtH(g.heuresSup)}</div>
+    <div class="kpi${g.heuresSup?' hot':''} xk" data-explain="heuresSup" title="Cliquez : règle et détail"><div class="k">Heures sup</div><div class="v">${fmtH(g.heuresSup)}</div>
       <div class="n">${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''} au-delà de ${nf(S.rules.seuilHebdo)} h / semaine</div></div>
-    <div class="kpi"><div class="k">Amplitude / jour</div><div class="v">${fmtH(g.amplitudeParJour)}</div><div class="n">${fmtH(g.heuresPlanifiees)} planifiées</div></div>
-    <div class="kpi"><div class="k">Heures de nuit</div><div class="v">${fmtH(g.heuresNuit)}</div><div class="n">hors pauses · AFR ${nW[0]}h–${nW[1]}h, CDR ${nC[0]}h–${nC[1]}h</div></div>
-    <div class="kpi"><div class="k">Missions</div><div class="v" data-count="${g.nbMissions}">${nf(g.nbMissions)}</div><div class="n">${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls</div></div>
-    <div class="kpi"><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> repos</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
+    <div class="kpi xk" data-explain="amplitude" title="Cliquez : règle et détail"><div class="k">Amplitude / jour</div><div class="v">${fmtH(g.amplitudeParJour)}</div><div class="n">${fmtH(g.heuresPlanifiees)} de TTE</div></div>
+    <div class="kpi xk" data-explain="heuresNuit" title="Cliquez : règle et détail"><div class="k">Heures de nuit</div><div class="v">${fmtH(g.heuresNuit)}</div><div class="n">hors pauses · AFR ${nW[0]}h–${nW[1]}h, CDR ${nC[0]}h–${nC[1]}h</div></div>
+    <div class="kpi xk" data-explain="nbMissions" title="Cliquez : règle et détail"><div class="k">Missions</div><div class="v" data-count="${g.nbMissions}">${nf(g.nbMissions)}</div><div class="n">${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls</div></div>
+    <div class="kpi xk" data-explain="joursRepos" title="Cliquez : règle et détail"><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> repos</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
   </div>`;
 }
 function viewSynthese(){
@@ -1904,7 +1962,7 @@ function viewSynthese(){
     {...cnt('nbTrajetsSeuls'),l:'Trajets seuls'},
     {k:'amplitudeParJour',l:'Ampl./jour',v:r=>r.x.amplitudeParJour,f:r=>fmtH(r.x.amplitudeParJour)},
     {k:'amplitudeTotale_moy',l:'Ampl./agent',v:r=>r.x.amplitudeTotale_moy,f:r=>fmtH(r.x.amplitudeTotale_moy)},
-    {...hrs('heuresPlanifiees'),l:'H. planifiées'},
+    {...hrs('heuresPlanifiees'),l:'TTE'},
     {...hrs('heuresSup'),l:'H. sup'},
     {...hrs('heuresNuit'),l:'H. nuit'},
     {...cnt('joursRepos'),l:'Repos'},{...cnt('joursCP'),l:'Congés'},{...cnt('joursAbsence'),l:'Absences'},
@@ -1922,6 +1980,7 @@ function viewSynthese(){
   const fus=sc.filter(a=>a.fusion), hc=sc.filter(a=>a.nbHorsColonne>0), nHC=hc.reduce((s,a)=>s+a.nbHorsColonne,0);
   return `
   ${nW>1?`<div class="note">Périmètre cumulé sur <b>${nW} semaines</b>. Chaque agent n'apparaît qu'une fois ; les moyennes par agent sont calculées par agent et par semaine.</div>`:''}
+  ${enBref()}
   ${kpiRow(g)}
   <section class="card">
     <div class="card-h"><div><h2>Par agence et corps de métier</h2><p class="card-s">${m==='total'?'total <span class="mut">· moyenne par agent</span>':modeHint()} — cliquez un en-tête pour trier</p></div>
@@ -1974,7 +2033,7 @@ const COLS=[
   {g:'temps',k:'amplitudeTotale',l:'Amplitude',f:numF('amplitudeTotale',fmtH)},
   {g:'temps',k:'amplitudeMoyenne',l:'Ampl. moy.',f:a=>a.amplitudeMoyenne?fmtH(a.amplitudeMoyenne):'<span class="z">—</span>',t:a=>a.amplitudeMoyenne},
   {g:'temps',k:'amplitudeMax',l:'Ampl. max',f:a=>a.amplitudeMax?fmtH(a.amplitudeMax):'<span class="z">—</span>',t:a=>a.amplitudeMax},
-  {g:'temps',k:'heuresPlanifiees',l:'H. planifiées',f:numF('heuresPlanifiees',fmtH)},
+  {g:'temps',k:'heuresPlanifiees',l:'TTE',f:numF('heuresPlanifiees',fmtH)},
   {g:'temps',k:'heuresSup',l:'H. sup',f:a=>{const v=pv(a,'heuresSup');return v?`<b>${fmtH(v)}</b>`:'<span class="z">—</span>';}},
   {g:'temps',k:'pauseTotaleMin',l:'Pauses',f:a=>{const v=pv(a,'pauseTotaleMin');return v?nf(v)+' min':'<span class="z">—</span>';}},
   {g:'temps',k:'heuresNuit',l:'H. nuit',f:numF('heuresNuit',fmtH)},
@@ -2299,11 +2358,273 @@ function videsView(x){
   </tbody></table></div>`;
 }
 /** Enregistre une correction : recalcul immédiat, puis mémorisation sur le serveur pour tous les utilisateurs */
-async function saveCorrection(msg){
-  recomputeLoaded(); S.vit=null; render();
-  try{ await api.saveRegles(S.rules); S.msg={m:msg+' — mémorisé pour tous les utilisateurs.'}; }
+async function saveCorrection(msg,detail){
+  const avant=totaux(); recomputeLoaded(); S.vit=null; render();
+  try{ await persistRules([detail?`${msg} — ${detail}`:msg],avant); S.msg={m:msg+' — mémorisé pour tous les utilisateurs.'}; }
   catch(err){ S.msg={m:'Correction appliquée ici mais non enregistrée : '+err.message,t:'c'}; }
   render(); setTimeout(()=>{S.msg=null;render();},4000);
+}
+
+
+/* ---------- journal des modifications, suivi, sauvegarde ---------- */
+/** Chiffres clés de toutes les semaines chargées : le journal note leur valeur avant et après chaque changement */
+/** Nom d'une personne d'après sa clé (m:matricule ou n:NOM|PRENOM), pour le journal */
+function nmPk(pk){ for(const w of S.loaded.values()){ const a=w.agents.find(x=>personKey(x)===pk); if(a) return `${a.nom} ${a.prenom}`; } return pk.replace(/^[mn]:/,''); }
+function corrDetail(key){ const [pk,a,b]=key.split('|'); return `${nmPk(pk)} · ${a&&a.length>10?dtISO(a):a?dFull(a):''}${b?' → '+dtISO(b):''}`; }
+function totaux(){
+  const all=[...S.loaded.values()].flatMap(v=>v.agents), g=agg(all);
+  return {rhr:g.nbRHR,jb:g.journeesBlanches,sup:g.heuresSup,tte:g.heuresPlanifiees,nuit:g.heuresNuit,paniers:g.nbPaniers};
+}
+const TOT_L={rhr:['RHR',nf],jb:['Journées blanches',nf],sup:['Heures sup',fmtH],tte:['TTE',fmtH],nuit:['Heures de nuit',fmtH],paniers:['Paniers',nf]};
+/** Différences lisibles entre deux jeux de règles (hors corrections, décrites à part) */
+function rulesDiff(a,b){
+  const L={rhrMinHours:'Durée minimale d’un RHR (h)',rhrMaxAbsence:'Seuil d’alerte d’absence (h)',rhrCoupeParRepos:'Un jour de repos interrompt le RHR',
+    rhrCountPending:'Coupure ouverte en fin de semaine comptée',jbExcludeNightOverlap:'Lendemain de nuit exclu des journées blanches',
+    jbRequireFramed:'Journée blanche encadrée par deux services',jbExcludeHorsResidence:'Pas de journée blanche hors résidence',panierRHR:'Panier en RHR',
+    horsColonne:'Missions hors colonne',seuilHebdo:'Seuil des heures sup (h)',heuresATCMD:'Heures d’une ATCMD',nuitAFR:'Nuit AFR',nuitCDR:'Nuit conducteurs',
+    trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',lieuxResidence:'Lieux reconnus comme résidence'};
+  const v=x=>typeof x==='boolean'?(x?'oui':'non'):Array.isArray(x)?x.join(', '):x&&typeof x==='object'?Object.entries(x).map(([k,y])=>`${k} → ${Array.isArray(y)?y.join('/'):y}`).join(' ; ')||'—':String(x);
+  return Object.keys(L).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).map(k=>`${L[k]} : ${v(a[k])} → ${v(b[k])}`);
+}
+/** Enregistre les règles avec une ligne de journal : auteur, changements, effet sur les chiffres */
+async function persistRules(changes,avant){
+  const apres=totaux();
+  const _journal={auteur:S.auteur||'administrateur',changes,chiffres:{avant,apres}};
+  await api.saveRegles({...S.rules,_journal});
+  S.journal=[...(S.journal||[]),{..._journal,le:new Date().toISOString()}].slice(-300);
+}
+async function saveSuivi(){
+  try{ await api.saveSuivi(S.suivi); }catch(err){ S.msg={m:'Suivi non enregistré : '+err.message,t:'c'}; render(); }
+}
+function journalCard(){
+  const J=(S.journal||[]).slice().reverse();
+  return `<section class="card"><div class="card-h"><div><h2>Journal des modifications</h2><p class="card-s">règles et corrections : qui, quand, quoi, et l'effet sur les chiffres de toutes les semaines</p></div>
+    ${admin()?`<label class="fld"><span class="flabel">Votre nom dans le journal</span><input type="text" id="auteur" value="${esc(S.auteur||'')}" placeholder="administrateur" style="width:180px"></label>`:''}</div>
+    <div class="card-b">${J.length?`<div class="tw tall"><table><thead><tr><th class="l">Quand</th><th class="l">Qui</th><th class="l">Changement</th><th class="l">Effet sur les chiffres</th></tr></thead><tbody>
+      ${J.map(e=>{const a=e.chiffres?.avant||{}, b=e.chiffres?.apres||{};
+        const d=Object.keys(TOT_L).filter(k=>a[k]!=null&&b[k]!=null&&r2(a[k])!==r2(b[k])).map(k=>{const [l,f]=TOT_L[k],x=b[k]-a[k];return `${l} ${f(a[k])} → <b>${f(b[k])}</b> <span class="${x>0?'up':'dn'}">(${x>0?'+':'−'}${f(Math.abs(r2(x)))})</span>`;});
+        return `<tr><td class="l mono">${dtISO(e.le).replace(' ',' à ')} ${new Date(e.le).getUTCFullYear()}</td><td class="l">${esc(e.auteur||'—')}</td>
+          <td class="l" style="white-space:normal;max-width:420px">${(e.changes||[]).map(esc).join('<br>')||'—'}</td><td class="l" style="white-space:normal">${d.join('<br>')||'<span class="mut">aucun chiffre modifié</span>'}</td></tr>`;}).join('')}
+    </tbody></table></div>`:'<p class="mut">Aucune modification enregistrée depuis la mise en place du journal.</p>'}</div></section>`;
+}
+function sauvegardeCard(){
+  if(!admin()) return '';
+  return `<section class="card"><div class="card-h"><div><h2>Sauvegarde et restauration</h2><p class="card-s">règles, résidences, correspondances, corrections, suivi des alertes et journal</p></div></div>
+    <div class="card-b"><div class="btns"><button class="btn btn-pri" id="bkSave">Télécharger la sauvegarde</button><button class="btn" id="bkLoad">Restaurer une sauvegarde…</button>
+      <input type="file" id="bkFile" accept=".json,application/json" hidden></div>
+    <p class="hint">Le fichier contient les corrections, donc des matricules : à conserver comme une donnée nominative, jamais dans le dépôt. Une restauration remplace les règles et le suivi actuels ; elle est notée au journal.</p></div></section>`;
+}
+
+
+/* ---------- à vérifier : toutes les alertes au même endroit, avec leur suivi ---------- */
+const AL_TYPES={lecture:'Lecture du fichier',horscol:'Mission hors colonne',long:'RHR de plus de 44 h',ailleurs:'Agent basé ailleurs',
+  jamais:'Jamais en résidence',residence:'Résidence à confirmer',ecart:'Écart inhabituel (agent)',ecartag:'Écart inhabituel (agence)',fichier:'Fichier suspect'};
+const AL_NIV={haute:['Haute','pill-c'],moyenne:['Moyenne','pill-w'],info:['Info','pill-n']};
+/** Écarts à sa propre habitude : valeur d'une semaine à plus de 2 écarts-types de la moyenne, avec un écart minimal */
+const ECARTS=[['nbRHR','RHR',2,nf],['heuresSup','Heures sup',4,fmtH],['heuresPlanifiees','TTE',8,fmtH],['journeesBlanches','Journées blanches',2,nf]];
+function ecartsDe(series,key,label,minD,f){
+  if(series.length<4) return [];
+  const v=series.map(x=>x.v), m=v.reduce((s,x)=>s+x,0)/v.length, sd=Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/v.length);
+  return series.filter(x=>sd>0&&Math.abs(x.v-m)>2*sd&&Math.abs(x.v-m)>=minD).map(x=>({...x,m,txt:`${label} : ${f(x.v)} cette semaine, ${f(r2(m))} en moyenne sur ${series.length} semaines`}));
+}
+/** Comparaison d'une semaine importée à la précédente : fichier incomplet ou inhabituel */
+function suspicions(cur,prev){
+  const out=[], nA=cur.nbAgents, pA=prev&&prev.nbAgents;
+  if(pA&&Math.abs(nA-pA)/pA>0.2) out.push(`effectif ${nA>pA?'en hausse':'en baisse'} de ${nf(Math.abs(100*(nA-pA)/pA),0)} % (${nf(pA)} → ${nf(nA)} lignes)`);
+  if(prev&&prev.agences&&cur.agences){ const miss=prev.agences.filter(a=>!cur.agences.includes(a)), neu=cur.agences.filter(a=>!prev.agences.includes(a));
+    if(miss.length) out.push(`agence${miss.length>1?'s':''} absente${miss.length>1?'s':''} : ${miss.join(', ')}`);
+    if(neu.length&&prev.agences.length) out.push(`nouvelle${neu.length>1?'s':''} agence${neu.length>1?'s':''} : ${neu.join(', ')}`); }
+  if(cur.fusions&&cur.nbAgents&&cur.fusions/cur.nbAgents>0.05) out.push(`${cur.fusions} agents sur plusieurs lignes (${nf(100*cur.fusions/cur.nbAgents,0)} %)`);
+  if(cur.vides!=null&&cur.nbAgents&&cur.vides/cur.nbAgents>0.1) out.push(`${cur.vides} lignes entièrement vides (${nf(100*cur.vides/cur.nbAgents,0)} %)`);
+  if(cur.extractDate&&cur.monday){ const d=(Date.parse(cur.extractDate)-Date.parse(cur.monday))/DAY; if(d>14||d<-60) out.push(`date d’extraction ${dFull(cur.extractDate)} éloignée de la semaine`); }
+  return out;
+}
+function collectAlertes(){
+  const out=[], add=a=>out.push(a);
+  const ids=[...S.loaded.keys()].sort(), W=id=>S.weeks.find(w=>w.weekId===id);
+  for(const w of S.weeks){ const c=w.controle; if(!c||!c.anomalies) continue;
+    for(const a of c.anomalies) add({key:`lec|${w.weekId}|${a.agent}|${a.jour}|${a.message}`,type:'lecture',niv:'moyenne',w:w.weekId,titre:`${a.agent} · ${a.jour}`,detail:a.message}); }
+  let prevR=null;
+  for(const id of ids){ const v=S.loaded.get(id), w=W(id);
+    for(const h of v.meta.horsColonne||[]) add({key:`hc|${id}|${h.agent}|${h.start}`,type:'horscol',niv:'moyenne',w:id,ag:h.agence,titre:`${h.agent} · ${h.jour}`,detail:`${h.label} daté du ${dtISO(h.start)} : écartée du calcul`});
+    for(const a of v.agents){ const pk=personKey(a), nm=`${a.nom} ${a.prenom}`;
+      for(const c of a.coupures||[]) if(c.long) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`});
+      if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`});
+      else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`}); }
+    for(const [ag,src] of Object.entries(v.meta.residenceSource||{})) if(src==='manuel'){
+      // résidence saisie à la main mais absente des missions de cette semaine (ex. « BORDEAUX » saisi, fichier écrit « BX »)
+      const lc=(v.meta.locCounts||{})[ag]||{}, res=[v.meta.residences[ag],...((S.rules.lieuxResidence||{})[ag]||[])].map(normLieu);
+      const top=Object.entries(lc).sort((x,y)=>y[1]-x[1])[0];
+      if(top&&!res.some(r=>lc[r])) add({key:`resman|${ag}|${id}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:`la résidence saisie « ${v.meta.residences[ag]} » n’apparaît dans aucune mission de la semaine ; le lieu le plus fréquent est « ${top[0]} » : s’il s’agit de la même résidence, ajoutez cette écriture (fiche d’un agent, bouton « … = résidence ») ; sinon corrigez la résidence dans les Réglages. D’ici là, les RHR de cette agence sont surestimés.`}); }
+    for(const [ag,src] of Object.entries(v.meta.residenceSource||{})) if(src==='indéterminée') add({key:`res|${ag}`,type:'residence',niv:'haute',w:id,ag,titre:ag,detail:'aucune résidence connue : aucun RHR ne peut être compté'});
+    const cur={...(w||{}),nbAgents:v.agents.length,agences:[...new Set(v.agents.map(a=>a.agence))],fusions:v.meta.fusions,
+      vides:v.agents.filter(a=>a.jours.every(j=>j.kind==='VIDE')).length,extractDate:v.meta.extractDate,monday:v.meta.monday};
+    const prevW=prevR&&Date.parse(cur.monday)-Date.parse(prevR.monday)===7*DAY?prevR:null;
+    for(const m of suspicions(cur,prevW)) add({key:`susp|${id}|${m.replace(/\d+/g,'#')}`,type:'fichier',niv:'moyenne',w:id,titre:w?weekLabel(w):id,detail:m});
+    prevR=cur; }
+  // écarts inhabituels : chaque agent comparé à ses propres semaines, chaque agence à ses propres semaines
+  const rows=[...S.loaded.entries()].flatMap(([id,v])=>v.agents.map(a=>({id,a})));
+  for(const [pk,l] of groupBy(rows,x=>personKey(x.a))) for(const [k,lab,minD,f] of ECARTS){
+    if(k==='nbRHR'&&!l[0].a.rhrApplicable) continue;
+    for(const e of ecartsDe(l.map(x=>({w:x.id,v:x.a[k]||0,a:x.a})),k,lab,minD,f))
+      add({key:`ecart|${pk}|${e.w}|${k}`,type:'ecart',niv:'info',w:e.w,ag:e.a.agence,pk,titre:`${e.a.nom} ${e.a.prenom}`,detail:e.txt}); }
+  for(const [ag,l] of groupBy(rows,x=>x.a.agence)) for(const [k,lab,,f] of ECARTS){
+    const per=[...groupBy(l,x=>x.id)].map(([w,x])=>({w,v:r2(x.reduce((s,y)=>s+(y.a[k]||0),0)/x.length)}));
+    for(const e of ecartsDe(per,k,lab+' par agent',k==='nbRHR'||k==='journeesBlanches'?0.5:1,f)) add({key:`ecartag|${ag}|${e.w}|${k}`,type:'ecartag',niv:'info',w:e.w,ag,titre:ag,detail:e.txt}); }
+  const st=S.suivi.alertes||{};
+  return out.map(a=>({...a,suivi:st[a.key]||null}));
+}
+const ST_AL={a_traiter:['À traiter',a=>!a.suivi||a.suivi.statut==='rouvert'],vu:['Vues',a=>a.suivi&&a.suivi.statut==='vu'],corrige:['Corrigées',a=>a.suivi&&a.suivi.statut==='corrige'],toutes:['Toutes',()=>true]};
+function viewVerifier(){
+  if(!S.weeks.length) return emptyScope();
+  const all=collectAlertes().filter(a=>!S.selAgences||!a.ag||S.selAgences.includes(a.ag));
+  S.alN=all.filter(ST_AL.a_traiter[1]).length;
+  const f=S.alf||(S.alf={st:'a_traiter',type:null});
+  const list=all.filter(ST_AL[f.st][1]).filter(a=>!f.type||a.type===f.type)
+    .sort((x,y)=>['haute','moyenne','info'].indexOf(x.niv)-['haute','moyenne','info'].indexOf(y.niv)||String(y.w).localeCompare(String(x.w)));
+  S.rows_al=list;
+  const types=[...groupBy(all.filter(ST_AL[f.st][1]),a=>a.type)];
+  const hist=(S.suivi.historique||[]).slice(-40).reverse();
+  return `<section class="card"><div class="card-h"><div><h2>À vérifier</h2><p class="card-s">toutes les alertes des semaines enregistrées · marquez-les vues ou corrigées : le suivi est partagé et historisé</p></div>
+      <div class="seg">${Object.entries(ST_AL).map(([k,[l,t]])=>`<button class="sg" data-alst="${k}" aria-pressed="${f.st===k}">${l} <span class="mut">${nf(all.filter(t).length)}</span></button>`).join('')}</div></div>
+    <div class="card-b"><div class="frow" style="margin-bottom:12px"><button class="chip chip-mini${f.type?'':' '}" data-alty="" aria-pressed="${!f.type}">Tous les types</button>
+      ${types.map(([k,l])=>`<button class="chip chip-mini" data-alty="${k}" aria-pressed="${f.type===k}">${esc(AL_TYPES[k])} <span class="mut">${l.length}</span></button>`).join('')}</div>
+    ${list.length?`<div class="tw tall"><table class="sticky1"><thead><tr><th class="l">Priorité</th><th class="l">Semaine</th><th class="l">Type</th><th class="l">Qui / quoi</th><th class="l">Détail</th><th class="l">Suivi</th><th class="l">Actions</th></tr></thead><tbody>
+      ${list.slice(0,600).map((a,i)=>`<tr><td class="l"><span class="pill ${AL_NIV[a.niv][1]}">${AL_NIV[a.niv][0]}</span></td><td class="l mono">${esc(String(a.w||'').replace(/^\d+-/,''))}</td>
+        <td class="l">${esc(AL_TYPES[a.type])}</td><td class="l nm">${esc(a.titre)}${a.ag&&a.titre!==a.ag?` <span class="mut nb">${esc(a.ag)}</span>`:''}</td>
+        <td class="l" style="white-space:normal;min-width:280px">${esc(a.detail)}${a.suivi&&a.suivi.note?`<div class="hint">Note : ${esc(a.suivi.note)}</div>`:''}</td>
+        <td class="l">${a.suivi?`<span class="pill ${a.suivi.statut==='corrige'?'pill-g':a.suivi.statut==='vu'?'pill-a':'pill-n'}">${{vu:'vue',corrige:'corrigée',rouvert:'rouverte'}[a.suivi.statut]||''}</span> <span class="mut sm">${dISO(a.suivi.le)}${a.suivi.auteur?' · '+esc(a.suivi.auteur):''}</span>`:'<span class="z">—</span>'}</td>
+        <td class="l"><span class="btns" style="gap:4px;flex-wrap:nowrap">${a.pk?`<button class="btn btn-sm" data-alopen="${i}">Fiche</button>`:''}
+          ${!a.suivi||a.suivi.statut==='rouvert'?`<button class="btn btn-sm" data-alset="${i}" data-v="vu">Vu</button><button class="btn btn-sm" data-alset="${i}" data-v="corrige">Corrigé</button>`:`<button class="btn btn-sm" data-alset="${i}" data-v="rouvert">Rouvrir</button>`}
+          <button class="btn btn-sm" data-alnote="${i}" title="Ajouter une note">Note</button></span></td></tr>`).join('')}
+    </tbody></table></div>${list.length>600?`<p class="hint">600 premières sur ${nf(list.length)} — filtrez par type.</p>`:''}`:'<p class="mut">Rien à afficher pour ce filtre.</p>'}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Historique du suivi</h2><p class="card-s">40 derniers changements</p></div></div>
+    <div class="card-b">${hist.length?`<div class="tw"><table><thead><tr><th class="l">Quand</th><th class="l">Qui</th><th class="l">Alerte</th><th class="l">Nouveau statut</th></tr></thead><tbody>
+      ${hist.map(h=>`<tr><td class="l mono">${dtISO(h.le)}</td><td class="l">${esc(h.auteur||'—')}</td><td class="l">${esc(h.titre||h.key)}</td><td class="l">${esc({vu:'vue',corrige:'corrigée',rouvert:'rouverte',note:'note ajoutée'}[h.statut]||h.statut)}</td></tr>`).join('')}
+    </tbody></table></div>`:'<p class="mut">Aucun changement pour l’instant.</p>'}</div></section>`;
+}
+function setSuivi(a,statut,note){
+  const al=S.suivi.alertes=S.suivi.alertes||{}, le=new Date().toISOString(), cur=al[a.key]||{};
+  al[a.key]={...cur,statut:statut==='note'?(cur.statut||'rouvert'):statut,le,auteur:S.auteur||'',...(note!=null?{note}:{})};
+  S.suivi.historique=[...(S.suivi.historique||[]),{key:a.key,titre:`${AL_TYPES[a.type]} · ${a.titre}`,statut,le,auteur:S.auteur||''}].slice(-1000);
+  render(); saveSuivi();
+}
+
+
+/* ---------- panneau générique (recherche, explications) ---------- */
+function openPanel(title,sub,html){
+  document.querySelector('.ov.pn')?.remove();
+  const d=document.createElement('div'); d.className='ov pn';
+  d.innerHTML=`<div class="dw" role="dialog" aria-label="${esc(title)}"><div class="dw-h"><div><h2>${esc(title)}</h2><div class="s">${sub||''}</div></div>
+    <button class="x" data-pnx aria-label="Fermer">×</button></div>${html}</div>`;
+  document.body.appendChild(d); document.body.style.overflow='hidden';
+  d.addEventListener('click',e=>{ if(e.target===d||e.target.closest('[data-pnx]')) closePanel(); });
+}
+function closePanel(){ const d=document.querySelector('.ov.pn'); if(!d) return; document.body.style.overflow=S.drawer?'hidden':''; d.classList.add('out'); setTimeout(()=>d.remove(),180); }
+const tbl=(cols,rows)=>`<div class="tw tall"><table><thead><tr>${cols.map(c=>`<th class="${c[1]||''}">${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+/* ---------- 2. explications : la règle appliquée et les éléments qui ont produit le chiffre ---------- */
+function explain(k){
+  const sc=scopeAgents(), r=S.rules, lim=400, nm=a=>`<span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}`, wk=a=>esc(String(a.weekId).replace(/^\d+-/,''));
+  let title='', rule='', html='';
+  if(k==='nbRHR'||k==='rhrNuits'){
+    const l=sc.filter(a=>a.rhrApplicable).flatMap(a=>a.rhr.map(x=>({a,x}))).sort((p,q)=>(q.x.dureeH||0)-(p.x.dureeH||0));
+    title='Repos hors résidence'; rule=`Un RHR est un repos journalier pris hors résidence (accord, art. 18) : une mission se termine ailleurs qu’à la résidence de l’agence et la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard${r.rhrCoupeParRepos?', sans jour de repos ni d’absence entre les deux':''}. Les AFR sont exclus. Les nuits comptent les passages de minuit pendant le repos.`;
+    html=tbl([['Agent','l'],['Sem.','l'],['Lieu','l'],['Fin de mission','l'],['Reprise','l'],['Durée'],['Nuits'],['Tranche','l']],
+      l.slice(0,lim).map(({a,x})=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td><td class="l mono">${esc(x.lieu)}</td><td class="l mono">${dtISO(x.debut)} <span class="mut">${esc(x.aller)}</span></td>
+        <td class="l mono">${x.fin?dtISO(x.fin):'<span class="mut">semaine suivante</span>'}</td><td>${x.dureeH!=null?fmtH(x.dureeH):'—'}</td><td>${x.nuits??'—'}</td>
+        <td class="l">${x.dureeH==null?'—':x.dureeH<12?'8–12 h':x.dureeH<24?'12–24 h':'24 h et plus'}${x.manuel?' <span class="pill pill-a">corrigé</span>':''}</td></tr>`));
+  } else if(k==='journeesBlanches'){
+    const l=sc.flatMap(a=>(a.blanches||[]).map(c=>({a,c})));
+    title='Journées blanches'; rule='Case vide (ni mission ni code) encadrée par deux services, y compris par la semaine voisine ; pas le lendemain d’un service de nuit, pas si l’agent est hors résidence. Un repos entre la case et le service ne l’empêche pas.';
+    html=tbl([['Agent','l'],['Jour','l'],['Mission avant','l'],['Mission après','l'],['Motif','l']],l.slice(0,lim).map(({a,c})=>`<tr><td class="l">${nm(a)}</td><td class="l">${JS[c.d]} ${dISO(c.date)}</td>
+      <td class="l mono">${c.avant?`${esc(c.avant.label)} <span class="mut">fin ${dtISO(c.avant.end)}</span>`:'—'}</td><td class="l mono">${c.apres?`${esc(c.apres.label)} <span class="mut">début ${dtISO(c.apres.start)}</span>`:'—'}</td><td class="l mut">${esc(c.raison||'')}</td></tr>`));
+  } else if(k==='heuresSup'||k==='heuresPlanifiees'){
+    const l=sc.filter(a=>a.joursService).sort((p,q)=>q.heuresPlanifiees-p.heuresPlanifiees);
+    title=k==='heuresSup'?'Heures sup':'TTE — temps de travail effectif';
+    rule=`TTE = amplitude de chaque mission moins ses pauses « P: » ; une ATCMD compte ${nfa(r.heuresATCMD)} h. Heures sup = TTE au-delà de ${nfa(r.seuilHebdo)} h, agent par agent et semaine par semaine.`;
+    html=tbl([['Agent','l'],['Sem.','l'],['Jours'],['Amplitude'],['Pauses'],['ATCMD'],['TTE'],['Heures sup']],(k==='heuresSup'?l.filter(a=>a.heuresSup>0):l).slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td>
+      <td>${a.joursService}</td><td>${fmtH(a.amplitudeTotale)}</td><td>${nf(a.pauseTotaleMin)} min</td><td>${a.nbATCMD||'<span class="z">0</span>'}</td><td><b>${fmtH(a.heuresPlanifiees)}</b></td><td>${a.heuresSup?`<b>${fmtH(a.heuresSup)}</b>`:'<span class="z">—</span>'}</td></tr>`));
+  } else if(k==='heuresNuit'){
+    const l=sc.filter(a=>a.heuresNuit>0).sort((p,q)=>q.heuresNuit-p.heuresNuit);
+    title='Heures de nuit'; rule=`Temps travaillé hors pauses dans la plage de nuit : AFR ${r.nuitAFR[0]}h–${r.nuitAFR[1]}h, conducteurs ${r.nuitCDR[0]}h–${r.nuitCDR[1]}h.`;
+    html=tbl([['Agent','l'],['Sem.','l'],['Métier','l'],['Heures de nuit'],['TTE'],['Part']],l.slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td><td class="l">${esc(a.metier)}</td><td><b>${fmtH(a.heuresNuit)}</b></td><td>${fmtH(a.heuresPlanifiees)}</td><td>${nf(100*a.heuresNuit/(a.heuresPlanifiees||1),0)} %</td></tr>`));
+  } else if(k==='nbMissions'){
+    const t={}; sc.forEach(a=>Object.entries(a.typesMission||{}).forEach(([x,n])=>t[x]=(t[x]||0)+n));
+    title='Missions'; rule=`Chaque intitulé d’une case de service est une mission. Trajet seul : intitulé réduit à ${esc((r.trajetTypes||[]).join(' ou '))}. MHIS, DISPO et ATCMD : intitulé qui contient ces lettres.`;
+    html=barChart(Object.entries(t).sort((p,q)=>q[1]-p[1]).slice(0,40).map(([l,v])=>({l,v})),{label:'Missions'});
+  } else if(k==='joursRepos'){
+    const c={}; sc.forEach(a=>Object.entries(a.codeCounts||{}).forEach(([x,n])=>c[x]=(c[x]||0)+n));
+    title='Repos, congés et absences'; rule='Repos : RP, RF, JF, RCL, RCC. Congés : CP, CPAT, CFAM, CSS/CPAR. Absences : tout autre code (MAL, AT, CPRCL…).';
+    html=tbl([['Code','l'],['Catégorie','l'],['Jours']],Object.entries(c).sort((p,q)=>q[1]-p[1]).map(([x,n])=>`<tr><td class="l">${esc(CODEL[x]||x)}</td><td class="l">${FAM_REPOS.includes(x)?'Repos':FAM_CONGES.includes(x)?'Congés':x==='HORS'?'Écarté':'Absences'}</td><td>${nf(n)}</td></tr>`));
+  } else if(k==='amplitude'){
+    const d=sc.flatMap(a=>a.jours.filter(j=>j.kind==='SERVICE').map(j=>({a,j}))).sort((p,q)=>q.j.amplitude-p.j.amplitude);
+    title='Amplitude des journées'; rule='Amplitude : de la prise à la fin de service, pauses comprises ; l’accord la limite à 11 h (art. 12). Moyenne = amplitude totale / jours de service.';
+    html=tbl([['Agent','l'],['Jour','l'],['Missions','l'],['Amplitude']],d.slice(0,lim).map(({a,j})=>`<tr><td class="l">${nm(a)}</td><td class="l">${JS[j.d]} ${dISO(j.date)}</td><td class="l mono">${j.missions.map(m=>esc(m.label)).join(' · ')}</td><td>${j.amplitude>11?`<span class="pill pill-w">${fmtH(j.amplitude)}</span>`:fmtH(j.amplitude)}</td></tr>`));
+  } else { const g=agg(sc); title='Agents'; rule='Une personne = son matricule (à défaut, nom + prénom) ; les lignes en double d’un fichier sont fusionnées.';
+    html=tbl([['Agence','l'],['Agents'],['Jours de service']],[...groupBy(sc,a=>a.agence)].map(([ag,l])=>{const x=agg(l);return `<tr><td class="l nm">${esc(ag)}</td><td>${nf(x.nbAgents)}</td><td>${nf(x.joursService)}</td></tr>`;})); }
+  openPanel(title,'Comment ce chiffre est obtenu, et ce qui le compose sur le périmètre affiché',`<div class="note">${rule}</div>${html}<p class="hint">Cliquez un agent dans les onglets Agents ou RHR pour sa fiche et ses corrections.</p>`);
+}
+/* ---------- 1. recherche globale : agents, agences, lieux, missions, onglets ---------- */
+function paletteData(){
+  const all=[...S.loaded.values()].flatMap(v=>v.agents);
+  const persons=new Map(); all.forEach(a=>persons.set(personKey(a),a));
+  const lieux=new Map(), codes=new Map();
+  for(const a of all) for(const m of a.missions||[]){ for(const l of [m.from,m.to]) if(l){const k=normLieu(l); lieux.set(k,(lieux.get(k)||0)+1);} const t=missionType(m.label); codes.set(t,(codes.get(t)||0)+1); }
+  return {all,persons:[...persons.values()],lieux,codes};
+}
+function openPalette(){
+  if(!S.role) return;
+  document.querySelector('.pal')?.remove();
+  const d=document.createElement('div'); d.className='ov pal';
+  d.innerHTML=`<div class="pal-b" role="dialog" aria-label="Recherche"><input id="palIn" type="search" placeholder="${S.role==='admin'?'Agent, matricule, agence, lieu, code mission, onglet…':'Onglet…'}" autocomplete="off"><div id="palR" class="pal-r"></div>
+    <div class="pal-f"><kbd>↑</kbd><kbd>↓</kbd> choisir · <kbd>Entrée</kbd> ouvrir · <kbd>Échap</kbd> fermer</div></div>`;
+  document.body.appendChild(d);
+  S.pal={data:S.role==='admin'?paletteData():{all:[],persons:[],lieux:new Map(),codes:new Map()},i:0,res:[]};
+  d.addEventListener('click',e=>{ if(e.target===d) d.remove(); const it=e.target.closest('[data-pi]'); if(it){ S.pal.i=+it.dataset.pi; palGo(); } });
+  el('palIn').focus(); palRender('');
+}
+function palRender(q){
+  const Q=deacc(q).toLowerCase().trim(), D=S.pal.data, res=[];
+  const has=s=>deacc(String(s)).toLowerCase().includes(Q);
+  for(const t of TABS.filter(t=>S.role==='admin'||['vitrine','lecture'].includes(t.k))) if(!Q||has(t.l)) res.push({g:'Aller à',l:t.l,go:()=>{S.tab=t.k;savePrefs();document.querySelector('[data-tab="'+t.k+'"]')?.click();}});
+  if(Q.length>=2){
+    D.persons.filter(a=>has(`${a.nom} ${a.prenom} ${a.matricule}`)).slice(0,8).forEach(a=>res.push({g:'Agents',l:`${a.nom} ${a.prenom}`,s:`${a.matricule} · ${a.agence} · ${a.metier}`,go:()=>{S.drawer=a;renderDrawer();}}));
+    allAgences().filter(has).slice(0,5).forEach(ag=>res.push({g:'Agences',l:ag,s:'filtrer le périmètre sur cette agence',go:()=>{S.selAgences=[ag];savePrefs();S.tab='synthese';render();}}));
+    [...D.lieux].filter(([l])=>has(l)).slice(0,6).forEach(([l,n])=>res.push({g:'Lieux',l,s:`${nf(n)} passages`,go:()=>searchPanel('lieu',l)}));
+    [...D.codes].filter(([c])=>has(c)).slice(0,6).forEach(([c,n])=>res.push({g:'Missions',l:c,s:`${nf(n)} missions`,go:()=>searchPanel('code',c)}));
+    if(D.all.some(a=>(a.missions||[]).some(m=>has(m.label)))) res.push({g:'Missions',l:`Toutes les missions contenant « ${q} »`,go:()=>searchPanel('texte',q)});
+  }
+  S.pal.res=res; S.pal.i=Math.min(S.pal.i,Math.max(0,res.length-1));
+  let g=''; el('palR').innerHTML=res.length?res.map((r,i)=>`${r.g!==g?`<div class="pal-g">${esc(g=r.g)}</div>`:''}<button class="pal-i${i===S.pal.i?' on':''}" data-pi="${i}"><span>${esc(r.l)}</span>${r.s?`<span class="mut sm">${esc(r.s)}</span>`:''}</button>`).join(''):'<p class="mut" style="padding:12px 16px">Aucun résultat.</p>';
+}
+function palGo(){ const r=S.pal&&S.pal.res[S.pal.i]; document.querySelector('.pal')?.remove(); if(r) r.go(); }
+/** Liste des missions d'un lieu, d'un code ou d'un texte, sur toutes les semaines chargées */
+function searchPanel(kind,q){
+  const D=paletteData(), Q=deacc(q).toLowerCase();
+  const ok=m=>kind==='lieu'?[m.from,m.to].some(l=>l&&normLieu(l)===q):kind==='code'?missionType(m.label)===q:deacc(m.label).toLowerCase().includes(Q);
+  const rows=D.all.flatMap(a=>(a.missions||[]).filter(ok).map(m=>({a,m}))).sort((x,y)=>y.m.start.localeCompare(x.m.start));
+  const rhr=kind==='lieu'?D.all.flatMap(a=>a.rhr.filter(x=>normLieu(x.lieu)===q)).length:null;
+  openPanel(kind==='lieu'?`Lieu ${q}`:kind==='code'?`Missions ${q}`:`Missions « ${q} »`,`${nf(rows.length)} mission${rows.length>1?'s':''}${rhr!=null?` · ${nf(rhr)} RHR à ce lieu`:''} · semaines chargées`,
+    tbl([['Agent','l'],['Agence','l'],['Mission','l'],['Trajet','l'],['Horaire','l']],rows.slice(0,500).map(({a,m})=>`<tr class="clk" data-pnag="${esc(personKey(a))}"><td class="l"><span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}</td><td class="l">${esc(a.agence)}</td><td class="l mono">${esc(m.label)}</td><td class="l mono">${esc(m.from||'?')} → ${esc(m.to||'?')}</td><td class="l mono">${dtISO(m.start)} – ${hm(m.end)}</td></tr>`)));
+}
+/* ---------- 3. en bref : la semaine racontée en quelques phrases ---------- */
+function enBref(){
+  const sc=scopeAgents(); if(!sc.length) return '';
+  const ids=[...new Set(sc.map(a=>a.weekId))].sort(), g=agg(sc), P=[];
+  const nW=ids.length, wl=nW===1?(()=>{const w=S.weeks.find(x=>x.weekId===ids[0]);return w?weekLabel(w):ids[0];})():`${nW} semaines`;
+  let evo='';
+  if(nW===1){ const all=S.weeks.map(w=>w.weekId).sort(), i=all.indexOf(ids[0]), pid=all[i-1], pv=pid&&S.loaded.get(pid);
+    if(pv){ const pl=pv.agents.filter(a=>(!S.selAgences||S.selAgences.includes(a.agence))&&(!S.selMetiers||S.selMetiers.includes(a.metier))), pg=agg(pl);
+      if(pg.nbRHR){ const d=100*(g.nbRHR-pg.nbRHR)/pg.nbRHR; evo=` (${d>=0?'+':''}${nf(d,0)} % par rapport à la semaine précédente)`; } } }
+  const byAg=[...groupBy(sc.filter(a=>a.rhrApplicable),a=>a.agence)].map(([ag,l])=>[ag,agg(l)]).sort((x,y)=>y[1].nbRHR-x[1].nbRHR);
+  P.push(`<b>${esc(wl)}</b> : ${nf(g.nbAgents)} agents, ${nf(g.joursService)} journées de service et <b>${nf(g.nbRHR)} repos hors résidence</b>${evo}.`);
+  if(byAg[0]&&byAg[0][1].nbRHR) P.push(`${esc(byAg[0][0])} en compte le plus (${nf(byAg[0][1].nbRHR)}, soit ${nf(byAg[0][1].nbRHR_moy,1)} par conducteur concerné)${byAg[1]&&byAg[1][1].nbRHR?`, devant ${esc(byAg[1][0])} (${nf(byAg[1][1].nbRHR)})`:''}.`);
+  P.push(`${g.journeesBlanches?`<b>${nf(g.journeesBlanches)} journée${g.journeesBlanches>1?'s':''} blanche${g.journeesBlanches>1?'s':''}</b> pour ${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''}`:'Aucune journée blanche'} ; ${g.heuresSup?`<b>${fmtH(g.heuresSup)} d’heures sup</b> pour ${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''}`:'aucune heure sup'} ; TTE moyen ${fmtH(g.heuresPlanifiees/(sc.filter(a=>a.joursService).length||1))} par agent en service et par semaine.`);
+  const h=H24(); for(const a of sc) for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions) for(const [s0,s1] of workSegments(m)) for(let t=Math.floor(s0/H)*H;t<s1;t+=H) h[new Date(t).getUTCHours()]+=ovl(t,t+H,s0,s1)/H;
+  const pk=h.indexOf(Math.max(...h));
+  P.push(`Heure la plus chargée : ${String(pk).padStart(2,'0')}h–${String(pk+1).padStart(2,'0')}h ; ${nf(100*g.heuresNuit/(g.heuresPlanifiees||1),0)} % du temps de travail se fait de nuit.`);
+  if(S.alN) P.push(`<a href="#" data-goto="verifier">${nf(S.alN)} alerte${S.alN>1?'s':''} à vérifier</a>.`);
+  return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`;
 }
 
 /* ---------- guide de lecture : schémas générés à partir des règles en vigueur ---------- */
@@ -2381,7 +2702,7 @@ function dgHeures(r){
   if(sup) g+=`<rect class="rhr" x="${X(r.seuilHebdo)}" y="28" width="${X(tot)-X(r.seuilHebdo)}" height="36" rx="5" style="fill:none"/><text class="ts" x="${(X(r.seuilHebdo)+X(tot))/2}" y="82" text-anchor="middle">${fmtH(sup)} sup</text>`;
   return `<svg viewBox="0 0 560 112">${DG_DEFS}${g}
     <line class="lns" x1="${X(r.seuilHebdo)}" y1="18" x2="${X(r.seuilHebdo)}" y2="72"/><text class="ts" x="${X(r.seuilHebdo)}" y="13" text-anchor="middle">seuil ${nf(r.seuilHebdo)} h</text>
-    <text class="t" x="20" y="102">5 jours de 8 h avec 30 min de pause = 5 × 7h30, plus une ATCMD comptée ${nf(atc)} h : ${fmtH(tot)} planifiées.</text></svg>`;
+    <text class="t" x="20" y="102">5 jours de 8 h avec 30 min de pause = 5 × 7h30, plus une ATCMD comptée ${nf(atc)} h : ${fmtH(tot)} de TTE.</text></svg>`;
 }
 /** Contrôle de la lecture, calculé sur les semaines chargées */
 function qualite(){
@@ -2422,8 +2743,56 @@ function viewGuide(){
     ${card('Repos hors résidence','une coupure hors résidence = 1 RHR',dgRHR(),`Chaque mission qui se termine ailleurs qu’à la résidence ouvre un arrêt ; il compte pour un RHR (repos journalier hors résidence) s’il dure au moins ${nfa(r.rhrMinHours)} h, de jour comme de nuit, même dans une seule case${r.rhrCoupeParRepos?', et s’il ne contient aucun jour de repos':''}. Un changement de train n’en est pas un. <b>Les AFR sont exclus</b> ; les moyennes ne portent que sur les agents qui en ont eu.`)}
     ${card('Journée blanche','case vide encadrée par deux services',dgBlanche(),`${r.jbRequireFramed?'Seules les cases vides entre le premier et le dernier service de la semaine comptent. ':''}${r.jbExcludeNightOverlap?'Le lendemain d’un service de nuit terminé au matin n’en est pas une. ':''}${r.jbExcludeHorsResidence?'Une journée passée hors résidence non plus. ':''}Un code (RP, congé…) n’est jamais une journée blanche.`)}
     ${card('Nuit et paniers repas','plages horaires, temps travaillé hors pauses',dgJour(r),`Heures de nuit : temps travaillé dans la plage, pauses déduites. Un panier au plus par plage et par jour${r.panierRHR?' ; un RHR qui englobe la plage du midi ou du soir donne aussi un panier':''}.`)}
-    ${card('Heures planifiées et heures sup','par agent et par semaine',dgHeures(r),`Heures planifiées = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
+    ${card('TTE et heures sup','par agent et par semaine',dgHeures(r),`TTE (temps de travail effectif) = amplitude moins les pauses « P: ». Une ATCMD compte ${nf(r.heuresATCMD)} h. Au-delà de ${nf(r.seuilHebdo)} h dans la semaine, le reste est compté en heures sup.`)}
   </div>`;
+}
+
+/* ---------- 4. carte des flux : lieux reliés par les missions, taille = passages, anneau ambre = RHR ---------- */
+function fluxLayout(nodes,edges,W,Hh){
+  const N=nodes.length, idx=new Map(nodes.map((n,i)=>[n.id,i]));
+  const P=nodes.map((n,i)=>{const a=2*Math.PI*i/N;return {x:W/2+Math.cos(a)*W/3,y:Hh/2+Math.sin(a)*Hh/3};});
+  const k=Math.sqrt(W*Hh/Math.max(1,N))*0.55, E=edges.map(e=>[idx.get(e.a),idx.get(e.b),Math.log(1+e.n)]).filter(e=>e[0]!=null&&e[1]!=null);
+  for(let it=0;it<400;it++){
+    const t=(1-it/400)*W/12, D=P.map(()=>({x:0,y:0}));
+    for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){ let dx=P[i].x-P[j].x, dy=P[i].y-P[j].y, d=Math.max(1,Math.hypot(dx,dy)), f=k*k/d;
+      D[i].x+=dx/d*f; D[i].y+=dy/d*f; D[j].x-=dx/d*f; D[j].y-=dy/d*f; }
+    for(const [i,j,w] of E){ const dx=P[i].x-P[j].x, dy=P[i].y-P[j].y, d=Math.max(1,Math.hypot(dx,dy)), f=d*d/k*(0.4+w/4);
+      D[i].x-=dx/d*f; D[i].y-=dy/d*f; D[j].x+=dx/d*f; D[j].y+=dy/d*f; }
+    for(let i=0;i<N;i++){ D[i].x+=(W/2-P[i].x)*0.02*k; D[i].y+=(Hh/2-P[i].y)*0.02*k;
+      const l=Math.max(1,Math.hypot(D[i].x,D[i].y)); P[i].x+=D[i].x/l*Math.min(l,t); P[i].y+=D[i].y/l*Math.min(l,t); }
+  }
+  const xs=P.map(p=>p.x), ys=P.map(p=>p.y), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys), m=60;
+  return P.map(p=>({x:m+(x1>x0?(p.x-x0)/(x1-x0):.5)*(W-2*m),y:m*.7+(y1>y0?(p.y-y0)/(y1-y0):.5)*(Hh-1.4*m)}));
+}
+function fluxMap(edges,rhr,res,opt={}){
+  if(!edges.length) return `<p class="mut">${opt.vide||'Aucun trajet entre deux lieux sur ce périmètre.'}</p>`;
+  const W=780, Hh=440, deg=new Map(), R=new Map(rhr.map(r=>[r.l,r.n])), RS=new Set(res);
+  for(const e of edges){ deg.set(e.a,(deg.get(e.a)||0)+e.n); deg.set(e.b,(deg.get(e.b)||0)+e.n); }
+  const nodes=[...deg].map(([id,n])=>({id,n,rhr:R.get(id)||0,res:RS.has(id)})).sort((a,b)=>b.n-a.n).slice(0,28);
+  const ids=new Set(nodes.map(n=>n.id)), E=edges.filter(e=>ids.has(e.a)&&ids.has(e.b));
+  const P=fluxLayout(nodes,E,W,Hh), at=new Map(nodes.map((n,i)=>[n.id,P[i]]));
+  const maxN=Math.max(...nodes.map(n=>n.n)), maxE=Math.max(...E.map(e=>e.n)), maxR=Math.max(1,...nodes.map(n=>n.rhr));
+  const rad=n=>6+14*Math.sqrt(n.n/maxN);
+  let g='';
+  for(const e of E.sort((a,b)=>a.n-b.n)){ const a=at.get(e.a), b=at.get(e.b);
+    g+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="var(--accent)" stroke-opacity="${(0.18+0.6*e.n/maxE).toFixed(2)}" stroke-width="${(1+7*e.n/maxE).toFixed(1)}" stroke-linecap="round"
+      data-tip="${esc(`<b>${esc(e.a)} ↔ ${esc(e.b)}</b><span class="tr"><span>Missions</span><b>${nf(e.n)}</b></span>`)}"/>`; }
+  for(const n of nodes){ const p=at.get(n.id), r=rad(n);
+    if(n.rhr) g+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(r+3+9*Math.sqrt(n.rhr/maxR)).toFixed(1)}" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.5"/>`;
+    g+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r.toFixed(1)}" fill="${n.res?'var(--accent)':'var(--surface)'}" stroke="var(--accent)" stroke-width="2"
+      data-tip="${esc(`<b>${esc(n.id)}</b>${n.res?' <span class="mut">résidence</span>':''}<span class="tr"><span>Passages</span><b>${nf(n.n)}</b></span><span class="tr"><span>RHR à ce lieu</span><b>${nf(n.rhr)}</b></span>`)}"${opt.click?` data-flieu="${esc(n.id)}" style="cursor:pointer"`:''}/>`;
+    g+=`<text x="${p.x.toFixed(1)}" y="${(p.y+r+14).toFixed(1)}" text-anchor="middle" class="fx-l">${esc(n.id)}</text>`; }
+  return `<div class="fx"><svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Carte des flux entre lieux">${g}</svg>
+    <div class="legend"><span class="lg"><span class="sw" style="background:var(--accent);border-radius:50%"></span>Résidence d’agence</span><span class="lg"><span class="sw" style="border-radius:50%;border:2px solid var(--accent)"></span>Autre lieu · taille = passages</span>
+    <span class="lg"><span class="sw" style="border-radius:50%;background:var(--signal-soft);border:1.5px solid var(--signal)"></span>Anneau = repos hors résidence</span><span class="lg">Trait = missions entre deux lieux</span></div></div>`;
+}
+/** Carte des flux du périmètre administrateur */
+function fluxAdmin(sc){
+  const E=new Map(), R=new Map(), res=new Set();
+  for(const a of sc){ if(a.residence) res.add(normLieu(a.residence));
+    for(const m of a.missions||[]){ if(!m.from||!m.to) continue; const x=normLieu(m.from), y=normLieu(m.to); if(x===y) continue; const k=x<y?x+'|'+y:y+'|'+x; E.set(k,(E.get(k)||0)+1); }
+    for(const x of a.rhr) R.set(normLieu(x.lieu),(R.get(normLieu(x.lieu))||0)+1); }
+  return fluxMap([...E].map(([k,n])=>{const [a,b]=k.split('|');return {a,b,n};}),[...R].map(([l,n])=>({l,n})),[...res],{click:true});
 }
 
 /* ---------- statistiques : comparer tout ce qui est comparable ---------- */
@@ -2556,6 +2925,8 @@ function viewStats(){
     <p class="hint">Périmètre : ${nf(new Set(sc.map(personKey)).size)} agents, ${nf(nW)} semaine${nW>1?'s':''} sélectionnée${nW>1?'s':''} · l'évolution et la comparaison de périodes portent sur toutes les semaines enregistrées · RHR : conducteurs uniquement ; moyennes et médianes RHR sur les agents qui en ont eu.</p></div></section>
   <section class="card"><div class="card-h"><div><h2>Tableau comparatif</h2><p class="card-s">toutes les mesures, par ${esc(ST_GRP.find(g=>g[0]===st.groupe)[1].toLowerCase())} · ${esc(ST_MODES.find(m=>m[0]===mode)[1].toLowerCase())} · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span> · cliquez une mesure pour la détailler</p></div></div>
     <div class="card-b">${cmp}</div></section>
+  <section class="card"><div class="card-h"><div><h2>Carte des flux</h2><p class="card-s">lieux reliés par les missions du périmètre · cliquez un lieu pour ses missions</p></div></div>
+    <div class="card-b">${fluxAdmin(sc)}</div></section>
   <section class="card"><div class="card-h"><div><h2>Heures chaudes</h2><p class="card-s">${esc(HU)} · ${nf(nW)} semaine${nW>1?'s':''}</p></div>${seg('stheat',HEAT,st.heat)}</div>
     <div class="card-b"><div class="ch">Par heure et par ${esc(ST_GRP.find(g=>g[0]===st.groupe)[1].toLowerCase())}</div>${hRows.length?heatmap(hRows,HU,hf):'<p class="mut">Aucune donnée.</p>'}
       <div class="ch" style="margin-top:18px">Par heure et par jour de la semaine</div>${heatmap(dRows,st.heat==='presence'?'agents en service en moyenne (ce jour-là)':HU,hf)}</div></section>
@@ -2568,7 +2939,7 @@ function viewStats(){
     <section class="card"><div class="card-h"><div><h2>Durée des RHR</h2><p class="card-s">tranches de prime de l'accord (annexe 1) · ${nf(rh.length)} RHR de durée connue</p></div></div><div class="card-b">${histo(bands,'RHR')}</div></section>
     <section class="card"><div class="card-h"><div><h2>RHR par agent et par semaine</h2><p class="card-s">conducteurs · nombre de semaines d'agent</p></div></div><div class="card-b">${histo(rhB,'Semaines d’agent')}</div></section>
     <section class="card"><div class="card-h"><div><h2>Amplitude des journées de service</h2><p class="card-s">${nf(days.length)} journées · en ambre : au-delà de 11 h (maximum de l'accord, art. 12)</p></div></div><div class="card-b">${histo(ampB,'Journées')}</div></section>
-    <section class="card"><div class="card-h"><div><h2>Heures planifiées par semaine</h2><p class="card-s">par agent · en ambre : au-delà de ${nf(S.rules.seuilHebdo)} h</p></div></div><div class="card-b">${histo(hpB,'Semaines d’agent')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>TTE par semaine</h2><p class="card-s">par agent · en ambre : au-delà de ${nf(S.rules.seuilHebdo)} h</p></div></div><div class="card-b">${histo(hpB,'Semaines d’agent')}</div></section>
     <section class="card"><div class="card-h"><div><h2>Heure de prise de service</h2><p class="card-s">première mission de chaque journée</p></div></div><div class="card-b">${histo(prises,'Journées')}</div></section>
     <section class="card"><div class="card-h"><div><h2>Journées blanches par agent et par semaine</h2><p class="card-s">nombre de semaines d'agent</p></div></div><div class="card-b">${histo(jbB,'Semaines d’agent')}</div></section>
   </div>
@@ -2596,7 +2967,7 @@ const VKPI=[
   {k:'rhrd',l:'Durée moyenne d’un RHR',v:g=>{const n=g.dist.rhrB.reduce((s,x)=>s+x,0);return n?g.s.rhrHeures/n:null;},f:fmtH,d:g=>`${nf(g.avecRHR?g.s.nbRHR/g.avecRHR:0,1)} RHR par conducteur concerné et par semaine`},
   {k:'jb',l:'Journées blanches',v:g=>g.s.joursService?100*g.s.journeesBlanches/g.s.joursService:null,f:v=>nf(v,1),u:'pour 100 journées',d:g=>`${nf(pct(g.avecJB,g.n),0)} % des agents concernés chaque semaine`},
   {k:'sup',l:'Heures sup par agent',v:g=>g.s.heuresSup/g.n,f:fmtH,u:'par semaine',d:g=>`${nf(pct(g.avecSup,g.n),0)} % des agents au-delà du seuil hebdomadaire`},
-  {k:'amp',l:'Amplitude d’une journée',v:g=>g.s.joursService?g.s.amplitudeTotale/g.s.joursService:null,f:fmtH,d:g=>`${fmtH(g.s.heuresPlanifiees/g.n)} planifiées par agent et par semaine`},
+  {k:'amp',l:'Amplitude d’une journée',v:g=>g.s.joursService?g.s.amplitudeTotale/g.s.joursService:null,f:fmtH,d:g=>`${fmtH(g.s.heuresPlanifiees/g.n)} de TTE par agent et par semaine`},
   {k:'nuit',l:'Part du travail de nuit',v:g=>pct(g.s.heuresNuit,g.s.heuresPlanifiees),f:v=>nf(v,1)+' %',d:g=>`${fmtH(g.s.heuresDimanche/g.n)} le dimanche par agent et par semaine`},
   {k:'pan',l:'Paniers repas',v:g=>g.s.joursService?g.s.nbPaniers/g.s.joursService:null,f:v=>nf(v,2),u:'par journée',d:g=>`${nf(pct(g.s.nbTrajetsSeuls,g.s.nbMissions),1)} % des missions sont des trajets seuls`},
 ];
@@ -2648,6 +3019,14 @@ function viewVitrine(){
     <div class="vh-p"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 3 3.7v4c0 3 2.2 5.4 5 6.5 2.8-1.1 5-3.5 5-6.5v-4L8 1.8Z"/><path d="m5.8 8 1.6 1.6L10.4 6.5"/></svg>
       Statistiques anonymes : aucun nom, aucun matricule ; chaque chiffre réunit au moins ${V.k} agents.</div>
   </section>
+  ${(()=>{ const P=[], rh=g.s.nbRHR/g.w, lastW=perW.filter(Boolean), l=lastW[lastW.length-1], pr=lastW[lastW.length-2];
+      P.push(`En moyenne <b>${nf(rh,1)} repos hors résidence par semaine</b>, d’une durée moyenne de ${VKPI[2].f(VKPI[2].v(g)||0)}.`);
+      if(vf.w==='__all__'&&l&&pr&&pr.s.nbRHR){ const d=100*(l.s.nbRHR-pr.s.nbRHR)/pr.s.nbRHR; P.push(`La dernière semaine en compte ${nf(l.s.nbRHR)}, soit ${d>=0?'+':''}${nf(d,0)} % par rapport à la précédente.`); }
+      const best=byAg.map(([ag,x])=>{const a=vAgg(x);return [ag,a.rhrApp?a.s.nbRHR/a.rhrApp:0];}).filter(x=>x[0]!=='Autres agences').sort((p,q)=>q[1]-p[1])[0];
+      if(best&&best[1]) P.push(`${esc(best[0])} a le plus de RHR par conducteur (${nf(best[1],2)} par semaine).`);
+      const pk=g.heat.presence.indexOf(Math.max(...g.heat.presence));
+      P.push(`L’activité culmine vers ${String(pk).padStart(2,'0')}h ; ${nf(VKPI[6].v(g)||0,0)} % du temps de travail se fait de nuit, et ${nf(VKPI[3].v(g)||0,1)} journées sur 100 sont blanches.`);
+      return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`; })()}
   <section class="card"><div class="card-b vfil">
     <label class="fld"><span class="flabel">Période</span><select id="vWeek"><option value="__all__">Toutes les semaines</option>${sem.slice().reverse().map(w=>`<option value="${w.weekId}"${vf.w===w.weekId?' selected':''}>${wl(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
     <div class="fld grow"><span class="flabel">Agences</span><div class="frow">${chips('vag',AG,vf.ags)}<button class="chip chip-mini ghost" data-vag="*">Toutes</button></div></div>
@@ -2658,6 +3037,10 @@ function viewVitrine(){
     <div class="seg">${HEAT.map(([k,l])=>`<button class="sg" data-vheat="${k}" aria-pressed="${HT===k}">${l}</button>`).join('')}</div></div>
     <div class="card-b"><div class="ch">Par agence</div>${heatmap(hRows,HU,hf)}
       ${HT==='presence'||HT==='prise'?`<div class="ch" style="margin-top:18px">Par jour de la semaine</div>${heatmap(dRows,pres?'agents en service en moyenne ce jour-là':HU,hf)}`:''}</div></section>
+  ${(()=>{ const fx=(V.flux||[]).filter(f=>vf.w==='__all__'||f.w===vf.w), E=new Map(), R=new Map(), RS=new Set();
+      for(const f of fx){ f.res.forEach(x=>RS.add(x)); for(const e of f.edges){const k=e.a+'|'+e.b; E.set(k,(E.get(k)||0)+e.n);} for(const r of f.rhr) R.set(r.l,(R.get(r.l)||0)+r.n); }
+      return `<section class="card"><div class="card-h"><div><h2>Carte des flux</h2><p class="card-s">lieux reliés par les missions · tout le réseau · seuls les trajets et lieux fréquentés par au moins ${V.k} agents différents sont montrés</p></div></div>
+      <div class="card-b">${fluxMap([...E].map(([k,n])=>{const [a,b]=k.split('|');return {a,b,n};}),[...R].map(([l,n])=>({l,n})),[...RS],{vide:'Aucun trajet assez fréquenté pour être publié.'})}</div></section>`; })()}
   <section class="card"><div class="card-h"><div><h2>Comparer les agences</h2><p class="card-s">indicateurs rapportés par semaine, par agent ou par journée · <span class="hi-k">plus haut</span> <span class="lo-k">plus bas</span></p></div></div>
     <div class="card-b"><div class="tw"><table class="cmp"><thead><tr><th class="l">Agence</th>${cmpK.map(k=>`<th>${esc(k.l)}${k.u?`<br><span class="nb">${k.u}</span>`:''}</th>`).join('')}</tr></thead><tbody>
       ${rowsA.map(r=>`<tr><td class="l nm">${esc(r.ag)}</td>${r.vals.map((v,i)=>{const [mn,mx]=ext[i];const c=v==null||mn===mx?'':v===mx?'hi':v===mn?'lo':'';return `<td class="${c}">${v==null?'<span class="z">—</span>':cmpK[i].f(v)}</td>`;}).join('')}</tr>`).join('')}
@@ -2666,11 +3049,207 @@ function viewVitrine(){
     <section class="card"><div class="card-h"><div><h2>Durée des repos hors résidence</h2><p class="card-s">tranches de l’accord d’entreprise (annexe 1)</p></div></div><div class="card-b">${histo(['8–12 h','12–24 h','24 h et plus'].map((l,i)=>({l,v:g.dist.rhrB[i]})),'RHR')}</div></section>
     <section class="card"><div class="card-h"><div><h2>RHR par conducteur et par semaine</h2><p class="card-s">part des semaines de conducteur</p></div></div><div class="card-b">${histo(['0','1','2','3','4 et +'].map((l,i)=>({l,v:g.dist.rhrN[i]})),'Semaines',v=>nf(v))}</div></section>
     <section class="card"><div class="card-h"><div><h2>Amplitude des journées de service</h2><p class="card-s">en ambre : au-delà de 11 h (maximum de l’accord, art. 12)</p></div></div><div class="card-b">${histo(['< 6 h','6–8 h','8–9 h','9–10 h','10–11 h','> 11 h'].map((l,i)=>({l,v:g.dist.amp[i],c:i===5?'var(--signal)':null})),'Journées')}</div></section>
-    <section class="card"><div class="card-h"><div><h2>Heures planifiées par semaine</h2><p class="card-s">semaines d’agent · en ambre : au-delà de ${nf(V.regles.seuilHebdo)} h</p></div></div><div class="card-b">${histo(['< 20 h','20–30 h','30–35 h','35–40 h','40–45 h','≥ 45 h'].map((l,i)=>({l,v:g.dist.hp[i],c:i>=3?'var(--signal)':null})),'Semaines')}</div></section>
+    <section class="card"><div class="card-h"><div><h2>TTE par semaine</h2><p class="card-s">semaines d’agent · en ambre : au-delà de ${nf(V.regles.seuilHebdo)} h</p></div></div><div class="card-b">${histo(['< 20 h','20–30 h','30–35 h','35–40 h','40–45 h','≥ 45 h'].map((l,i)=>({l,v:g.dist.hp[i],c:i>=3?'var(--signal)':null})),'Semaines')}</div></section>
   </div>
   ${series.length?`<section class="card"><div class="card-h"><div><h2>Repos hors résidence semaine après semaine</h2><p class="card-s">une courbe par agence</p></div></div>
     <div class="card-b">${lineChart(series,sem.map(w=>`S${String(w.week).padStart(2,'0')}`),v=>nf(v))}<div class="clg">${series.map(s=>`<span class="lg"><span class="cdot" style="background:${s.color}"></span>${esc(s.name)}</span>`).join('')}</div></div></section>`:''}
   <p class="vfoot">Sources : fichiers ARP « Récap National Corridor ». Règles de calcul : repos hors résidence à partir de ${nfa(V.regles.rhrMinHours)} h (accord d’entreprise, art. 18) ; journée blanche = case vide encadrée par deux services ; heures sup au-delà de ${nf(V.regles.seuilHebdo)} h par semaine. Les groupes de moins de ${V.k} agents sont regroupés${V.ecartes?` ou écartés (${nf(V.ecartes)} lignes d’agent-semaine non publiées)`:''}. Détail des méthodes : onglet « Guide de lecture ».</p>`;
+}
+
+/* ---------- 5 et 6. comparer : deux périodes, deux agences, deux agents ---------- */
+const CMP_MODES=[['periodes','Deux périodes'],['agences','Deux agences'],['agents','Deux agents']];
+function cmpTable(labA,labB,la,lb,mode){
+  return `<div class="tw tall"><table class="sticky1 cmp"><thead><tr><th class="l st">Mesure</th><th>${esc(labA)}</th><th>${esc(labB)}</th><th>Écart</th><th>Évolution</th></tr></thead><tbody>
+    ${FIELDS.map(f=>{ const a=statVal(la,f.k,mode), b=statVal(lb,f.k,mode), F=stFmt(f.k), d=a!=null&&b!=null?b-a:null, ev=d!=null&&a?100*d/a:null;
+      return `<tr><td class="l st">${esc(f.l)}</td><td>${F(a)}</td><td>${F(b)}</td>
+        <td>${d==null||!d?'<span class="z">—</span>':`<span class="${d>0?'up':'dn'}">${d>0?'+':'−'}${F(Math.abs(r2(d)))}</span>`}</td>
+        <td>${ev==null||!d?'<span class="z">—</span>':`<span class="${ev>0?'up':'dn'}">${ev>0?'▲ +':'▼ '}${nf(ev,1)} %</span>`}</td></tr>`;}).join('')}
+  </tbody></table></div>`;
+}
+function profilH(list){ const h=H24(); const nW=new Set(list.map(a=>a.weekId)).size||1;
+  for(const a of list) for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions) for(const [s0,s1] of workSegments(m)) for(let t=Math.floor(s0/H)*H;t<s1;t+=H) h[new Date(t).getUTCHours()]+=ovl(t,t+H,s0,s1)/H;
+  return h.map(x=>r2(x/(nW*7))); }
+function viewComparer(){
+  if(!S.weeks.length) return emptyScope();
+  const c=S.cmp, ids=S.weeks.map(w=>w.weekId).sort(), W=id=>S.weeks.find(w=>w.weekId===id);
+  const wOpt=(sel)=>ids.map(id=>`<option value="${id}"${sel===id?' selected':''}>${weekLabel(W(id))} · ${weekRange(W(id))}</option>`).join('');
+  const seg=`<div class="seg">${CMP_MODES.map(([k,l])=>`<button class="sg" data-cmpm="${k}" aria-pressed="${c.mode===k}">${l}</button>`).join('')}</div>`;
+  const modeSel=`<div class="seg">${ST_MODES.map(([k,l])=>`<button class="sg" data-cmpv="${k}" aria-pressed="${c.val===k}">${l}</button>`).join('')}</div>`;
+  const all=scopeAgents({allWeeks:true});
+  let body='', ctrls='';
+  if(c.mode==='periodes'){
+    const last=ids[ids.length-1], prev=ids[ids.length-2]||last;
+    c.a0=c.a0&&ids.includes(c.a0)?c.a0:prev; c.a1=c.a1&&ids.includes(c.a1)?c.a1:prev; c.b0=c.b0&&ids.includes(c.b0)?c.b0:last; c.b1=c.b1&&ids.includes(c.b1)?c.b1:last;
+    const inR=(id,x,y)=>id>=(x<y?x:y)&&id<=(x<y?y:x);
+    const la=all.filter(a=>inR(a.weekId,c.a0,c.a1)), lb=all.filter(a=>inR(a.weekId,c.b0,c.b1));
+    const lab=(x,y)=>x===y?weekLabel(W(x)):`${weekLabel(W(x<y?x:y))} → ${weekLabel(W(x<y?y:x))}`;
+    ctrls=`<div class="fld"><span class="flabel">Période A : du</span><select data-cmpf="a0">${wOpt(c.a0)}</select></div><div class="fld"><span class="flabel">au</span><select data-cmpf="a1">${wOpt(c.a1)}</select></div>
+      <div class="fld"><span class="flabel">Période B : du</span><select data-cmpf="b0">${wOpt(c.b0)}</select></div><div class="fld"><span class="flabel">au</span><select data-cmpf="b1">${wOpt(c.b1)}</select></div>`;
+    body=`<section class="card"><div class="card-h"><div><h2>${esc(lab(c.a0,c.a1))} comparée à ${esc(lab(c.b0,c.b1))}</h2><p class="card-s">périmètre d’agences et de métiers sélectionné · ${nf(new Set(la.map(a=>a.weekId)).size)} et ${nf(new Set(lb.map(a=>a.weekId)).size)} semaine(s)</p></div></div>
+      <div class="card-b">${la.length&&lb.length?cmpTable(lab(c.a0,c.a1),lab(c.b0,c.b1),la,lb,c.val):'<p class="mut">Une des deux périodes est vide sur ce périmètre.</p>'}</div></section>`;
+  } else if(c.mode==='agences'){
+    const ags=[...new Set(all.map(a=>a.agence))].sort();
+    c.gA=ags.includes(c.gA)?c.gA:ags[0]; c.gB=ags.includes(c.gB)&&c.gB!==c.gA?c.gB:(ags.find(x=>x!==c.gA)||ags[0]);
+    const act=new Set(activeWeeks()), la=all.filter(a=>a.agence===c.gA&&act.has(a.weekId)), lb=all.filter(a=>a.agence===c.gB&&act.has(a.weekId));
+    const o=v=>ags.map(a=>`<option${a===v?' selected':''}>${esc(a)}</option>`).join('');
+    ctrls=`<div class="fld"><span class="flabel">Agence A</span><select data-cmpf="gA">${o(c.gA)}</select></div><div class="fld"><span class="flabel">Agence B</span><select data-cmpf="gB">${o(c.gB)}</select></div>`;
+    const hA=profilH(la), hB=profilH(lb);
+    body=`<section class="card"><div class="card-h"><div><h2>${esc(c.gA)} et ${esc(c.gB)}</h2><p class="card-s">semaine(s) sélectionnée(s) en haut · les moyennes rendent comparables deux agences de tailles différentes</p></div></div>
+      <div class="card-b">${cmpTable(c.gA,c.gB,la,lb,c.val)}</div></section>
+      <section class="card"><div class="card-h"><div><h2>Profil horaire</h2><p class="card-s">agents en service en moyenne, heure par heure, jour moyen</p></div></div>
+      <div class="card-b">${lineChart([{name:c.gA,short:c.gA.slice(0,10),color:'var(--s1)',values:hA},{name:c.gB,short:c.gB.slice(0,10),color:'var(--s2)',values:hB}],Array.from({length:24},(_,h)=>String(h).padStart(2,'0')+'h'),v=>nf(v,1))}
+        <div class="clg"><span class="lg"><span class="cdot" style="background:var(--s1)"></span>${esc(c.gA)}</span><span class="lg"><span class="cdot" style="background:var(--s2)"></span>${esc(c.gB)}</span></div></div></section>`;
+  } else {
+    const ps=mergeAcrossWeeks(all).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')), pk=personKey;
+    c.pA=ps.some(p=>pk(p)===c.pA)?c.pA:(ps[0]&&pk(ps[0])); c.pB=ps.some(p=>pk(p)===c.pB)&&c.pB!==c.pA?c.pB:(ps[1]&&pk(ps[1]));
+    const A=ps.find(p=>pk(p)===c.pA), B=ps.find(p=>pk(p)===c.pB);
+    const wks=[...new Set([...(A?A.parSemaine:[]),...(B?B.parSemaine:[])].map(x=>x.weekId))].sort();
+    c.wk=wks.includes(c.wk)?c.wk:wks[wks.length-1];
+    const o=v=>ps.map(p=>`<option value="${esc(pk(p))}"${pk(p)===v?' selected':''}>${esc(p.nom)} ${esc(p.prenom)} · ${esc(p.agence)}</option>`).join('');
+    ctrls=`<div class="fld"><span class="flabel">Agent A</span><select data-cmpf="pA" style="max-width:260px">${o(c.pA)}</select></div><div class="fld"><span class="flabel">Agent B</span><select data-cmpf="pB" style="max-width:260px">${o(c.pB)}</select></div>
+      <div class="fld"><span class="flabel">Semaine</span><select data-cmpf="wk">${wks.map(id=>`<option value="${id}"${id===c.wk?' selected':''}>${weekLabel(W(id))}</option>`).join('')}</select></div>`;
+    const wa=A&&A.parSemaine.find(x=>x.weekId===c.wk), wb=B&&B.parSemaine.find(x=>x.weekId===c.wk);
+    const card=(p,x)=>`<section class="card"><div class="card-h"><div><h2>${p?`${esc(p.nom)} ${esc(p.prenom)}`:'—'}</h2><p class="card-s">${p?`${esc(p.agence)} · ${esc(p.metier)}`:''}${x?` · ${fmtH(x.heuresPlanifiees)} de TTE · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.journeesBlanches} journée(s) blanche(s)`:' · absent cette semaine'}</p></div></div>
+      <div class="card-b">${x?weekTimeline(x):'<p class="mut">Pas de ligne pour cet agent cette semaine.</p>'}</div></section>`;
+    body=`${card(A,wa)}${card(B,wb)}<div style="margin-top:-6px">${legendTimeline()}</div>
+      <section class="card"><div class="card-h"><div><h2>Chiffres de la semaine</h2></div></div><div class="card-b">${wa&&wb?cmpTable(`${A.nom} ${A.prenom}`,`${B.nom} ${B.prenom}`,[wa],[wb],'total'):'<p class="mut">Les deux agents doivent être présents cette semaine.</p>'}</div></section>`;
+  }
+  return `<section class="card"><div class="card-b"><div class="ctrls" style="margin-bottom:0;border-bottom:0;padding-bottom:0">
+    <div class="fld"><span class="flabel">Comparer</span>${seg}</div>${ctrls}${c.mode!=='agents'?`<div class="fld"><span class="flabel">Valeur</span>${modeSel}</div>`:''}</div></div></section>${body}`;
+}
+
+/* ---------- 13. export détaillé : une ligne par RHR, par arrêt, par case vide, par mission ---------- */
+function detailSheets(){
+  const sc=scopeAgents().slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr')||String(a.weekId).localeCompare(String(b.weekId)));
+  const id=a=>[a.matricule,a.nom,a.prenom,a.agence,a.metier,String(a.weekId).replace(/^\d+-/,'')];
+  const idc=[{t:'Matricule',w:10},{t:'Nom',w:18},{t:'Prénom',w:13},{t:'Agence',w:18},{t:'Métier',w:12},{t:'Semaine',w:8}];
+  const d=s=>s?dtISO(s)+' '+new Date(s).getUTCFullYear():'';
+  const ST={rhr:'RHR',force:'RHR (corrigé)',lien:'RHR (missions liées)',ouvert:'RHR ouvert',residence:'à la résidence',court:'trop court',repos:'repos pendant l’arrêt',ecarte:'écarté (corrigé)'};
+  const rhr=[], arr=[], vides=[], mis=[];
+  for(const a of sc){
+    for(const x of a.rhr) rhr.push([...id(a),a.residence||'',x.lieu,d(x.debut),d(x.fin),x.dureeH,x.nuits,x.dureeH==null?'':x.dureeH<12?'8–12 h':x.dureeH<24?'12–24 h':'24 h et plus',x.aller,x.retour||'',x.manuel?'oui':'']);
+    for(const c of a.coupures||[]) arr.push([...id(a),c.lieu||'',d(c.debut),d(c.fin),c.dureeH,ST[c.statut]||c.statut,c.compte?'oui':'non',c.long?'oui':'',c.aller,c.retour||'',c.manuel?'oui':'']);
+    for(const c of a.casesVides||[]) vides.push([...id(a),`${JN[c.d]} ${dFull(c.date)}`,c.compte?'oui':'non',c.raison||'',c.avant?`${c.avant.label} (fin ${d(c.avant.end)})`:'',c.apres?`${c.apres.label} (début ${d(c.apres.start)})`:'',c.horsResidence?'oui':'',c.manuel?'oui':'']);
+    for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions)
+      mis.push([...id(a),`${JN[j.d]} ${dFull(j.date)}`,m.label,m.note||'',missionType(m.label),m.from||'',m.to||'',d(m.start),d(m.end),m.amplitude,m.pauseMin,/ATCMD/i.test(m.label)?S.rules.heuresATCMD:m.travail]);
+  }
+  return [
+    {name:'RHR',cols:[...idc,{t:'Résidence',w:10},{t:'Lieu',w:10},{t:'Fin de mission',w:17},{t:'Reprise',w:17},{t:'Durée (h)',w:9,fmt:'dec'},{t:'Nuits',w:6,fmt:'int'},{t:'Tranche (annexe 1)',w:12},{t:'Mission aller',w:16},{t:'Mission retour',w:16},{t:'Corrigé',w:8}],rows:rhr},
+    {name:'Arrêts',cols:[...idc,{t:'Lieu',w:10},{t:'Fin de mission',w:17},{t:'Reprise',w:17},{t:'Durée (h)',w:9,fmt:'dec'},{t:'Statut',w:18},{t:'Compté en RHR',w:10},{t:'Plus de 44 h',w:9},{t:'Mission aller',w:16},{t:'Mission retour',w:16},{t:'Corrigé',w:8}],rows:arr},
+    {name:'Cases vides',cols:[...idc,{t:'Jour',w:18},{t:'Journée blanche',w:10},{t:'Motif',w:36},{t:'Mission avant',w:30},{t:'Mission après',w:30},{t:'Hors résidence',w:9},{t:'Corrigé',w:8}],rows:vides},
+    {name:'Missions',cols:[...idc,{t:'Jour',w:18},{t:'Intitulé',w:18},{t:'Note',w:12},{t:'Type',w:10},{t:'Départ',w:10},{t:'Arrivée',w:10},{t:'Début',w:17},{t:'Fin',w:17},{t:'Amplitude (h)',w:10,fmt:'dec'},{t:'Pauses (min)',w:9,fmt:'int'},{t:'TTE (h)',w:9,fmt:'dec'}],rows:mis},
+  ];
+}
+/* ---------- 15. une carte de la page en image PNG ---------- */
+async function nodeToPng(node,scale=2){
+  const z=parseFloat(getComputedStyle(node).zoom)||1;   // les diapositives sont affichées réduites : l'image, elle, est en taille réelle
+  const w=Math.round(node.getBoundingClientRect().width/z), h=Math.round(node.getBoundingClientRect().height/z), cs=getComputedStyle(document.documentElement);
+  const q=v=>String(v).replace(/"/g,"'");   // valeurs placées dans un attribut style="…"
+  const vars=[...cs].filter(p=>p.startsWith('--')).map(p=>`${p}:${q(cs.getPropertyValue(p))}`).join(';');
+  const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const clone=node.cloneNode(true); clone.querySelectorAll('.pngb,button[data-png]').forEach(b=>b.remove());
+  clone.style.margin='0'; clone.style.width=w+'px'; clone.style.zoom='1';
+  const html=`<div xmlns="http://www.w3.org/1999/xhtml" style="${vars};background:${getComputedStyle(document.body).backgroundColor};color:${cs.getPropertyValue('--ink')};font-family:${q(getComputedStyle(document.body).fontFamily)};font-size:14px;line-height:1.5;padding:0"><style>${css}
+*,*::before,*::after{animation:none!important;transition:none!important}</style>${new XMLSerializer().serializeToString(clone)}</div>`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+  const img=new Image(); img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); await img.decode();
+  const c=document.createElement('canvas'); c.width=Math.round(w*scale); c.height=Math.round(h*scale);
+  const x=c.getContext('2d'); x.fillStyle=getComputedStyle(document.body).backgroundColor; x.fillRect(0,0,c.width,c.height); x.scale(scale,scale); x.drawImage(img,0,0);
+  const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+async function pngCard(btn){
+  const card=btn.closest('section.card,.vhero,.kpis,.vkpis'); if(!card) return;
+  const title=(card.querySelector('h2')?.textContent||'carte').trim();
+  try{ dl(`recap-corridor-${slug(title).slice(0,40)}.png`,await nodeToPng(card),'image/png'); }
+  catch(e){ S.msg={m:'Image impossible dans ce navigateur (utilisez Edge ou Chrome) : '+(e.message||e),t:'w'}; render(); }
+}
+/** Bouton « Image » ajouté aux cartes des onglets de lecture */
+function addPngButtons(v){
+  if(!['synthese','stats','vitrine','graphiques','comparer','rhr','blanches'].includes(S.tab)) return;
+  v.querySelectorAll('section.card>.card-h').forEach(h=>{ if(h.querySelector('.pngb')) return;
+    const b=document.createElement('button'); b.className='btn btn-sm pngb'; b.dataset.png='1'; b.title='Télécharger cette carte en image PNG'; b.textContent='Image'; h.appendChild(b); });
+}
+/* ---------- 12. présentation de réunion : diapositives anonymes, en PDF (impression) ou PowerPoint ---------- */
+function slidesHTML(){
+  const sc=scopeAgents(); if(!sc.length) return [];
+  const g=agg(sc), ids=[...new Set(sc.map(a=>a.weekId))].sort(), W=id=>S.weeks.find(w=>w.weekId===id);
+  const per=ids.length===1?`${weekLabel(W(ids[0]))} · du ${dFull(W(ids[0]).monday)} au ${dFull(W(ids[0]).sunday)}`:`${ids.length} semaines · du ${dFull(W(ids[0]).monday)} au ${dFull(W(ids[ids.length-1]).sunday)}`;
+  const peri=`${esc(scopeAgences().length===allAgences().length?'Toutes les agences':scopeAgences().join(', '))} · ${esc(scopeMetiers().join(', '))}`;
+  const S_=(t,body,sub)=>`<div class="sl"><div class="sl-h"><span class="sl-k">Récap Corridor</span><h2>${t}</h2>${sub?`<p>${sub}</p>`:''}</div><div class="sl-b">${body}</div><div class="sl-f">${esc(per)} · données anonymes</div></div>`;
+  const kp=(l,v,n)=>`<div class="kpi"><div class="k">${l}</div><div class="v">${v}</div><div class="n">${n||''}</div></div>`;
+  const cdr=sc.filter(a=>a.rhrApplicable), byAg=[...groupBy(cdr,a=>a.agence)].map(([l,x])=>{const q=agg(x);return {l,v:q.nbRHR,sub:nf(q.nbRHR_moy,2),sub2:'par conducteur concerné'};}).sort((a,b)=>b.v-a.v);
+  const jbAg=[...groupBy(sc,a=>a.agence)].map(([l,x])=>({l,v:agg(x).journeesBlanches})).sort((a,b)=>b.v-a.v);
+  const supAg=[...groupBy(sc,a=>a.agence)].map(([l,x])=>{const q=agg(x);return {l,v:q.heuresSup};}).sort((a,b)=>b.v-a.v);
+  const hg=new Map(); for(const a of sc){ if(!hg.has(a.agence)) hg.set(a.agence,H24()); const r=hg.get(a.agence);
+    for(const j of a.jours) if(j.kind==='SERVICE') for(const m of j.missions) for(const [s0,s1] of workSegments(m)) for(let t=Math.floor(s0/H)*H;t<s1;t+=H) r[new Date(t).getUTCHours()]+=ovl(t,t+H,s0,s1)/H; }
+  const hRows=[...hg].sort((a,b)=>a[0].localeCompare(b[0])).map(([l,v])=>({l,v:v.map(x=>r2(x/(ids.length*7)))}));
+  const allW=S.weeks.map(w=>w.weekId).sort(), allR=scopeAgents({allWeeks:true});
+  const evo=[['RHR','nbRHR','var(--s1)'],['Journées blanches','journeesBlanches','var(--s2)']].map(([n,k,c])=>({name:n,short:n,color:c,values:allW.map(id=>{const l=allR.filter(a=>a.weekId===id);return l.length?agg(l)[k]:null;})}));
+  const al=collectAlertes(), alT=[...groupBy(al.filter(ST_AL.a_traiter[1]),a=>a.type)].map(([k,l])=>({l:AL_TYPES[k],v:l.length})).sort((a,b)=>b.v-a.v);
+  const txt=enBref().replace(/<a [^>]*>|<\/a>/g,'').replace(/<section[^>]*><div[^>]*><span[^>]*>En bref<\/span>/,'').replace(/<\/div><\/section>$/,'');
+  return [
+    `<div class="sl sl-t"><div><span class="sl-k">Récap Corridor · réunion</span><h1>Activité, repos et temps de travail</h1><p>${esc(per)}</p><p class="sl-s">${peri}</p></div><div class="sl-f">Édité le ${dFull(new Date().toISOString())} · statistiques sans nom ni matricule</div></div>`,
+    S_('En bref',`<div class="sl-txt">${txt}</div><div class="kpis sl-k4">${kp('Agents',nf(g.nbAgents),nf(g.joursService)+' jours de service')}${kp('Repos hors résidence',nf(g.nbRHR),nf(g.agentsAvecRHR)+' agents')}${kp('Journées blanches',nf(g.journeesBlanches),nf(g.agentsAvecBlanche)+' agents')}${kp('Heures sup',fmtH(g.heuresSup),nf(g.agentsHeuresSup)+' agents')}${kp('TTE',fmtH(g.heuresPlanifiees),'temps de travail effectif')}${kp('Heures de nuit',fmtH(g.heuresNuit),nf(100*g.heuresNuit/(g.heuresPlanifiees||1),0)+' % du TTE')}${kp('Amplitude / jour',fmtH(g.amplitudeParJour),'')}${kp('Paniers',nf(g.nbPaniers),nf(g.ratioPanierJS,2)+' par journée')}</div>`),
+    S_('Repos hors résidence',`<div class="sl-2"><div><div class="ch">Par agence</div>${barChart(byAg.slice(0,10),{label:'RHR'})}</div><div><div class="ch">Par tranche de l’accord (annexe 1)</div>${histo([['8–12 h','rhr8_12'],['12–24 h','rhr12_24'],['24 h et plus','rhr24']].map(([l,k])=>({l,v:g[k]})),'RHR')}</div></div>`,`${nf(g.nbRHR)} RHR · ${fmtH(g.rhrHeures)} hors résidence · ${nf(g.rhrSuccessifs)} RHR successifs`),
+    S_('Journées blanches et heures sup',`<div class="sl-2"><div><div class="ch">Journées blanches par agence</div>${barChart(jbAg.slice(0,10),{label:'Journées blanches'})}</div><div><div class="ch">Heures sup par agence</div>${barChart(supAg.slice(0,10),{label:'Heures sup',fmt:fmtH})}</div></div>`),
+    S_('Quand le corridor travaille',heatmap(hRows,'agents en service en moyenne (jour moyen)',v=>nf(v,v<10?1:0)),'agents en service, heure par heure, par agence'),
+    ...(allW.length>1?[S_('Évolution semaine après semaine',lineChart(evo,allW.map(id=>`S${String(W(id).week).padStart(2,'0')}`),v=>nf(v))+`<div class="clg">${evo.map(s=>`<span class="lg"><span class="cdot" style="background:${s.color}"></span>${s.name}</span>`).join('')}</div>`,'toutes les semaines enregistrées, périmètre sélectionné')]:[]),
+    S_('Points à vérifier',alT.length?barChart(alT,{label:'Alertes à traiter'}):'<p>Aucune alerte en attente.</p>','alertes non traitées, par type — le détail nominatif reste dans l’outil'),
+  ];
+}
+function openSlides(){
+  const sl=slidesHTML(); if(!sl.length){ S.msg={m:'Aucune donnée sur ce périmètre.',t:'w'}; render(); return; }
+  document.querySelector('.ov.pres')?.remove();
+  const d=document.createElement('div'); d.className='ov pres';
+  d.innerHTML=`<div class="pres-b"><div class="pres-t"><div><b>Présentation de réunion</b> <span class="mut">· ${sl.length} diapositives · sans nom ni matricule · périmètre et semaines sélectionnés</span></div>
+    <div class="btns"><button class="btn btn-pri" id="slPdf">Imprimer / PDF</button><button class="btn btn-pri" id="slPptx">PowerPoint (.pptx)</button><button class="btn" id="slX">Fermer</button></div></div>
+    <div class="pres-l" id="slides">${sl.join('')}</div></div>`;
+  document.body.appendChild(d); document.body.classList.add('presenting');
+}
+function closeSlides(){ document.querySelector('.ov.pres')?.remove(); document.body.classList.remove('presenting'); }
+/** PowerPoint minimal : une image pleine page par diapositive (16:9) */
+async function exportPptx(){
+  const nodes=[...document.querySelectorAll('#slides .sl')]; if(!nodes.length) return;
+  S.msg={m:'Préparation du PowerPoint…'}; renderToasts();
+  const imgs=[]; for(const n of nodes) imgs.push(await nodeToPng(n,1.5));
+  const E=te.encode.bind(te), cx=12192000, cy=6858000, X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+  const REL='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const spTree=inner=>`<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${inner}</p:spTree></p:cSld>`;
+  const files=[
+    {name:'[Content_Types].xml',data:E(X+`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>${imgs.map((_,i)=>`<Override PartName="/ppt/slides/slide${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join('')}</Types>`)},
+    {name:'_rels/.rels',data:E(X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="ppt/presentation.xml"/></Relationships>`)},
+    {name:'ppt/presentation.xml',data:E(X+`<p:presentation ${NS} saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${imgs.map((_,i)=>`<p:sldId id="${256+i}" r:id="rId${i+3}"/>`).join('')}</p:sldIdLst><p:sldSz cx="${cx}" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`)},
+    {name:'ppt/_rels/presentation.xml.rels',data:E(X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId2" Type="${REL}/theme" Target="theme/theme1.xml"/>${imgs.map((_,i)=>`<Relationship Id="rId${i+3}" Type="${REL}/slide" Target="slides/slide${i+1}.xml"/>`).join('')}</Relationships>`)},
+    {name:'ppt/slideMasters/slideMaster1.xml',data:E(X+`<p:sldMaster ${NS}>${spTree('')}<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst></p:sldMaster>`)},
+    {name:'ppt/slideMasters/_rels/slideMaster1.xml.rels',data:E(X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="${REL}/theme" Target="../theme/theme1.xml"/></Relationships>`)},
+    {name:'ppt/slideLayouts/slideLayout1.xml',data:E(X+`<p:sldLayout ${NS} type="blank" preserve="1">${spTree('')}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`)},
+    {name:'ppt/slideLayouts/_rels/slideLayout1.xml.rels',data:E(X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>`)},
+    {name:'ppt/theme/theme1.xml',data:E(X+`<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Recap"><a:themeElements><a:clrScheme name="Recap"><a:dk1><a:srgbClr val="0E1826"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="175E82"/></a:dk2><a:lt2><a:srgbClr val="EDF0F4"/></a:lt2><a:accent1><a:srgbClr val="175E82"/></a:accent1><a:accent2><a:srgbClr val="F2B233"/></a:accent2><a:accent3><a:srgbClr val="2A78D6"/></a:accent3><a:accent4><a:srgbClr val="EB6834"/></a:accent4><a:accent5><a:srgbClr val="1BAF7A"/></a:accent5><a:accent6><a:srgbClr val="4A3AA7"/></a:accent6><a:hlink><a:srgbClr val="175E82"/></a:hlink><a:folHlink><a:srgbClr val="0E4460"/></a:folHlink></a:clrScheme><a:fontScheme name="Recap"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Recap"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`)},
+  ];
+  imgs.forEach((png,i)=>{
+    files.push({name:`ppt/media/image${i+1}.png`,data:png});
+    files.push({name:`ppt/slides/_rels/slide${i+1}.xml.rels`,data:E(X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="${REL}/image" Target="../media/image${i+1}.png"/></Relationships>`)});
+    files.push({name:`ppt/slides/slide${i+1}.xml`,data:E(X+`<p:sld ${NS}>${spTree(`<p:pic><p:nvPicPr><p:cNvPr id="2" name="Diapositive ${i+1}" descr="Récap Corridor, diapositive ${i+1}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`)}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`)});
+  });
+  dl(`recap-corridor-reunion-${scopeTag()}.pptx`,zipFiles(files),'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+  S.msg=null; renderToasts();
+}
+/* ---------- 14. rapport de la semaine : lien vers la vitrine et message prêt à envoyer ---------- */
+function rapportCard(){
+  if(!admin()||!S.weeks.length) return '';
+  const ids=S.weeks.map(w=>w.weekId).sort().reverse(), w=S.rapW&&ids.includes(S.rapW)?S.rapW:ids[0], W=S.weeks.find(x=>x.weekId===w);
+  const url=`${location.origin}${location.pathname}?semaine=${w}`;
+  const l=[...S.loaded.values()].find(v=>v.meta.weekId===w), g=l?agg(l.agents):null;
+  const msg=`Bonjour,\n\nLe récapitulatif du corridor pour la ${weekLabel(W)} (du ${dFull(W.monday)} au ${dFull(W.sunday)}) est disponible :\n${url}\n\n${g?`En bref : ${nf(g.nbAgents)} agents, ${nf(g.nbRHR)} repos hors résidence, ${nf(g.journeesBlanches)} journées blanches, ${fmtH(g.heuresSup)} d’heures sup.\n\n`:''}Accès avec le code visiteur : statistiques anonymes, sans nom ni matricule.\n`;
+  S.rapMsg=msg; S.rapUrl=url;
+  return `<section class="card"><div class="card-h"><div><h2>Rapport de la semaine à diffuser</h2><p class="card-s">préparé automatiquement après chaque import · le lien ouvre la Vitrine anonyme sur la semaine choisie</p></div>
+    <label class="fld"><span class="flabel">Semaine</span><select id="rapW">${ids.map(id=>`<option value="${id}"${id===w?' selected':''}>${weekLabel(S.weeks.find(x=>x.weekId===id))}</option>`).join('')}</select></label></div>
+    <div class="card-b stack" style="padding-top:0;gap:10px"><div class="row"><div class="rl"><div class="rt mono" style="font-size:12.5px;word-break:break-all">${esc(url)}</div><div class="rs">lien à partager avec le code visiteur</div></div>
+      <div class="ract"><button class="btn btn-sm" id="rapCopy">Copier le lien</button><button class="btn btn-sm" id="rapMsg">Copier le message</button>
+      <a class="btn btn-sm btn-pri" href="mailto:?subject=${encodeURIComponent('Récap Corridor — '+weekLabel(W))}&body=${encodeURIComponent(msg)}">Écrire le courriel</a></div></div>
+      <pre class="rap">${esc(msg)}</pre></div></section>`;
 }
 
 /* ---------- exports ---------- */
@@ -2712,7 +3291,7 @@ function tables(){
       {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},{t:'Journées blanches',w:12,fmt:'int'},
       {t:'J. blanches / agent',w:12,fmt:'dec'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'MHIS',w:7,fmt:'int'},
       {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},{t:'Amplitude / agent (h)',w:13,fmt:'dec'},
-      {t:'Amplitude / jour (h)',w:13,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},
+      {t:'Amplitude / jour (h)',w:13,fmt:'dec'},{t:'TTE — temps de travail effectif (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},
       {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
       {t:'Panier / JS',w:9,fmt:'dec'},{t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
       {t:'Jours de week-end',w:11,fmt:'int'}],rows:synth},
@@ -2722,7 +3301,7 @@ function tables(){
       {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'RHR',w:7,fmt:'int'},{t:'RHR en cours',w:10,fmt:'int'},
       {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},{t:'Lieux de RHR',w:14},
       {t:'Journées blanches',w:12,fmt:'int'},{t:'Amplitude (h)',w:11,fmt:'dec'},{t:'Amplitude moyenne (h)',w:13,fmt:'dec'},
-      {t:'Amplitude max (h)',w:12,fmt:'dec'},{t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Pauses (min)',w:10,fmt:'int'},
+      {t:'Amplitude max (h)',w:12,fmt:'dec'},{t:'TTE — temps de travail effectif (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Pauses (min)',w:10,fmt:'int'},
       {t:'Heures de nuit hors pauses (h)',w:14,fmt:'dec'},{t:'Heures du dimanche (h)',w:13,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},{t:'Panier / JS',w:9,fmt:'dec'},
       {t:'Prise la plus tôt',w:11},{t:'Fin la plus tard',w:11},
       {t:'Jours de week-end',w:11,fmt:'int'},{t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'},{t:'Absences',w:9,fmt:'int'},
@@ -2740,7 +3319,7 @@ function tables(){
       {t:'Semaine',w:11},{t:'Lundi',w:11},{t:'Dimanche',w:11},{t:'Agents',w:8,fmt:'int'},{t:'Jours de service',w:11,fmt:'int'},
       {t:'RHR',w:7,fmt:'int'},{t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},
       {t:'Journées blanches',w:12,fmt:'int'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'Amplitude (h)',w:12,fmt:'dec'},
-      {t:'Heures planifiées (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Heures de nuit (h)',w:12,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
+      {t:'TTE — temps de travail effectif (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Heures de nuit (h)',w:12,fmt:'dec'},{t:'Paniers',w:9,fmt:'int'},
       {t:'Repos (RP RF JF RCL RCC)',w:12,fmt:'int'},{t:'Congés (CP CPAT CFAM CSS)',w:12,fmt:'int'}],rows:hist},
   };
 }
@@ -2762,6 +3341,7 @@ const scopeTag=()=>{
   return w+a;
 };
 function exportXlsx(which){
+  if(which==='detail'){ dl(`recap-corridor-detail-${scopeTag()}.xlsx`,buildXlsx(detailSheets()),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); return; }
   const t=tables();
   const sheets=(which==='tout'?['synthese','agents','rhr','blanches','historique']:[which]).map(k=>t[k]);
   dl(`recap-corridor-${which}-${scopeTag()}.xlsx`, buildXlsx(sheets),
@@ -2784,10 +3364,11 @@ function viewExports(){
     {k:'rhr',n:'RHR par agent',d:'Une ligne par agent ayant eu au moins un RHR : nombre, temps en RHR, temps moyen, temps par semaine, lieux, DISPO, ATCMD, heures sup.',c:t.rhr.rows.length},
     {k:'blanches',n:'Journées blanches',d:'Une ligne par agent concerné, avec la liste des dates.',c:t.blanches.rows.length},
     {k:'historique',n:'Historique par semaine',d:'Une ligne par semaine enregistrée, pour suivre la tendance.',c:t.historique.rows.length},
+    {k:'detail',n:'Détail pour vérification',d:'Quatre feuilles : une ligne par RHR, par arrêt entre deux missions (avec son statut), par case vide (journée blanche ou motif) et par mission (horaires, pauses, TTE).',c:sc.reduce((n,a)=>n+a.nbMissions,0)},
   ];
   return `<section class="card"><div class="card-h"><div><h2>Exports</h2>
     <p class="card-s">le périmètre sélectionné s'applique — ${nf(new Set(sc.map(personKey)).size)} agent${sc.length>1?'s':''}</p></div>
-    <button class="btn btn-sm" id="btnPrint">Version imprimable</button></div>
+    <div class="btns"><button class="btn btn-sm btn-pri" id="btnSlides">Présentation de réunion</button><button class="btn btn-sm" id="btnPrint">Version imprimable</button></div></div>
     <div class="card-b stack" style="padding-top:0">
       <div class="row" style="background:var(--accent-soft);border-color:var(--accent-line)">
         <div class="rl"><div class="rt">Rapport autonome à diffuser</div>
@@ -2797,8 +3378,8 @@ function viewExports(){
       <div class="rows">${items.map(i=>`<div class="row">
         <div class="rl"><div class="rt">${i.n}</div><div class="rs">${i.d} — ${nf(i.c)} ligne${i.c>1?'s':''}</div></div>
         <div class="ract"><button class="btn btn-sm btn-pri" data-xlsx="${i.k}">Excel</button>
-          ${i.k!=='tout'?`<button class="btn btn-sm" data-csv="${i.k}">CSV</button>`:''}</div></div>`).join('')}</div>
-    </div></section>`;
+          ${i.k!=='tout'&&i.k!=='detail'?`<button class="btn btn-sm" data-csv="${i.k}">CSV</button>`:''}</div></div>`).join('')}</div>
+    </div></section>`+rapportCard();
 }
 
 /* ---------- import multiple ---------- */
@@ -2855,6 +3436,7 @@ function queueView(){
         <div class="rs">${q.view
           ? `${esc(q.name)} · ${taille(q.size)} · ${dFull(q.view.meta.monday)} → ${dFull(q.view.meta.sunday)} · ${nf(q.view.agents.length)} agents${q.view.meta.fusions?` (${q.view.meta.fusions} en double, fusionnés)`:''} · ${nf(q.stats.nbRHR)} RHR · ${nf(q.stats.journeesBlanches)} journées blanches · ${fmtH(q.stats.heuresSup)} d'heures sup${q.anom?` · ${q.anom} cellule${q.anom>1?'s':''} illisible${q.anom>1?'s':''}`:''}`
           : esc(q.err||q.name)}</div>
+          ${q.susp&&q.susp.length?`<div class="note w" style="margin-top:8px"><b>Fichier à vérifier</b> par rapport à la semaine précédente : ${q.susp.map(esc).join(' · ')}</div>`:''}
           ${q.parsed?`<div style="margin-top:6px">${gauge(controleOf(q.parsed))}</div>${q.parsed.anomalies.length?anomList(q.parsed.anomalies):''}${q.view.meta.horsColonne.length?`<details class="qd" style="margin-top:6px"><summary>Voir les ${q.view.meta.horsColonne.length} mission${q.view.meta.horsColonne.length>1?'s':''} hors colonne</summary><ul>${q.view.meta.horsColonne.slice(0,200).map(h=>`<li><b>${esc(h.agent)}</b> · ${esc(h.jour)} — ${esc(h.label)} du ${dtISO(h.start)}</li>`).join('')}</ul></details>`:''}`:''}</div>
         <div class="ract">${s!=='enregistre'?`<button class="btn btn-sm" data-qdel="${i}">Retirer</button>`:''}</div></div>`;}).join('')}</div>
     ${ok?`<div><button class="btn btn-pri" id="saveAll"${S.busy?' disabled':''}>${S.busy?'Enregistrement…':`Enregistrer ${ok} semaine${ok>1?'s':''}`}</button>
@@ -2931,7 +3513,7 @@ function viewReglages(){
           <span><span class="rn">Un jour de repos ou d'absence interrompt le repos hors résidence</span>
           <span class="rd">Un arrêt qui contient un RP, RF, JF, congé ou tout autre code n'est pas un RHR : le repos périodique comprend le repos journalier à résidence (art. 19).</span></span></label>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures supplémentaires et ATCMD</span>
-          <span class="rd">Heures sup : heures planifiées hors pauses au-delà du seuil, par agent et par semaine. Une ATCMD compte pour un nombre d'heures fixe.</span>
+          <span class="rd">Heures sup : TTE hors pauses au-delà du seuil, par agent et par semaine. Une ATCMD compte pour un nombre d'heures fixe.</span>
           <span class="inl">au-delà de <input type="text" id="rSeuil" value="${r.seuilHebdo}" inputmode="decimal"> <span class="mut">h / semaine</span></span>
           <span class="inl">une ATCMD = <input type="text" id="rATCMD" value="${r.heuresATCMD}" inputmode="decimal"> <span class="mut">h</span></span></span></div>
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Heures de nuit (hors pauses)</span>
@@ -2952,7 +3534,7 @@ function viewReglages(){
       <tbody>${ags.map(ag=>{const lc=(first.locCounts||{})[ag]||{};
         const top=Object.entries(lc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,n])=>`${l} <span class="mut">${n}</span>`).join(' · ');
         return `<tr><td class="l nm">${esc(ag)}</td>
-          <td class="l"><input type="text" data-res="${esc(ag)}" value="${esc(r.residences[ag]||(first.residences||{})[ag]||'')}" placeholder="—" class="mono sm-i"></td>
+          <td class="l"><input type="text" data-res="${esc(ag)}" data-man="${r.residences[ag]?'1':''}" value="${esc(r.residences[ag]||(first.residences||{})[ag]||'')}" data-init="${esc(r.residences[ag]||(first.residences||{})[ag]||'')}" placeholder="—" class="mono sm-i"></td>
           <td class="l">${r.residences[ag]?'<span class="pill pill-a">manuelle</span>'
             :((first.residenceSource||{})[ag]==='auto'?'<span class="pill pill-n">automatique</span>':'<span class="pill pill-w">indéterminée</span>')}</td>
           <td class="l">${((r.lieuxResidence||{})[ag]||[]).map(l=>`<span class="pill pill-a">${esc(l)}${admin()?` <button class="lnk" data-aliasdel="${esc(JSON.stringify([ag,l]))}" title="Retirer">×</button>`:''}</span>`).join(' ')||'<span class="z">—</span>'}</td>
@@ -2961,12 +3543,14 @@ function viewReglages(){
       <p class="hint">« Aussi reconnus » : écritures apprises depuis la fiche d'un agent (bouton « … = résidence »). Majuscules et accents sont toujours ignorés.</p></div></section>
   ${agencesCard()}
   ${correctionsCard()}
+  ${journalCard()}
+  ${sauvegardeCard()}
   <section class="card"><div class="card-h"><h2>Comment les chiffres sont calculés</h2></div>
     <div class="card-b prose">
       <p><b>Repos hors résidence.</b> Les missions de chaque agent sont remises dans l'ordre chronologique. Quand une mission se termine ailleurs qu'à la résidence de son agence et que la suivante commence au moins ${nfa(r.rhrMinHours)} h plus tard, cet arrêt compte pour un RHR (repos journalier hors résidence, accord d'entreprise art. 18), de jour comme de nuit — même si les deux missions sont dans la même case${r.rhrCoupeParRepos?'. Un arrêt qui contient un jour de repos ou d’absence n’en est pas un : le repos périodique se prend à résidence (art. 19)':''}. Les lieux sont comparés sans tenir compte des majuscules ni des accents. Un séjour de deux nuits avec un service sur place au milieu compte donc deux coupures. Les AFR sont exclus, et les moyennes RHR ne portent que sur les agents qui en ont eu au moins un.</p>
       <p><b>Journée blanche.</b> Une journée sans mission et sans code, située entre deux services de la semaine. Le lendemain d'un service de nuit terminé au petit matin n'en est pas une${r.jbExcludeHorsResidence?", ni une journée passée hors résidence (pendant un RHR)":''}. La veille d'une reprise juste après minuit en est une si l'agent est à sa résidence.</p>
       <p><b>Amplitude.</b> De la prise de service à la fin de service, coupures incluses.</p>
-      <p><b>Heures planifiées et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont les heures planifiées au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
+      <p><b>TTE (temps de travail effectif) et heures sup.</b> Amplitude moins les pauses « P: » et « P2: » ; une ATCMD compte ${nf(r.heuresATCMD)} h. Les absences ne comptent aucune heure. Les heures sup sont le TTE au-delà de ${nf(r.seuilHebdo)} h, agent par agent et semaine par semaine.</p>
       <p><b>Heures de nuit.</b> Temps travaillé hors pauses entre ${r.nuitAFR[0]}h et ${r.nuitAFR[1]}h pour les AFR, entre ${r.nuitCDR[0]}h et ${r.nuitCDR[1]}h pour les conducteurs. Heures du dimanche : temps travaillé hors pauses le dimanche.</p>
       <p><b>Comptages.</b> MHIS, DISPO et ATCMD : toute mission dont l'intitulé contient ces lettres, même combinées à autre chose (« VS+MHIS » compte comme MHIS). DISPO et ATCMD sont comptés séparément. Trajet seul : mission dont l'intitulé se réduit à ${esc((r.trajetTypes||[]).join(' ou '))}.</p>
       <p><b>Paniers repas.</b> ${nf(r.panierMidi[2])} h travaillée entre ${h(r.panierMidi[0])} et ${h(r.panierMidi[1])}, ${nf(r.panierSoir[2])} h entre ${h(r.panierSoir[0])} et ${h(r.panierSoir[1])}, ${nf(r.panierNuit[2])} h entre ${h(r.panierNuit[0])} et ${h(r.panierNuit[1])}${r.panierRHR?', ou un RHR qui englobe la plage du midi ou du soir':''}. Un panier au plus par plage et par jour. Le ratio rapporte les paniers aux jours de service travaillés.</p>
@@ -2998,12 +3582,13 @@ function render(){
   const v=el('view');
   const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
-    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='import'?viewImport(): viewReglages();
+    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
   v.innerHTML=body;
   v.classList.toggle('enter',entering);
+  addPngButtons(v);
   if(entering){ countUp(v); }
   else v.querySelectorAll('.tw').forEach((t,i)=>{ if(sc[i]){ t.scrollTop=sc[i][0]; t.scrollLeft=sc[i][1]; } });
   el('brandsub').textContent=S.weeks.length
@@ -3077,7 +3662,7 @@ function renderDrawer(){
       <div><div class="k">RHR</div><div class="v">${a.rhrApplicable?a.nbRHR:'n/a'}</div></div>
       <div><div class="k">Journées blanches</div><div class="v">${a.journeesBlanches}</div></div>
       <div><div class="k">Amplitude</div><div class="v">${fmtH(a.amplitudeTotale)}</div></div>
-      <div><div class="k">Heures planifiées</div><div class="v">${fmtH(a.heuresPlanifiees)}</div></div>
+      <div><div class="k">TTE (temps de travail effectif)</div><div class="v">${fmtH(a.heuresPlanifiees)}</div></div>
       <div><div class="k">Heures sup</div><div class="v">${fmtH(a.heuresSup)}</div></div>
       <div><div class="k">Heures de nuit</div><div class="v">${fmtH(a.heuresNuit)}</div></div>
       <div><div class="k">Heures du dimanche</div><div class="v">${fmtH(a.heuresDimanche)}</div></div>
@@ -3088,7 +3673,7 @@ function renderDrawer(){
     </div>
     ${weeks.map(x=>{const w=S.weeks.find(y=>y.weekId===x.weekId);
       return `<section class="card"><div class="card-h"><div><h2>${w?weekLabel(w)+' · '+weekRange(w):esc(String(x.weekId))}</h2>
-        <p class="card-s">${esc(x.agence)} · ${fmtH(x.heuresPlanifiees)} planifiées${x.heuresSup?` · <b>${fmtH(x.heuresSup)} sup</b>`:''} · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.nbPaniers} panier${x.nbPaniers>1?'s':''}${x.fusion?` · <span class="pill pill-n">${x.fusion.lignes} lignes fusionnées</span>`:''}</p></div></div>
+        <p class="card-s">${esc(x.agence)} · ${fmtH(x.heuresPlanifiees)} de TTE${x.heuresSup?` · <b>${fmtH(x.heuresSup)} sup</b>`:''} · ${x.rhrApplicable?x.nbRHR+' RHR · ':''}${x.nbPaniers} panier${x.nbPaniers>1?'s':''}${x.fusion?` · <span class="pill pill-n">${x.fusion.lignes} lignes fusionnées</span>`:''}</p></div></div>
         <div class="card-b">${weekTimeline(x)}
           <div class="sub-h">Coupures entre missions</div>${coupuresView(x)}
           <div class="sub-h">Cases vides</div>${videsView(x)}
@@ -3137,6 +3722,10 @@ async function handleFiles(list){
       q.parsed=parsed; q.view=view; q.anom=parsed.anomalies.length;
       q.stats=agg(view.agents);
       q.existe=S.weeks.some(w=>w.weekId===parsed.meta.weekId);
+      // fichier suspect : comparé à la semaine précédente enregistrée (effectif, agences, doublons, lignes vides, date)
+      const pm=isoD(new Date(Date.parse(parsed.meta.monday)-7*DAY)), prevW=S.weeks.find(w=>w.monday===pm);
+      q.susp=suspicions({nbAgents:parsed.agents.length,agences:[...new Set(parsed.agents.map(a=>a.agence))],fusions:view.meta.fusions,
+        vides:parsed.agents.filter(a=>a.jours.every(j=>j.kind==='VIDE')).length,extractDate:parsed.meta.extractDate,monday:parsed.meta.monday},prevW||null);
       const dup=S.queue.find(o=>o!==q&&o.view&&o.view.meta.weekId===parsed.meta.weekId);
       if(dup){ q.state='erreur'; q.err=`${f.name} — ${weekLabel(parsed.meta)} est déjà dans la liste.`; }
       else q.state='pret';
@@ -3184,7 +3773,7 @@ async function saveAll(){
   if(!S.selAgences){ const p=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(p.length) S.selAgences=p; }
   await ensureLoaded(toLoad());
   S.queue=S.queue.filter(q=>q.state!=='enregistre'); S.vit=null;
-  S.msg={m:`${n} semaine${n>1?'s':''} enregistrée${n>1?'s':''}.`};
+  S.msg={m:`${n} semaine${n>1?'s':''} enregistrée${n>1?'s':''}. Le rapport à diffuser est prêt dans l’onglet Exports.`};
   if(!S.queue.length&&n) S.tab='synthese';
   savePrefs(); render();
   setTimeout(()=>{S.msg=null;render();},5000);
@@ -3196,12 +3785,33 @@ async function saveAll(){
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
-    '#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
+    '#btnPal,#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],#bkSave,#bkLoad,[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
+  if(t.id==='btnPal'){ openPalette(); return; }
   if(t.dataset.act==='theme'){ el('btnTheme').click(); return; }
+  if(t.id==='bkSave'){ const d={format:'recap-corridor-sauvegarde',version:1,le:new Date().toISOString(),regles:S.rules,suivi:S.suivi,journal:S.journal};
+    dl(`recap-corridor-sauvegarde-${isoD(new Date())}.json`,JSON.stringify(d,null,1),'application/json'); return; }
+  if(t.id==='bkLoad'){ el('bkFile').click(); return; }
   if(t.dataset.jbf){ S.jbFiltre=t.dataset.jbf; render(); return; }
+  if(t.dataset.png){ pngCard(t); return; }
+  if(t.id==='btnSlides'){ openSlides(); return; }
+  if(t.id==='slX'){ closeSlides(); return; }
+  if(t.id==='slPdf'){ window.print(); return; }
+  if(t.id==='slPptx'){ exportPptx().catch(e=>{S.msg={m:'PowerPoint impossible : '+e.message,t:'c'};render();}); return; }
+  if(t.id==='rapCopy'){ navigator.clipboard?.writeText(S.rapUrl).then(()=>{S.msg={m:'Lien copié.'};render();}); return; }
+  if(t.id==='rapMsg'){ navigator.clipboard?.writeText(S.rapMsg).then(()=>{S.msg={m:'Message copié.'};render();}); return; }
+  if(t.dataset.cmpm){ S.cmp.mode=t.dataset.cmpm; render(); return; }
+  if(t.dataset.cmpv){ S.cmp.val=t.dataset.cmpv; render(); return; }
+  if(t.dataset.flieu){ searchPanel('lieu',t.dataset.flieu); return; }
+  if(t.dataset.explain){ explain(t.dataset.explain); return; }
+  if(t.dataset.pnag){ const pk=t.dataset.pnag, x=[...S.loaded.values()].flatMap(v=>v.agents).find(y=>personKey(y)===pk); if(x){ closePanel(); S.drawer=x; renderDrawer(); } return; }
+  if(t.dataset.alst){ S.alf.st=t.dataset.alst; render(); return; }
+  if(t.dataset.alty!=null){ S.alf.type=t.dataset.alty||null; render(); return; }
+  if(t.dataset.alopen!=null){ const a=S.rows_al[+t.dataset.alopen]; const x=a&&[...S.loaded.values()].flatMap(v=>v.agents).find(y=>personKey(y)===a.pk); if(x){ S.drawer=x; renderDrawer(); } return; }
+  if(t.dataset.alset!=null&&admin()){ const a=S.rows_al[+t.dataset.alset]; if(a) setSuivi(a,t.dataset.v); return; }
+  if(t.dataset.alnote!=null&&admin()){ const a=S.rows_al[+t.dataset.alnote]; if(!a) return; const n=prompt('Note sur cette alerte :',a.suivi?.note||''); if(n!=null) setSuivi(a,'note',n.trim()); return; }
   if(t.dataset.vheat){ S.vf.heat=t.dataset.vheat; render(); return; }
   if(t.dataset.vag!=null){ const all=[...new Set(S.vit.cells.map(c=>c.ag))], v=t.dataset.vag;
     if(v==='*') S.vf.ags=null; else { let c=S.vf.ags||all.slice(); c=c.includes(v)?c.filter(x=>x!==v):[...c,v]; S.vf.ags=c.length&&c.length<all.length?c:null; }
@@ -3213,10 +3823,10 @@ document.addEventListener('click',async e=>{
   if(t.dataset.jbl!=null){ const r=(S.rows_jbl||[])[+t.dataset.jbl]; if(r){ S.drawer=r.a; renderDrawer(); } return; }
   if(t.dataset.crhr!=null&&admin()){ const c=S.rules.corrections, v=t.dataset.v;
     if(v) c.rhr[t.dataset.crhr]=v; else delete c.rhr[t.dataset.crhr];
-    return saveCorrection(v==='oui'?'Coupure comptée en RHR':v==='non'?'Coupure écartée':'Correction annulée'); }
+    return saveCorrection(v==='oui'?'Coupure comptée en RHR':v==='non'?'Coupure écartée':'Correction de coupure annulée',corrDetail(t.dataset.crhr)); }
   if(t.dataset.cjb!=null&&admin()){ const c=S.rules.corrections, v=t.dataset.v;
     if(v) c.jb[t.dataset.cjb]=v; else delete c.jb[t.dataset.cjb];
-    return saveCorrection(v==='oui'?'Journée blanche ajoutée':v==='non'?'Journée blanche écartée':'Correction annulée'); }
+    return saveCorrection(v==='oui'?'Journée blanche ajoutée':v==='non'?'Journée blanche écartée':'Correction de journée blanche annulée',corrDetail(t.dataset.cjb)); }
   if(t.dataset.lieures!=null&&admin()){ const ag=t.dataset.lieures, l=t.dataset.lieu, lr=S.rules.lieuxResidence=S.rules.lieuxResidence||{};
     lr[ag]=[...new Set([...(lr[ag]||[]),normLieu(l)])];
     return saveCorrection(`« ${l} » est désormais reconnu comme la résidence de ${ag}`); }
@@ -3225,11 +3835,11 @@ document.addEventListener('click',async e=>{
     const ia=+el('lA-'+wk).value, ib=+el('lB-'+wk).value, ms=x.missions;
     if(!(ib>ia)){ S.msg={m:'Choisissez une seconde mission postérieure à la première.',t:'w'}; render(); return; }
     S.rules.corrections.liens=[...(S.rules.corrections.liens||[]).filter(l=>!(l.p===pk&&l.a===ms[ia].start)),{p:pk,a:ms[ia].start,b:ms[ib].start}];
-    return saveCorrection(`Missions liées : ${ms[ia].label} → ${ms[ib].label}`); }
+    return saveCorrection(`Missions liées : ${ms[ia].label} → ${ms[ib].label}`,`${nmPk(pk)} · ${dtISO(ms[ia].end)} → ${dtISO(ms[ib].start)}`); }
   if(t.dataset.ratt!=null&&admin()){ const k=t.dataset.ratt, c=S.rules.corrections; c.residenceSemaine=c.residenceSemaine||{};
     const v=t.dataset.sel?el(t.dataset.sel)?.value:'';
     if(v) c.residenceSemaine[k]=v; else delete c.residenceSemaine[k];
-    return saveCorrection(v?`Rattachement temporaire à ${v} pour la semaine`:'Rattachement temporaire annulé'); }
+    return saveCorrection(v?`Rattachement temporaire à ${v} pour la semaine`:'Rattachement temporaire annulé',`${nmPk(k.split('|')[0])} · ${k.split('|')[1]}`); }
   if(t.dataset.lienDel!=null&&admin()){ const L=JSON.parse(t.dataset.lienDel);
     S.rules.corrections.liens=(S.rules.corrections.liens||[]).filter(l=>!(l.p===L.p&&l.a===L.a&&l.b===L.b));
     return saveCorrection('Lien supprimé'); }
@@ -3291,6 +3901,7 @@ document.addEventListener('click',async e=>{
     if(S.selWeek===id) S.selWeek=S.weeks[0]?S.weeks[0].weekId:'__all__';
     await ensureLoaded(toLoad()); render(); setTimeout(()=>{S.msg=null;render();},4000); return; }
   if(t.id==='saveRules'){
+    const avantR=structuredClone(S.rules), avant=totaux();
     const num=(id,d)=>{const v=parseFloat(String(el(id)?.value??'').replace(',','.'));return isFinite(v)?v:d;};
     S.rules={...S.rules,
       rhrMetiers: el('rMet').checked?['CONDUCTEUR']:allMetiers(),
@@ -3304,24 +3915,41 @@ document.addEventListener('click',async e=>{
       seuilHebdo: num('rSeuil',35), heuresATCMD: num('rATCMD',5),
       nuitAFR:[num('rNA0',22),num('rNA1',7)], nuitCDR:[num('rNC0',22),num('rNC1',5)],
       trajetTypes: String(el('rTraj').value).split(/[,;]/).map(x=>x.trim().toUpperCase()).filter(Boolean),
+      // une résidence déduite automatiquement reste automatique (elle peut s'écrire BX une semaine, BORDEAUX une autre) :
+      // seule une valeur déjà manuelle, ou modifiée à la main, est enregistrée
       residences: Object.fromEntries([...document.querySelectorAll('[data-res]')]
+        .filter(i=>i.dataset.man||i.value.trim()!==i.dataset.init)
         .map(i=>[i.dataset.res,i.value.trim()]).filter(([,v])=>v)),
       agencesAlias: (()=>{ const auto=autoAlias(), o={...(S.rules.agencesAlias||{})};
         document.querySelectorAll('[data-agal]').forEach(i=>{ const k=i.dataset.agal, v=i.value.trim();
           if(!v||v===auto[k]) delete o[k]; else o[k]=v; }); return o; })()};
     recomputeLoaded(); S.vit=null;
-    try{ await api.saveRegles(S.rules); S.msg={m:'Règles enregistrées — elles s’appliquent à tous les utilisateurs.'}; }
+    const ch=rulesDiff(avantR,S.rules);
+    try{ await persistRules(ch.length?ch:['Règles enregistrées sans changement'],avant); S.msg={m:'Règles enregistrées — elles s’appliquent à tous les utilisateurs.'}; }
     catch(err){ S.msg={m:err.message,t:'c'}; }
     render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
 });
 document.addEventListener('change',async e=>{
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
+  if(e.target.dataset&&e.target.dataset.cmpf){ S.cmp[e.target.dataset.cmpf]=e.target.value; render(); return; }
+  if(e.target.id==='rapW'){ S.rapW=e.target.value; render(); return; }
+  if(e.target.id==='auteur'){ S.auteur=e.target.value.trim(); savePrefs(); return; }
+  if(e.target.id==='bkFile'){ const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    try{ const d=JSON.parse(await f.text());
+      if(d.format!=='recap-corridor-sauvegarde'||!d.regles) throw new Error('ce fichier n’est pas une sauvegarde Récap Corridor');
+      if(!confirm(`Restaurer la sauvegarde du ${dFull(d.le)} ? Les règles et le suivi actuels seront remplacés.`)) return;
+      const avant=totaux(); S.rules=loadRules(d.regles); S.suivi=d.suivi||{alertes:{}}; recomputeLoaded(); S.vit=null;
+      await persistRules([`Restauration de la sauvegarde du ${dFull(d.le)}`],avant); await api.saveSuivi(S.suivi);
+      S.msg={m:'Sauvegarde restaurée.'}; }
+    catch(err){ S.msg={m:'Restauration impossible : '+err.message,t:'c'}; }
+    render(); return; }
   if(e.target.id==='vWeek'){ S.vf.w=e.target.value; render(); return; }
   if(e.target.id==='stMetric'){ S.st.metric=e.target.value; savePrefs(); render(); return; }
   if(e.target.id==='cTop'){ S.chart.top=+e.target.value; savePrefs(); render(); return; }
 });
 document.addEventListener('input',e=>{
+  if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
   if(e.target.id==='fSearch'){ S.search=e.target.value; const p=e.target.selectionStart; render();
     const n=el('fSearch'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
 });
@@ -3329,8 +3957,14 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&S.drawer){ closeDrawer(); return; }
   if(e.key==='Escape'&&S.scopeOpen){ S.scopeOpen=false; render(); return; }
   const typing=/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'');
-  if(S.role&&((e.key==='/'&&!typing)||(e.key.toLowerCase()==='k'&&(e.ctrlKey||e.metaKey)))){
-    const n=el('fSearch'); if(n){ e.preventDefault(); n.focus(); n.select(); } }
+  if(document.querySelector('.pal')){
+    if(e.key==='Escape'){ document.querySelector('.pal').remove(); return; }
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); S.pal.i=Math.max(0,Math.min(S.pal.res.length-1,S.pal.i+(e.key==='ArrowDown'?1:-1))); palRender(el('palIn').value); return; }
+    if(e.key==='Enter'){ e.preventDefault(); palGo(); return; }
+    return; }
+  if(e.key==='Escape'&&document.querySelector('.ov.pn')){ closePanel(); return; }
+  if(e.key==='Escape'&&document.querySelector('.ov.pres')){ closeSlides(); return; }
+  if(S.role&&((e.key==='/'&&!typing)||(e.key.toLowerCase()==='k'&&(e.ctrlKey||e.metaKey)))){ e.preventDefault(); openPalette(); }
   if(e.key==='Enter'&&el('codeIn')&&document.activeElement===el('codeIn')) login();
 });
 document.addEventListener('dragover',e=>{ if(S.role!=='admin')return; e.preventDefault(); el('drop')?.classList.add('on'); });
@@ -3366,8 +4000,8 @@ async function login(code){
 }
 async function boot(){
   try{
-    const {weeks,regles}=await withLoad(api.etat());
-    S.weeks=weeks||[];
+    const {weeks,regles,suivi,journal}=await withLoad(api.etat());
+    S.weeks=weeks||[]; S.suivi=suivi||{alertes:{}}; S.journal=journal||[];
     S.rules=loadRules(regles);
     const p=prefs();
     if(p.selAgences) S.selAgences=p.selAgences.filter(a=>allAgences().includes(a));
@@ -3384,10 +4018,13 @@ async function boot(){
 }
 (async function start(){
   const p=prefs();
+  const qs=new URLSearchParams(location.search).get('semaine');
+  if(qs&&/^\d{4}-S\d{2}$/.test(qs)){ S.vf.w=qs; p.tab='vitrine'; }
   if(p.theme) document.documentElement.dataset.theme=p.theme;
   if(p.cols) S.cols={...S.cols,...p.cols};
   if(p.chart) S.chart={...S.chart,...p.chart};
   if(p.st) S.st={...S.st,...p.st};
+  if(p.auteur) S.auteur=p.auteur;
   if(p.mode) S.mode=p.mode;
   if(p.tab) S.tab=p.tab;
   render();
@@ -3418,7 +4055,7 @@ function buildReport(){
     ['Nuits hors résidence',nf(g.rhrNuits),`${fmtH(g.rhrHeures)} cumulées`],
     ['Journées blanches',nf(g.journeesBlanches),`${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}`,g.journeesBlanches>0],
     ['Heures sup',fmtH(g.heuresSup),`${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''} au-delà de ${nf(S.rules.seuilHebdo)} h / semaine`,g.heuresSup>0],
-    ['Amplitude / jour',fmtH(g.amplitudeParJour),`${fmtH(g.heuresPlanifiees)} planifiées`],
+    ['Amplitude / jour',fmtH(g.amplitudeParJour),`${fmtH(g.heuresPlanifiees)} de TTE`],
     ['Heures de nuit',fmtH(g.heuresNuit),`hors pauses`],
     ['Missions',nf(g.nbMissions),`${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls`],
     ['Repos & congés',nf(g.joursRepos)+' repos',`${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences`],
