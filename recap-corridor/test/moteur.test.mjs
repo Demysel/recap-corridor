@@ -491,3 +491,12 @@ test('métier corrigé pour une semaine, un mois ou une année ; le plus précis
   // ancienne saisie « à partir de » toujours respectée
   assert.equal(one(j, {}, C({ residenceAgent: { 'm:1|2026-S30': 'BAYONNE' } })).residence, 'BAYONNE');
 });
+
+test('RHR de fin de semaine : semaine suivante importée avec seulement des codes → pas de RHR (plus « à finir en S+1 »)', () => {
+  const w1 = run(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: ['RP', 'RP', 'RP', 'RP', 'RP', 'RP', svc(['T1', 'HENDAYE', 'BORDEAUX', 13, '06:00', 13, '10:00'])] }]), RES);
+  const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'A', j: ['RP', 'RP', 'CP', 'CP', 'CP', 'RP', 'RP'] }]), RES);
+  assert.equal(w1.agents[0].rhrEnCours, 1);
+  E.reconcile(new Map([['2026-S37', w1], ['2026-S38', w2]]), RES);
+  assert.equal(w1.agents[0].rhrEnCours, 0);
+  assert.equal(w1.agents[0].nbRHR, 0);
+});

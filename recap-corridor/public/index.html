@@ -1454,8 +1454,16 @@ function reconcile(weeks,rulesIn){
     for(const a of c.agents){
       const p=a.rhr.find(x=>x.enCours&&!x.fin);
       if(!p) continue;
-      const pm=(idx.get(personKey(a))||{}).premiereMission;
-      if(!pm) continue;
+      const na0=idx.get(personKey(a)), pm=(na0||{}).premiereMission;
+      if(!pm){
+        // semaine suivante importée sans aucune mission : un jour de code (RP, congé…) interrompt l'arrêt, ce n'est pas un RHR
+        if(na0&&rules.rhrCoupeParRepos&&p.manuel!=='oui'&&(na0.jours||[]).some(j=>j.kind==='CODE'&&j.family!=='HORS')){
+          a.rhr.splice(a.rhr.indexOf(p),1); a.nbRHR=a.rhr.length; a.rhrEnCours=0; a.rhrLieux=[...new Set(a.rhr.map(x=>x.lieu))];
+          const cp0=(a.coupures||[]).find(x=>x.fin==null&&x.debut===p.debut); if(cp0){cp0.statut='repos';cp0.compte=false;}
+          setBands(a); a.rhrHeures=rM(a.rhr.reduce((s2,x)=>s2+(x.dureeH||0),0)); a.rhrNuits=a.rhr.reduce((s2,x)=>s2+(x.nuits||0),0);
+        }
+        continue;
+      }
       const fin=new Date(pm.start), deb=new Date(p.debut);
       if(fin<=deb) continue;
       p.fin=pm.start; p.dureeH=rM((fin-deb)/H); p.nuits=nights(deb,fin); p.retour=pm.label; p.cloturee=true;
@@ -1966,6 +1974,7 @@ async function ensureLoaded(ids){
   reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
 }
 function recomputeLoaded(){
+  S.rv=(S.rv||0)+1;
   const R=effRules();
   for(const [id,p] of S.parsedCache){ const v=applyRules(p,R); v.agents.forEach(a=>a.weekId=id); S.loaded.set(id,v); }
   reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
@@ -1977,6 +1986,7 @@ const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includ
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
   const ids=S.weeks.map(w=>w.weekId).sort(), out=new Set(activeWeeks());
   if(S.tab==='agents') for(const id of periodWeeks('y:'+anneeCP(),S.weeks)) out.add(id);
+  { const t=isoD(new Date(nowW())); for(const w of S.weeks) if(w.monday<=t&&t<=w.sunday){ out.add(w.weekId); const i=ids.indexOf(w.weekId); if(i>0) out.add(ids[i-1]); } }
   for(const id of activeWeeks()){ const i=ids.indexOf(id); if(i>0) out.add(ids[i-1]); if(i>=0&&i<ids.length-1) out.add(ids[i+1]); }
   return [...out]; };
 /* ==========================================================================
@@ -2131,6 +2141,40 @@ function renderFilters(){
         <button class="chip chip-mini ghost" id="meAll">Tous</button></div></div>
     </div>`:''}`;
 }
+/** Statut « en ce moment » : l'heure de l'appareil comparée aux missions et aux RHR des semaines chargées.
+    Les horaires du fichier sont des heures locales : « maintenant » est lu de la même façon. */
+const nowW=()=>{const d=new Date();return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate(),d.getHours(),d.getMinutes());};
+let LIVE=null;
+function liveIndex(){
+  const t=nowW(), key=Math.floor(t/6e4)+'|'+S.loaded.size+'|'+(S.rv||0);
+  if(LIVE&&LIVE.key===key) return LIVE.m;
+  const m=new Map();
+  for(const v of S.loaded.values()) for(const a of v.agents){
+    if(a.exclu) continue; const k=personKey(a);
+    for(const j of a.jours||[]) if(j.kind==='SERVICE') for(const x of j.missions) if(Date.parse(x.start)<=t&&t<Date.parse(x.end)) m.set(k,{t:'svc',l:x.label,fin:x.end});
+    if(!m.has(k)) for(const r of a.rhr||[]){ const d0=Date.parse(r.debut), d1=r.fin?Date.parse(r.fin):null;
+      if(d0<=t&&(d1?t<d1:true)&&(d1||t<Date.parse(v.meta.sunday+'T00:00:00Z')+8*DAY)) m.set(k,{t:'rhr',l:r.lieu,fin:r.fin}); }
+  }
+  LIVE={key,m}; return m;
+}
+/** Synthèse : qui est en service ou en RHR en ce moment, sur le périmètre (agences, métiers, agents) */
+function liveNote(){
+  const m=liveIndex(), seen=new Map();
+  for(const v of S.loaded.values()) for(const a of v.agents){ const k=personKey(a);
+    if(!m.has(k)||seen.has(k)) continue;
+    if(S.selAgences&&!S.selAgences.includes(a.agence)||S.selMetiers&&!S.selMetiers.includes(a.metier)||selAg().length&&!selAg().includes(k)) continue;
+    seen.set(k,{a,x:m.get(k)}); }
+  if(!seen.size) return '';
+  const L=[...seen.values()].sort((p,q)=>p.a.nom.localeCompare(q.a.nom,'fr')), sv=L.filter(z=>z.x.t==='svc'), rh=L.filter(z=>z.x.t==='rhr');
+  const nm=z=>`${esc(z.a.nom)} ${esc(z.a.prenom)}${z.x.t==='rhr'?` (${esc(z.x.l)})`:''}`;
+  return `<div class="note"><b>En ce moment</b> (${hm(new Date(nowW()).toISOString())}) : ${nf(sv.length)} en service · ${nf(rh.length)} en RHR
+    <details class="qd"><summary>voir les noms</summary>${sv.length?`<div class="mt"><b>En service</b> : ${sv.map(nm).join(' · ')}</div>`:''}${rh.length?`<div class="mt"><b>En RHR</b> : ${rh.map(nm).join(' · ')}</div>`:''}</details></div>`;
+}
+function livePill(a){
+  const x=liveIndex().get(personKey(a)); if(!x) return '';
+  return x.t==='svc'?` <span class="pill pill-g" title="En service maintenant : ${esc(x.l)}, jusqu’à ${hm(x.fin)}">en service</span>`
+    :` <span class="pill pill-w" title="En repos hors résidence maintenant à ${esc(x.l)}${x.fin?`, reprise ${dtISO(x.fin)}`:''}">en RHR · ${esc(x.l)}</span>`;
+}
 /** Sélecteur multiple d'agents (filtre principal) : toutes les vues se limitent aux agents choisis */
 const selAg=()=>S.selAgents||[];
 function agentNoms(){ const m=new Map(); for(const a of scopeAgents({tousAgents:true,allWeeks:true})){ const k=personKey(a); if(!m.has(k)) m.set(k,a); } return m; }
@@ -2154,7 +2198,7 @@ function kpiRow(g){
   // quatre indicateurs principaux, puis les autres en bandeau compact
   return `<div class="kpis lead">
     <div class="kpi${g.nbRHR?' hot':''} xk" data-explain="nbRHR" ${T}><div class="k">Repos hors résidence</div><div class="v" data-count="${g.nbRHR}">${nf(g.nbRHR)}</div>
-      <div class="n">${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} en cours`:''}</div></div>
+      <div class="n">${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} à finir en S+1`:''}</div></div>
     <div class="kpi${g.journeesBlanches?' hot':''} xk" data-explain="journeesBlanches" ${T}><div class="k">Journées blanches</div><div class="v" data-count="${g.journeesBlanches}">${nf(g.journeesBlanches)}</div>
       <div class="n">${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}</div></div>
     <div class="kpi${g.heuresSup?' hot':''} xk" data-explain="heuresSup" ${T}><div class="k">Heures sup</div><div class="v">${fmtH(g.heuresSup)}</div>
@@ -2211,6 +2255,7 @@ function viewSynthese(){
   ${(()=>{ const n=new Set(scopeAgents({exclus:true}).filter(a=>a.exclu).map(personKey)).size;
       return n?`<div class="note w"><b>${n} agent${n>1?'s':''} exclu${n>1?'s':''} des chiffres</b> sur ce périmètre (incohérence signalée) — liste et réintégration dans Réglages, « Corrections mémorisées ».</div>`:''; })()}
   ${enBref()}
+  ${liveNote()}
   ${kpiRow(g)}
   <section class="card">
     <div class="card-h"><div><h2>Par agence et corps de métier</h2><p class="card-s">${m==='total'?'total <span class="mut">· moyenne par agent</span>':modeHint()} — cliquez un en-tête pour trier</p></div>
@@ -2243,7 +2288,7 @@ function viewSynthese(){
 const pv=(a,k)=>S.mode==='total'||k==='cpAnnee'?(a[k]||0):r2((a[k]||0)/(a.nbSemaines||1));
 const numF=(k,fmt)=>a=>{const v=pv(a,k);return v?(fmt?fmt(v):nfa(v)):'<span class="z">'+(fmt?'—':'0')+'</span>';};
 const COLS=[
-  {g:'identite',k:'nom',l:'Agent',cls:'l',st:1,f:a=>`<span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}${a.fusion?' <span class="pill pill-n" title="Lignes en double dans le fichier, fusionnées">fusion</span>':''}`,t:a=>`${a.nom} ${a.prenom}`},
+  {g:'identite',k:'nom',l:'Agent',cls:'l',st:1,f:a=>`<span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}${livePill(a)}${a.fusion?' <span class="pill pill-n" title="Lignes en double dans le fichier, fusionnées">fusion</span>':''}`,t:a=>`${a.nom} ${a.prenom}`},
   {g:'identite',k:'matricule',l:'Matricule',cls:'l mono',f:a=>esc(a.matricule)},
   {g:'identite',k:'agence',l:'Agence',cls:'l',f:a=>`<span class="dot" style="background:${agenceColor(a.agence)}"></span>${esc(a.agence)}${a.agences.length>1?` <span class="mut" title="${esc(a.agences.join(' → '))}">+${a.agences.length-1}</span>`:''}`,t:a=>a.agence},
   {g:'identite',k:'metier',l:'Métier',cls:'l',f:a=>esc(a.metier)},
@@ -2256,7 +2301,7 @@ const COLS=[
   {g:'activite',k:'nbDISPO',l:'DISPO'},
   {g:'activite',k:'nbATCMD',l:'ATCMD'},
   {g:'activite',k:'weekendTravaille',l:'J. week-end'},
-  {g:'rhr',k:'nbRHR',l:'RHR',f:a=>a.rhrApplicable?(a.nbRHR?`<b>${nfa(pv(a,'nbRHR'))}</b>`+(a.rhrEnCours?' <span class="pill pill-w">en cours</span>':''):'<span class="z">0</span>'):'<span class="z">n/a</span>',t:a=>a.rhrApplicable?pv(a,'nbRHR'):-1},
+  {g:'rhr',k:'nbRHR',l:'RHR',f:a=>a.rhrApplicable?(a.nbRHR?`<b>${nfa(pv(a,'nbRHR'))}</b>`+(a.rhrEnCours?' <span class="pill pill-w" title="RHR commencé en fin de semaine : sa fin est dans la semaine suivante, pas encore importée">suite S+1</span>':''):'<span class="z">0</span>'):'<span class="z">n/a</span>',t:a=>a.rhrApplicable?pv(a,'nbRHR'):-1},
   {g:'rhr',k:'rhrNuits',l:'Nuits HR'},
   {g:'rhr',k:'rhrLieux',l:'Lieux',cls:'l mono',f:a=>a.rhrLieux.length?esc(a.rhrLieux.join(' ')):'<span class="z">—</span>',t:a=>a.rhrLieux.join(' ')},
   {g:'temps',k:'amplitudeTotale',l:'Amplitude',f:numF('amplitudeTotale',fmtH)},
@@ -2419,10 +2464,10 @@ function viewRHR(){
     rhr8_12:nf(gT.rhr8_12),rhr12_24:nf(gT.rhr12_24),rhr24:nf(gT.rhr24),rhrSuccessifs:nf(gT.rhrSuccessifs)})[c.k];
   const persons=mergeAcrossWeeks(cdr).filter(p=>p.nbRHR>0);
   const perCols=[
-    {k:'nom',l:'Agent',cls:'l',st:1,v:p=>p.nom+' '+p.prenom,f:p=>`<span class="nm">${esc(p.nom)}</span> ${esc(p.prenom)}`},
+    {k:'nom',l:'Agent',cls:'l',st:1,v:p=>p.nom+' '+p.prenom,f:p=>`<span class="nm">${esc(p.nom)}</span> ${esc(p.prenom)}${livePill(p)}`},
     {k:'agence',l:'Agence',cls:'l',f:p=>`<span class="dot" style="background:${agenceColor(p.agence)}"></span>${esc(p.agence)}`},
     {k:'nbSemaines',l:'Semaines',f:p=>nf(p.nbSemaines)},
-    {k:'nbRHR',l:'RHR',f:p=>`<b>${nf(p.nbRHR)}</b>${p.rhrEnCours?' <span class="pill pill-w">en cours</span>':''}`},
+    {k:'nbRHR',l:'RHR',f:p=>`<b>${nf(p.nbRHR)}</b>${p.rhrEnCours?' <span class="pill pill-w" title="RHR commencé en fin de semaine : sa fin est dans la semaine suivante, pas encore importée">suite S+1</span>':''}`},
     {k:'rhrHeures',l:'Temps en RHR',f:p=>fmtH(p.rhrHeures)},
     {k:'tpsMoy',l:'Temps moyen / RHR',v:p=>p.rhrHeures/p.nbRHR,f:p=>fmtH(p.rhrHeures/p.nbRHR)},
     {k:'tpsSem',l:'Temps RHR / semaine',v:p=>p.rhrHeures/p.nbSemaines,f:p=>fmtH(p.rhrHeures/p.nbSemaines)},
@@ -3623,7 +3668,7 @@ function tables(){
     agents:{name:'Agents',cols:[
       {t:'Matricule',w:10},{t:'Nom',w:20},{t:'Prénom',w:14},{t:'Agence',w:20},{t:'Métier',w:13},{t:'Semaines',w:9,fmt:'int'},{t:'Résidence',w:10},
       {t:'Jours de service',w:10,fmt:'int'},{t:'Missions',w:9,fmt:'int'},{t:'Trajets seuls',w:10,fmt:'int'},{t:'MHIS',w:7,fmt:'int'},
-      {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'RHR',w:7,fmt:'int'},{t:'RHR en cours',w:10,fmt:'int'},
+      {t:'DISPO',w:7,fmt:'int'},{t:'ATCMD',w:7,fmt:'int'},{t:'RHR',w:7,fmt:'int'},{t:'RHR à finir en S+1',w:10,fmt:'int'},
       {t:'Nuits hors résidence',w:12,fmt:'int'},{t:'Heures hors résidence',w:13,fmt:'dec'},{t:'Lieux de RHR',w:14},
       {t:'Journées blanches',w:12,fmt:'int'},{t:'Amplitude (h)',w:11,fmt:'dec'},{t:'Amplitude moyenne (h)',w:13,fmt:'dec'},
       {t:'Amplitude max (h)',w:12,fmt:'dec'},{t:'TTE — temps de travail effectif (h)',w:13,fmt:'dec'},{t:'Heures sup (h)',w:11,fmt:'dec'},{t:'Pauses (min)',w:10,fmt:'int'},
@@ -4006,7 +4051,7 @@ function renderDrawer(){
   const weeks=vide?[]:(a.parSemaine||[a]).slice().sort((x,y)=>String(y.weekId).localeCompare(String(x.weekId)));
   const d=document.createElement('div'); d.className='ov';
   d.innerHTML=`<div class="dw" role="dialog" aria-label="Détail agent">
-    <div class="dw-h"><div><h2>${esc(a.nom)} ${esc(a.prenom)}</h2>
+    <div class="dw-h"><div><h2>${esc(a.nom)} ${esc(a.prenom)}${livePill(a)}</h2>
       <div class="s">${esc(a.matricule)} · ${esc((a.agences||[a.agence]).join(' → '))} · ${esc(a.metier)} · ${nf(weeks.length)} semaine${weeks.length>1?'s':''}${a.residence?` · résidence ${esc(a.residence)}`:''}</div></div>
       <button class="x" id="dwx" aria-label="Fermer">×</button></div>
     ${perBar}
@@ -4449,7 +4494,7 @@ function buildReport(){
 
   const kpis=[
     ['Agents',nf(g.nbAgents),`${nf(g.joursService)} jours de service`],
-    ['Repos hors résidence',nf(g.nbRHR),`${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} en cours`:''}`,g.nbRHR>0],
+    ['Repos hors résidence',nf(g.nbRHR),`${nf(g.agentsAvecRHR)} agent${g.agentsAvecRHR>1?'s':''}${g.rhrEnCours?` · ${g.rhrEnCours} à finir en S+1`:''}`,g.nbRHR>0],
     ['Nuits hors résidence',nf(g.rhrNuits),`${fmtH(g.rhrHeures)} cumulées`],
     ['Journées blanches',nf(g.journeesBlanches),`${nf(g.agentsAvecBlanche)} agent${g.agentsAvecBlanche>1?'s':''} concerné${g.agentsAvecBlanche>1?'s':''}`,g.journeesBlanches>0],
     ['Heures sup',fmtH(g.heuresSup),`${nf(g.agentsHeuresSup)} agent${g.agentsHeuresSup>1?'s':''} au-delà de ${nf(S.rules.seuilHebdo)} h / semaine`,g.heuresSup>0],

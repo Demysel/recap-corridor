@@ -50,6 +50,10 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Tranches de l'annexe 1 comptées : 8–12 h, 12–24 h, 24 h et plus ; RHR successifs (sans retour à
   résidence entre deux). Rattachement temporaire à une autre résidence pour une semaine (art. 8),
   saisi dans la fiche agent. AFR exclus. Moyennes RHR calculées uniquement sur les agents qui en ont eu.
+  RHR commencé en fin de semaine : affiché « suite S+1 » (et « à finir en S+1 ») tant que la semaine suivante n'est pas
+  importée ; clos avec la première mission de S+1 ; supprimé si S+1 est importée sans mission mais avec un code.
+  Statut « en ce moment » (heure de l'appareil, comme les horaires du fichier) : « en service » pendant une mission,
+  « en RHR · lieu » pendant un RHR — pastille dans Agents, RHR et la fiche ; note « En ce moment » dans la Synthèse.
 - Lieux comparés sans majuscules, accents ni ponctuation (fautes de frappe des fichiers).
 - Corrections manuelles (admin, depuis la fiche agent ou l'onglet Journées blanches) : coupure
   comptée / écartée, deux missions liées en un seul RHR, journée blanche oui / non, lieu appris comme
