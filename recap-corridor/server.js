@@ -203,6 +203,21 @@ async function api(req, res, url) {
   return json(req, res, 404, { error: 'Adresse inconnue.' });
 }
 
+/* ------------------------------------------------------------ icônes (onglet, écran d'accueil, application) */
+const ICONES = {
+  '/icons/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/icons/favicon-32.png': ['favicon-32.png', 'image/png'],
+  '/icons/favicon-16.png': ['favicon-16.png', 'image/png'], '/icons/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
+  '/icons/icon-192.png': ['icon-192.png', 'image/png'], '/icons/icon-512.png': ['icon-512.png', 'image/png'],
+  '/icons/icon-maskable-512.png': ['icon-maskable-512.png', 'image/png'], '/icons/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+  // adresses demandées d'office par certains navigateurs
+  '/favicon.ico': ['favicon-32.png', 'image/png'], '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
+  '/apple-touch-icon-precomposed.png': ['apple-touch-icon.png', 'image/png'],
+};
+async function icone(req, res, path) {
+  const [f, type] = ICONES[path];
+  return send(req, res, 200, await readFile(join(ROOT, 'icons', f)), type, { 'Cache-Control': 'public, max-age=86400' });
+}
+
 /* ------------------------------------------------------------ page */
 const PAGE = join(ROOT, 'index.html');
 async function statique(req, res, url) {
@@ -218,6 +233,7 @@ http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (url.pathname === '/robots.txt') return send(req, res, 200, 'User-agent: *\nDisallow: /\n', 'text/plain; charset=utf-8');
+    if (ICONES[url.pathname]) return await icone(req, res, url.pathname);
     return await statique(req, res, url);
   } catch (e) {
     console.error(e);
