@@ -2640,6 +2640,17 @@ function enBref(){
   return `<section class="card bref"><div class="card-b"><span class="flabel">En bref</span><p>${P.join(' ')}</p></div></section>`;
 }
 
+/** Détail des paniers d'une semaine : jour, plage, et ce qui l'a produit (travail dans la plage ou RHR) */
+function paniersView(x){
+  const P=(x.paniers||[]).slice().sort((a,b)=>(a.date+a.plage).localeCompare(b.date+b.plage)), r=S.rules;
+  if(!P.length) return '<p class="hint">Aucun panier cette semaine.</p>';
+  const PL={midi:`midi (${fmtHour(r.panierMidi[0])}–${fmtHour(r.panierMidi[1])})`,soir:`soir (${fmtHour(r.panierSoir[0])}–${fmtHour(r.panierSoir[1])})`,nuit:`nuit (${fmtHour(r.panierNuit[0])}–${fmtHour(r.panierNuit[1])})`};
+  const why=p=>p.source==='RHR'?'repos hors résidence qui touche la plage':p.plage==='nuit'?`au moins ${nfa(r.panierNuit[2])} h travaillées dans la plage`:`au moins ${nfa(p.plage==='midi'?r.panierMidi[2]:r.panierSoir[2])} h travaillée dans la plage`;
+  return `<div class="tw"><table><thead><tr><th class="l">Jour</th><th class="l">Plage</th><th class="l">Origine</th></tr></thead><tbody>
+    ${P.map(p=>{const d=new Date(p.date+'T00:00:00Z');return `<tr><td class="l"><b>${JS[(d.getUTCDay()+6)%7]}</b> <span class="mono mut">${dISO(p.date)}</span></td><td class="l">${PL[p.plage]||p.plage}</td>
+      <td class="l">${p.source==='RHR'?'<span class="pill pill-w">RHR</span>':'<span class="pill pill-a">travail</span>'} <span class="mut sm">${why(p)}</span></td></tr>`;}).join('')}
+  </tbody></table></div><p class="hint">${P.length} panier${P.length>1?'s':''} · un panier nuit est daté du jour où la plage de nuit commence.</p>`;
+}
 /* ---------- fiche agent : exclusion des chiffres et résidence propre ---------- */
 function gestionAgent(a,weeks){
   if(!admin()) return a.exclu?`<div class="note w"><b>Agent exclu des chiffres</b>${a.exclu.motif?` : ${esc(a.exclu.motif)}`:''}.</div>`:'';
@@ -3715,6 +3726,7 @@ function renderDrawer(){
         <div class="card-b">${weekTimeline(x)}
           <div class="sub-h">Coupures entre missions</div>${coupuresView(x)}
           <div class="sub-h">Cases vides</div>${videsView(x)}
+          <div class="sub-h">Paniers repas</div>${paniersView(x)}
           <details class="qd" style="margin-top:14px"><summary>Détail des cases du fichier</summary><div style="margin-top:10px">${rosterBand(x)}${legendBand()}</div></details></div></section>`;}).join('')}
     <div style="margin-top:-6px">${legendTimeline()}</div>
     ${a.rhr.length?`<section class="card"><div class="card-h"><h2>Repos hors résidence</h2></div><div class="card-b"><div class="tw"><table>
