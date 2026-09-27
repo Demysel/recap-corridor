@@ -1157,7 +1157,7 @@ function applyRules(parsed, rulesIn){
   const src=parsed.agents.map(refam).map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};})
     .filter(a=>!agenceExclue(a.agence,rules));   // agences hors production : jamais comptées, anciens comme nouveaux fichiers
   const cM=(rules.corrections||{}).metierAgent||{};
-  const src1=Object.keys(cM).length?src.map(a=>{const c=correctionPeriode(cM,personKey(a),parsed.meta.weekId,isoD(days[3]));
+  const src1=Object.keys(cM).length?src.map(a=>{const c=correctionPeriode(cM,personKey(a),parsed.meta.weekId,isoD(days[0]));
     return c&&c.v!==a.metier?{...a,metierFichier:a.metier,metier:c.v}:a;}):src;
   const cI=(rules.corrections||{}).ignorees||{};
   const src15=Object.keys(cI).length?src1.map(a=>{ const pk=personKey(a); let chg=false;
@@ -1256,15 +1256,16 @@ function isTrajetSeul(label,types){
 }
 /** Correction propre à un agent pour une période : clé personne|w:2026-S38 (une semaine), |m:2026-09 (un mois),
     |y:2026 (une année) — la plus précise l'emporte — ou ancienne clé personne|2026-S38 (« à partir de »).
-    Une semaine appartient au mois et à l'année de son jeudi. */
-function correctionPeriode(map,pk,weekId,jeudiIso){
+    Le métier et la résidence ne changent pas au milieu d'une semaine : une semaine à cheval prend la correction du mois
+    et de l'année de son lundi (choisi par l'utilisateur). */
+function correctionPeriode(map,pk,weekId,lundiIso){
   let best=null, rank=-1;
   for(const [k,v] of Object.entries(map||{})){
     if(!k.startsWith(pk+'|')) continue;
     const P=k.slice(pk.length+1); let r=-1;
     if(P.startsWith('w:')) r=P.slice(2)===String(weekId)?4:-1;
-    else if(P.startsWith('m:')) r=P.slice(2)===jeudiIso.slice(0,7)?3:-1;
-    else if(P.startsWith('y:')) r=P.slice(2)===jeudiIso.slice(0,4)?2:-1;
+    else if(P.startsWith('m:')) r=P.slice(2)===lundiIso.slice(0,7)?3:-1;
+    else if(P.startsWith('y:')) r=P.slice(2)===lundiIso.slice(0,4)?2:-1;
     else if(/^\d{4}-S\d{2}$/.test(P)&&P<=String(weekId)) r=1;   // « à partir de » : la plus récente l'emporte
     if(r>rank||r===rank&&best&&P>best.P){ rank=r; best={v,P}; }
   }
@@ -1275,7 +1276,7 @@ function computeAgent(a,days,rules,residence,weekId){
   // rattachement temporaire à une autre zone de résidence (accord art. 8), saisi pour une semaine
   const ratt=(corr.residenceSemaine||{})[pk+'|'+weekId]||null;
   // résidence propre à l'agent à partir d'une semaine (mouvement d'agence), saisie dans sa fiche
-  const perso=correctionPeriode(corr.residenceAgent,pk,weekId,isoD(days[3]));
+  const perso=correctionPeriode(corr.residenceAgent,pk,weekId,isoD(days[0]));
   const resPerso=perso?{lieu:perso.v,periode:perso.P,depuis:/^\d{4}-S/.test(perso.P)?perso.P:null}:null;
   if(ratt) residence=normLieu(ratt); else if(resPerso) residence=normLieu(resPerso.lieu);
   const resSet=new Set(ratt||resPerso?[residence]:[residence,...((rules.lieuxResidence||{})[a.agence]||[])].filter(Boolean).map(normLieu));
@@ -1458,9 +1459,10 @@ function computeAgent(a,days,rules,residence,weekId){
   return out;
 }
 /** Partie d'une ligne agent-semaine comprise entre deux dates (incluses) : un mois ou une année s'arrête au
-    dernier jour, pas à la semaine du jeudi (demandé par l'utilisateur). Missions, heures, nuit, dimanche, codes et
+    dernier jour (demandé par l'utilisateur ; une semaine va du lundi 00:00 au dimanche 23:59). Missions, heures, nuit, dimanche, codes et
     journées blanches au jour de la case ; RHR (et ses paniers) au jour où il commence ; heures sup comptées à la
-    semaine, entières dans la partie qui contient le jeudi. Semaine entière dans la période : ligne inchangée. */
+    semaine, entières dans la partie qui contient le dimanche (acquises en fin de semaine, choisi par l'utilisateur).
+    Semaine entière dans la période : ligne inchangée. */
 function sliceAgent(a,d0,d1){
   const inR=dt=>dt>=d0&&dt<=d1, dOf=x=>String(x).slice(0,10);
   const inD=a.jours.map(j=>inR(j.date));
@@ -1478,7 +1480,7 @@ function sliceAgent(a,d0,d1){
     joursService:js, weekendTravaille:sum('wk'), nbMissions:sum('nb'),
     amplitudeTotale:rM(amp), amplitudeMoyenne:js?r2(amp/js):0, amplitudeMax:rM(Math.max(0,...P.map(x=>x.ampMax))),
     pauseTotaleMin:sum('pause'), heuresPlanifiees:rM(sum('plan')), heuresNuit:rM(sum('nuit')), heuresDimanche:rM(sum('dim')),
-    heuresSup:inR(a.jours[3].date)?a.heuresSup:0,
+    heuresSup:inR(a.jours[6].date)?a.heuresSup:0,
     nbMHIS:sum('mhis'), nbDISPO:sum('dispo'), nbATCMD:sum('atcmd'), nbTrajetsSeuls:sum('traj'), pausesInconnues:sum('pinc'),
     priseServicePlusTot:pr.length?Math.min(...pr):null, finServicePlusTard:fi.length?Math.max(...fi):null,
     typesMission:sumO('types'), destinations:sumO('dests'),
@@ -2022,7 +2024,8 @@ const allAgences=()=>{const R=effRules(), al=R.agencesAlias;return [...new Set(S
 const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMetier(m)||m))].sort();
 /* Périodes : une semaine, un mois, une année, ou un échantillon glissant compté depuis la dernière semaine enregistrée.
    Mois et années au jour près (demandé par l'utilisateur) : 2025 s'arrête au 31/12, 2026 commence au 01/01 ; une semaine
-   à cheval est coupée (sliceAgent). Le jeudi (règle ISO) ne sert plus qu'aux heures sup, comptées à la semaine. */
+   à cheval est coupée (sliceAgent). Une semaine va du lundi 00:00 au dimanche 23:59 ; le jeudi ne sert qu'à l'envoi du
+   planning et n'intervient dans aucun calcul (précisé par l'utilisateur). */
 const finMois=m=>isoD(new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7),0)));
 function periodRange(code){
   if(!code||!code.includes(':')) return null;
@@ -2034,7 +2037,6 @@ function rowsOfPeriod(rows,code){
   const ids=new Set(periodWeeks(code,S.weeks)), r=periodRange(code);
   return rows.filter(a=>ids.has(a.weekId)).map(a=>r?sliceAgent(a,r[0],r[1]):a).filter(Boolean);
 }
-const jeudi=w=>isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+3*DAY));
 const MOISF=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const ECHANT=[['n:2','2 dernières semaines'],['n:4','4 dernières semaines'],['r:1','Dernier mois'],['r:3','3 derniers mois'],['r:6','6 derniers mois'],['r:12','12 derniers mois'],['__all__','Toujours (toutes les semaines)']];
 function periodWeeks(code,weeks){
@@ -2460,9 +2462,9 @@ const COLS=[
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
-/** Année du compte « CP de l'année » : celle (jeudi) de la dernière semaine de la période sélectionnée */
+/** Année du compte « CP de l'année » : celle du dernier jour de la période sélectionnée (dimanche de la dernière semaine) */
 const anneeCP=()=>{ const r=periodRange(S.selWeek); if(r) return r[1].slice(0,4);
-  const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?jeudi(w).slice(0,4):String(new Date().getUTCFullYear()); };
+  const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?w.sunday.slice(0,4):String(new Date().getUTCFullYear()); };
 function sortAgents(list){
   const {k,dir}=S.sort, col=COLS.find(c=>c.k===k);
   const val=a=>col&&col.t?col.t(a):(typeof a[k]==='number'?pv(a,k):a[k]);
@@ -3109,7 +3111,7 @@ function perLab(P){ const W=id=>S.weeks.find(w=>w.weekId===id);
   const w=W(P); return 'depuis '+(w?weekLabel(w):P); }
 function perExclOptions(curWeek){
   const L=S.weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId));
-  const ms=[...new Set(L.map(w=>jeudi(w).slice(0,7)))], ys=[...new Set(L.map(w=>jeudi(w).slice(0,4)))];
+  const ms=[...new Set(L.flatMap(w=>[w.sunday.slice(0,7),w.monday.slice(0,7)]))], ys=[...new Set(ms.map(m=>m.slice(0,4)))];
   return `<optgroup label="Une semaine">${L.map(w=>`<option value="w:${w.weekId}"${w.weekId===curWeek?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</optgroup>
     <optgroup label="Un mois">${ms.map(m=>`<option value="m:${m}">${MOISF[+m.slice(5)-1]} ${m.slice(0,4)}</option>`).join('')}</optgroup>
     <optgroup label="Une année">${ys.map(y=>`<option value="y:${y}">${y}</option>`).join('')}</optgroup>`;
@@ -3137,7 +3139,7 @@ function gestionAgent(a,weeks){
         <div class="btns" style="align-items:center"><select id="mtM">${mets.map(m=>`<option${m===cur?.metier?' selected':''}>${esc(m)}</option>`).join('')}</select>
           ${pSel('mtW')}
           <button class="btn btn-sm btn-pri" data-metag="${esc(pk)}">Changer le métier</button></div></div>
-      <p class="hint">Résidence et métier s’appliquent uniquement à la période choisie : une semaine, un mois ou une année (une semaine compte dans le mois et l’année de son jeudi). Si plusieurs corrections se recouvrent, la plus précise l’emporte (semaine, puis mois, puis année). Le rattachement temporaire se règle aussi plus bas, semaine par semaine.</p>
+      <p class="hint">Résidence et métier s’appliquent uniquement à la période choisie : une semaine, un mois ou une année (une semaine à cheval prend la correction du mois et de l’année de son lundi). Si plusieurs corrections se recouvrent, la plus précise l’emporte (semaine, puis mois, puis année). Le rattachement temporaire se règle aussi plus bas, semaine par semaine.</p>
     </div></section>`;
 }
 

@@ -479,7 +479,7 @@ test('trajet seul : VOY- / -VOY / VS- / -VS oui ; collé à un + non', () => {
 test('métier corrigé pour une semaine, un mois ou une année ; le plus précis l’emporte ; résidence exclusive', () => {
   const j = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'];
   const C = (c) => ({ ...RES, corrections: { rhr: {}, jb: {}, liens: [], ...c } });
-  // semaine du 07/09/2026 = 2026-S37, jeudi 10/09 → septembre 2026
+  // semaine du 07/09/2026 = 2026-S37, lundi 07/09 → septembre 2026
   assert.equal(one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|w:2026-S37': 'CONDUCTEUR' } })).metier, 'CONDUCTEUR');
   assert.equal(one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|w:2026-S38': 'CONDUCTEUR' } })).metier, 'AFR');
   const a = one(j, { met: 'AFR' }, C({ metierAgent: { 'm:1|y:2026': 'CONDUCTEUR' } }));
@@ -565,7 +565,7 @@ test('périodes au jour près : une semaine à cheval sur deux années se coupe 
   assert.equal(y26.codeCounts.JF, 1);
   assert.equal(y26.codeCounts.RP, 1);
   assert.equal(y26.heuresDimanche, a.heuresDimanche);
-  // les deux parties redonnent la semaine entière ; heures sup entières dans la partie du jeudi (01/01)
+  // les deux parties redonnent la semaine entière ; heures sup entières dans la partie du dimanche (04/01)
   for (const k of ['nbMissions', 'heuresPlanifiees', 'amplitudeTotale', 'heuresNuit', 'joursService', 'nbPaniers', 'joursRepos'])
     assert.equal(Math.round((y25[k] + y26[k]) * 60), Math.round(a[k] * 60), k);
   assert.equal(y25.heuresSup, 0);
@@ -585,4 +585,15 @@ test('vitrine : une semaine à cheval sur deux années a aussi une cellule par p
   assert.equal(full.s.nbMissions, 15);
   assert.equal(p25.s.nbMissions, 10);
   assert.equal(p26.s.nbMissions, 5);
+});
+
+test('semaine du lundi 00:00 au dimanche 23:59 : heures sup dans le mois du dimanche, corrections dans le mois du lundi', () => {
+  // semaine du lundi 28/09/2026 au dimanche 04/10/2026 : 4 × 10 h = 40 h de TTE → 5 h sup
+  const j = [28, 29, 30, 1].map((d) => svc(['M', 'HENDAYE', 'HENDAYE', d, '06:00', d, '16:00'])).concat(['RP', 'RP', 'RP']);
+  const rules = { ...RES, corrections: { rhr: {}, jb: {}, liens: [], metierAgent: { 'm:1|m:2026-09': 'AFR', 'm:1|m:2026-10': 'COORDO AFR' } } };
+  const a = run(week([2026, 9, 28], [{ mat: '1', nom: 'TEST', j }]), rules).agents[0];
+  assert.equal(a.heuresSup, 5);
+  assert.equal(E.sliceAgent(a, '2026-09-01', '2026-09-30').heuresSup, 0);
+  assert.equal(E.sliceAgent(a, '2026-10-01', '2026-10-31').heuresSup, 5);
+  assert.equal(a.metier, 'AFR');                     // correction du mois du lundi (septembre)
 });

@@ -76,7 +76,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   résidence d'une agence, agent exclu des chiffres (toutes les semaines ou une seule, avec motif ;
   calculé mais retiré de tous les chiffres et de la vitrine, réintégrable), résidence propre à un agent et
   métier corrigé d'un agent, pour une période exclusive choisie dans la fiche : une semaine (clé …|w:2026-S38),
-  un mois (…|m:2026-09) ou une année (…|y:2026), la plus précise l'emportant (`correctionPeriode`) ; les anciennes
+  un mois (…|m:2026-09) ou une année (…|y:2026), la plus précise l'emportant (`correctionPeriode` ; semaine à cheval :
+  mois et année de son lundi) ; les anciennes
   résidences saisies « à partir de » (…|2026-S38) restent valables. Résidence propre prioritaire sur celle de
   l'agence, le rattachement temporaire d'une semaine restant prioritaire. Mémorisées dans `recap.config` (clé `regles`, champs
   `corrections` : rhr, jb, liens, residenceSemaine, residenceAgent, metierAgent, exclus, horaires ; `lieuxResidence`) et rejouées
@@ -106,7 +107,7 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Classement des codes (validé) : Repos = RP, RF, JF, RCL, RCC ; Congés = CP, CPAT, CFAM, CSS/CPAR ;
   Absences = tout le reste (MAL, AT, CPRCL…).
   Onglet Agents (groupe Repos & absences) : détail RP, RF, JF, RCL, RCC, puis CP sur la période et « CP <année> »
-  (CP de toute l'année civile — jeudi — de la dernière semaine sélectionnée ; année civile validée par l'utilisateur,
+  (CP de toute l'année civile du dernier jour de la période sélectionnée, compté au jour près ; année civile validée par l'utilisateur,
   pas la période de référence mai–mai). Fiche agent : tuile « Codes » (acronyme + nombre).
   Tableau des agents : une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
   « Cases vides » est supprimée (demandé par l'utilisateur). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
@@ -163,7 +164,10 @@ années, mois, semaines. **Mois et années au jour près** (demandé par l'utili
 commence au 01/01) : une semaine à cheval est coupée (`sliceAgent`, ventilation `parJour` de computeAgent ; `periodRange`,
 `rowsOfPeriod`, `moisParts`) — missions, heures, nuit, dimanche, codes, journées blanches au jour de la case (une
 mission ou un RHR à cheval sur minuit compte au jour où il commence, paniers du RHR avec lui) ; **heures sup comptées
-à la semaine**, entières dans la partie qui contient le jeudi. S'applique au filtre principal, à la fiche, à Comparer,
+à la semaine**, entières dans la partie qui contient le dimanche (choisi par l'utilisateur). **Une semaine va du lundi
+00:00 au dimanche 23:59 ; le jeudi ne sert qu'à l'envoi du planning et n'intervient dans aucun calcul** (précisé par
+l'utilisateur). Corrections de métier / résidence saisies pour un mois ou une année : une semaine à cheval prend celle
+du mois et de l'année de son lundi (choisi par l'utilisateur). S'applique au filtre principal, à la fiche, à Comparer,
 au « CP <année> », aux regroupements mois / trimestre / année des Statistiques et à la vitrine (cellules en plus par
 mois pour une semaine à cheval, champ `p`, mêmes groupes ≥ 5 agents ; la carte des flux reste par semaine entière).
 Les échantillons glissants (2, 4 semaines, n mois) restent en semaines entières.
