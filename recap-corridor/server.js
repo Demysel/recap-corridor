@@ -9,6 +9,8 @@
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
      CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
      PORT           fourni par Render
+     DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
+     APP_ENV        « dev » : site de test, couleurs différentes et bandeau « SITE DE TEST »
    ========================================================================== */
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -23,6 +25,9 @@ import pg from 'pg';
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url));
 const PORT = Number(process.env.PORT || 10000);
 const MAX_BODY = 200 * 1024 * 1024;     // 200 Mo : aucun fichier réel n'approche
+/** Site principal : schéma « recap ». Site de test : même base, schéma distinct (« recap_dev »), sans effet sur le principal */
+const SCHEMA = /^[a-z_][a-z0-9_]{0,40}$/.test(process.env.DB_SCHEMA || '') ? process.env.DB_SCHEMA : 'recap';
+const DEV = process.env.APP_ENV === 'dev';
 
 /* --------------------------------------------------------- base de données */
 let pool = null;
@@ -40,7 +45,7 @@ async function connectDb() {
   let last;
   for (const url of candidates) {
     const p = makePool(url);
-    try { await p.query('select 1 from recap.semaines limit 1'); pool = p; console.log('Base connectée :', new URL(url).host); return; }
+    try { await p.query(`select 1 from ${SCHEMA}.semaines limit 1`); pool = p; console.log('Base connectée :', new URL(url).host); return; }
     catch (e) { last = e; console.error('Connexion refusée par', new URL(url).host, '—', e.message); await p.end().catch(() => {}); }
   }
   throw last;
@@ -110,8 +115,8 @@ function engine() {
 let vitrineCache = null;       // recalculée après chaque import, suppression ou changement de règles
 async function vitrine(p) {
   if (vitrineCache) return vitrineCache;
-  const d = await p.query('select week_id, data from recap.details order by week_id, agence_slug');
-  const c = await p.query("select valeur from recap.config where cle = 'regles'");
+  const d = await p.query(`select week_id, data from ${SCHEMA}.details order by week_id, agence_slug`);
+  const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'regles'`);
   const weeks = new Map();
   for (const r of d.rows) {
     if (!weeks.has(r.week_id)) weeks.set(r.week_id, { meta: r.data.meta, agents: [] });
@@ -142,9 +147,9 @@ async function api(req, res, url) {
   const p = await db();
 
   if (route === 'etat' && req.method === 'GET') {
-    const w = await p.query('select resume from recap.semaines order by week_id desc');
+    const w = await p.query(`select resume from ${SCHEMA}.semaines order by week_id desc`);
     if (!admin) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
-    const c = await p.query("select cle, valeur from recap.config where cle in ('regles', 'suivi', 'journal')");
+    const c = await p.query(`select cle, valeur from ${SCHEMA}.config where cle in ('regles', 'suivi', 'journal')`);
     const cfg = Object.fromEntries(c.rows.map((x) => [x.cle, x.valeur]));
     return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: cfg.regles || null,
       suivi: cfg.suivi || { alertes: {} }, journal: (cfg.journal || []).slice(-300) });
@@ -154,7 +159,7 @@ async function api(req, res, url) {
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
-    const d = await p.query('select data from recap.details where week_id = $1 order by agence_slug', [id]);
+    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 order by agence_slug`, [id]);
     return json(req, res, 200, { docs: d.rows.map((x) => x.data) });
   }
   if (route === 'semaine' && req.method === 'PUT') {
@@ -165,12 +170,12 @@ async function api(req, res, url) {
     const c = await p.connect();
     try {
       await c.query('begin');
-      await c.query('insert into recap.semaines(week_id, resume) values ($1, $2) on conflict (week_id) do update set resume = excluded.resume, maj = now()', [resume.weekId, resume]);
-      await c.query('delete from recap.details where week_id = $1', [resume.weekId]);
+      await c.query(`insert into ${SCHEMA}.semaines(week_id, resume) values ($1, $2) on conflict (week_id) do update set resume = excluded.resume, maj = now()`, [resume.weekId, resume]);
+      await c.query(`delete from ${SCHEMA}.details where week_id = $1`, [resume.weekId]);
       for (const d of details) {
         const sl = String(d.agenceSlug || '').replace(/[^a-z0-9._~:@+-]/gi, '').slice(0, 120);
         if (!sl) continue;
-        await c.query('insert into recap.details(week_id, agence_slug, data) values ($1, $2, $3)', [resume.weekId, sl, d]);
+        await c.query(`insert into ${SCHEMA}.details(week_id, agence_slug, data) values ($1, $2, $3)`, [resume.weekId, sl, d]);
       }
       await c.query('commit');
     } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }
@@ -181,7 +186,7 @@ async function api(req, res, url) {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de supprimer.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
-    await p.query('delete from recap.semaines where week_id = $1', [id]);   // les détails suivent (cascade)
+    await p.query(`delete from ${SCHEMA}.semaines where week_id = $1`, [id]);   // les détails suivent (cascade)
     vitrineCache = null;
     return json(req, res, 200, { ok: true });
   }
@@ -189,17 +194,17 @@ async function api(req, res, url) {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de modifier les règles.' });
     const { _journal, ...body } = await readBody(req);
     const le = new Date().toISOString();
-    await p.query("insert into recap.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ ...body, majLe: le }]);
+    await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [{ ...body, majLe: le }]);
     if (_journal) {   // journal des modifications : qui, quand, quoi, et l'effet sur les chiffres
-      const j = await p.query("select valeur from recap.config where cle = 'journal'");
+      const j = await p.query(`select valeur from ${SCHEMA}.config where cle = 'journal'`);
       const list = [...(j.rows[0]?.valeur || []), { ..._journal, le }].slice(-500);
-      await p.query("insert into recap.config(cle, valeur) values ('journal', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [JSON.stringify(list)]);
+      await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('journal', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify(list)]);
     }
     vitrineCache = null;
     return json(req, res, 200, { ok: true });
   }
   if (route === 'mentions' && req.method === 'GET') {   // mentions légales : lisibles par les deux codes (page du visiteur)
-    const m = await p.query("select valeur from recap.config where cle = 'mentions'");
+    const m = await p.query(`select valeur from ${SCHEMA}.config where cle = 'mentions'`);
     return json(req, res, 200, m.rows[0]?.valeur || {});
   }
   if (route === 'mentions' && req.method === 'PUT') {
@@ -207,13 +212,13 @@ async function api(req, res, url) {
     const body = await readBody(req);
     const m = Object.fromEntries(MENTIONS.map(([k, max]) => [k, String(body[k] ?? '').trim().slice(0, max)]));
     m.majLe = new Date().toISOString();
-    await p.query("insert into recap.config(cle, valeur) values ('mentions', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [m]);
+    await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('mentions', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [m]);
     return json(req, res, 200, { ok: true, mentions: m });
   }
   if (route === 'suivi' && req.method === 'PUT') {   // suivi des alertes « À vérifier » : vu, corrigé, note
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier le suivi.' });
     const body = await readBody(req);
-    await p.query("insert into recap.config(cle, valeur) values ('suivi', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [{ alertes: body.alertes || {}, majLe: new Date().toISOString() }]);
+    await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('suivi', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [{ alertes: body.alertes || {}, majLe: new Date().toISOString() }]);
     return json(req, res, 200, { ok: true });
   }
   return json(req, res, 404, { error: 'Adresse inconnue.' });
@@ -238,7 +243,9 @@ async function icone(req, res, path) {
 const PAGE = join(ROOT, 'index.html');
 async function statique(req, res, url) {
   if (url.pathname !== '/' && url.pathname !== '/index.html') return send(req, res, 404, 'Page introuvable', 'text/plain; charset=utf-8');
-  const buf = await readFile(PAGE);
+  let buf = await readFile(PAGE);
+  // site de test : la page est marquée data-env="dev" (autres couleurs, bandeau) et son titre commence par « [TEST] »
+  if (DEV) buf = Buffer.from(buf.toString('utf8').replace('<html lang="fr">', '<html lang="fr" data-env="dev">').replace('<title>Récap Corridor</title>', '<title>[TEST] Récap Corridor</title>'));
   const etag = '"' + crypto.createHash('sha1').update(buf).digest('base64url').slice(0, 20) + '"';
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag }); return res.end(); }
   return send(req, res, 200, buf, 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache', ETag: etag });
@@ -256,6 +263,6 @@ http.createServer(async (req, res) => {
     if (!res.headersSent) json(req, res, e.status || 500, { error: e.status ? e.message : 'Erreur serveur : ' + e.message });
   }
 }).listen(PORT, () => {
-  console.log('Récap Corridor à l’écoute sur le port', PORT);
+  console.log('Récap Corridor à l’écoute sur le port', PORT, '· schéma', SCHEMA, DEV ? '· SITE DE TEST' : '');
   connectDb().catch((e) => console.error('Base indisponible au démarrage :', e.message));
 });

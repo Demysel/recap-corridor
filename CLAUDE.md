@@ -196,6 +196,19 @@ quatre indicateurs principaux puis un bandeau compact pour les autres.
   `CODE_LECTURE`, `DATABASE_URL`). **Ne jamais les écrire dans le dépôt.**
 - Le dépôt ne doit contenir **aucune donnée nominative** (fichiers Excel, sauvegardes JSON).
 
+## Site de test (demandé par l'utilisateur)
+
+- Service Render `recap-corridor-dev`, branche Git **`dev`** (déployé à chaque commit sur `dev`) ; le site principal
+  (`recap-corridor`, branche `main`, schéma `recap`) n'est jamais touché par le site de test.
+- Même base Supabase, **schéma distinct `recap_dev`** (copie de `recap` au départ, mêmes tables, propriétaire `recap_app`) :
+  importer ou supprimer des semaines sur le site de test n'a aucun effet sur le principal.
+- Variables Render du service de test : `APP_ENV=dev`, `DB_SCHEMA=recap_dev`, plus `DATABASE_URL`, `CODE_ADMIN`,
+  `CODE_LECTURE` (saisis par l'utilisateur dans Render, jamais dans le dépôt).
+- `APP_ENV=dev` : le serveur marque la page `data-env="dev"` → bleu électrique (#1F4BFF) au lieu du rouge, liseré jaune
+  en haut, pastille jaune « SITE DE TEST » en bas, titre « [TEST] Récap Corridor ». Sans ces variables : schéma `recap`,
+  couleurs normales (le code de `dev` peut donc être fusionné dans `main` sans effet sur le principal).
+- Travail courant : développer et essayer sur `dev`, puis fusionner `dev` dans `main` pour mettre en production.
+
 ## Mise en ligne d'une modification
 
 Pousser sur `main` (ou ouvrir une pull request vers `main` et indiquer à l'utilisateur de la

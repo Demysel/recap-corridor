@@ -33,3 +33,21 @@ revoke all on schema recap from public, anon, authenticated;
 
 -- Chaîne de connexion à mettre dans DATABASE_URL (pooler Supavisor, mode session) :
 -- postgresql://recap_app.<ref-projet>:MOT_DE_PASSE@aws-0-<region>.pooler.supabase.com:5432/postgres
+
+-- ---------------------------------------------------------------------------
+-- Site de test : même base, schéma distinct « recap_dev » (copie de « recap » au départ).
+-- Le service Render de test utilise DB_SCHEMA=recap_dev ; le site principal reste sur « recap ».
+-- create schema if not exists recap_dev authorization recap_app;
+-- set role recap_app;
+-- create table recap_dev.semaines (like recap.semaines including all);
+-- create table recap_dev.details  (like recap.details  including all);
+-- create table recap_dev.config   (like recap.config   including all);
+-- alter table recap_dev.details add foreign key (week_id) references recap_dev.semaines(week_id) on delete cascade;
+-- insert into recap_dev.semaines select * from recap.semaines;
+-- insert into recap_dev.details  select * from recap.details;
+-- insert into recap_dev.config   select * from recap.config;
+-- alter table recap_dev.semaines enable row level security;
+-- alter table recap_dev.details  enable row level security;
+-- alter table recap_dev.config   enable row level security;
+-- reset role;
+-- revoke all on schema recap_dev from public, anon, authenticated;
