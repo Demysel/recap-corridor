@@ -510,3 +510,21 @@ test('agence hors production (Paris) : ses agents sont retirés de tous les chif
   assert.equal(JSON.stringify(run(rows, RES).agents.map((a) => a.matricule)), '["1"]');
   assert.equal(run(rows, { ...RES, agencesExclues: [] }).agents.length, 4);
 });
+
+test('À vérifier : texte brut de la case gardé, mission ignorée à la main, mission hors colonne comptée quand même', () => {
+  const cell = 'TRAIN X\nHENDAYE - BORDEAUX';
+  const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: [cell, 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  assert.equal(p.anomalies[0].brut, cell);
+  // deux missions qui se chevauchent : on en ignore une
+  const j = [svc(['A', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '12:00'], ['B', 'HENDAYE', 'HENDAYE', 7, '11:00', 7, '15:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'];
+  const a0 = one(j, {}, RES);
+  const k = 'm:1|' + a0.jours[0].missions[1].start + '|B';
+  const a1 = one(j, {}, { ...RES, corrections: { rhr: {}, jb: {}, liens: [], ignorees: { [k]: true } } });
+  assert.equal(a1.nbMissions, 1);
+  assert.equal(a1.chevauchements.length, 0);
+  // mission datée d'un autre jour (hors colonne) : écartée, puis comptée à la demande
+  const hc = [svc(['T', 'HENDAYE', 'HENDAYE', 9, '06:00', 9, '12:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'];
+  assert.equal(one(hc, {}, RES).nbMissions, 0);
+  const st = new Date(Date.UTC(2026, 8, 9, 6, 0)).toISOString();
+  assert.equal(one(hc, {}, { ...RES, corrections: { rhr: {}, jb: {}, liens: [], garderHC: { ['m:1|' + st]: true } } }).nbMissions, 1);
+});

@@ -80,6 +80,13 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   d'une mission, compter ou écarter un RHR de plus de 44 h, rattacher l'agent à son lieu habituel pour la semaine
   ou changer sa résidence à partir de la semaine, reconnaître un lieu comme résidence de l'agence, ouvrir les
   Réglages ou l'Import. Une alerte réparée disparaît d'elle-même.
+  « Aperçu » (toute alerte liée à un agent) : panneau avec le texte brut de la case du fichier (`brut`, gardé à la lecture ;
+  semaines importées avant cette version : réimporter pour le voir) et le planning de la semaine de l'agent, pour
+  distinguer une erreur de lecture d'un vrai oubli. Mission sans horaire : formulaire début / fin (→ `horaires`) ou
+  « Pas une mission : classer ». Missions qui se chevauchent : « Ignorer « X » » (`corrections.ignorees`, clé
+  personne|début|intitulé, mission retirée des calculs). Mission hors colonne : « Compter quand même »
+  (`corrections.garderHC`, clé personne|début). « Tout marquer vu » (liste affichée) et « Vider l'historique… »
+  (historique du suivi seulement ; le journal des règles n'est jamais effacé). Tout se défait dans Réglages → corrections.
 - Journée blanche : case vide encadrée par deux services, y compris le lendemain d'un service de nuit (validé par
   l'utilisateur, quelle que soit l'heure de fin ; ancienne exclusion réactivable dans Réglages, règles v4), et
   pas si l'agent est hors résidence ce jour-là (pendant un RHR). La veille d'une reprise juste après
