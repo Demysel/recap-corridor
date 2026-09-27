@@ -528,3 +528,12 @@ test('À vérifier : texte brut de la case gardé, mission ignorée à la main, 
   const st = new Date(Date.UTC(2026, 8, 9, 6, 0)).toISOString();
   assert.equal(one(hc, {}, { ...RES, corrections: { rhr: {}, jb: {}, liens: [], garderHC: { ['m:1|' + st]: true } } }).nbMissions, 1);
 });
+
+test('codes : « JF, » reste un JF, et une semaine lue avec un ancien classement est reclassée à l’affichage', () => {
+  const a = one(['JF,', 'RF', 'JF', 'CP,', 'RP-12', 'AI', 'RP'], {}, RES);
+  assert.equal(a.jours.map((j) => j.family).join(), 'JF,RF,JF,CP,RP,AUTRE,RP');
+  // ancien import : famille « AUTRE » enregistrée pour un JF
+  const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: ['JF', 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  p.agents[0].jours[0] = { ...p.agents[0].jours[0], family: 'AUTRE' };
+  assert.equal(E.applyRules(p, RES).agents[0].jours[0].family, 'JF');
+});

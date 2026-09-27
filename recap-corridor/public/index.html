@@ -837,7 +837,7 @@ const CODEL={RP:'Repos périodique',CP:'Congé payé',CPAT:'Congé CPAT',RCL:'Re
 /** Classement validé par l'utilisateur : repos, congés ; tout le reste (MAL, AT, CPRCL, autres) = absences */
 const FAM_REPOS=['RP','RF','JF','RCL','RCC'], FAM_CONGES=['CP','CPAT','CFAM','CSS'];
 /** Anciens fichiers : « CP/CP », « MAL/MAL » — la famille se lit sur la première partie */
-const codeFam=c=>{const s=String(c).trim().split('/')[0].trim();for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
+const codeFam=c=>{const s=String(c).trim().split('/')[0].trim().replace(/[\s,.;:]+$/,'');for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
 const codeTxt=c=>{const p=String(c).trim().split('/').map(x=>x.trim());return p.length===2&&p[0]===p[1]?p[0]:String(c).trim();};
 /** Lieux comparés sans majuscules, accents ni ponctuation : « Hendaye », « HENDAYE » et « hendaye » sont le même lieu */
 const normLieu=s=>deacc(String(s??'')).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
@@ -913,7 +913,7 @@ function parseDayCell(raw,mon){
   // missions sans horaire gardées à part : l'horaire peut être saisi depuis « À vérifier »
   const sh=ms.filter(m=>!m.start||!m.end).map(m=>({label:m.label,from:m.from,to:m.to}));
   const SH=sh.length?{sansHoraire:sh}:{};
-  if(!ok.length) return {kind:'CODE',code:lines[0],family:'AUTRE',anom,...SH};
+  if(!ok.length) return {kind:'CODE',code:lines[0],family:codeFam(lines[0]),anom,...SH};
   for(const m of ok){
     if(m.end-m.start>=DAY) anom.push(`mission « ${m.label} » de 24 h ou plus : horaire à vérifier`);
     for(const [ps,pe] of m.pauses) if(pe<=m.start||ps>=m.end||ps<m.start||pe>m.end) anom.push(`pause ${hhmm(ps.toISOString())}–${hhmm(pe.toISOString())} en dehors de la mission « ${m.label} » : seule la partie comprise dans la mission est déduite`);
@@ -1150,7 +1150,11 @@ function applyRules(parsed, rulesIn){
   const rules={...DEFAULT_RULES,...rulesIn};
   const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
   const al=rules.agencesAlias||{};
-  const src=parsed.agents.map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};})
+  // famille des codes relue sur le code écrit à chaque affichage : les semaines importées avec une ancienne
+  // version (JF, RF, AT, CSS… classés « AUTRE », « JF, » avec virgule) sont reclassées sans réimport
+  const refam=a=>{ let chg=false; const jours=a.jours.map(j=>{ if(j.kind!=='CODE'||j.family==='HORS') return j;
+    const f=codeFam(j.code); if(f===j.family) return j; chg=true; return {...j,family:f}; }); return chg?{...a,jours}:a; };
+  const src=parsed.agents.map(refam).map(a=>{const ag=al[a.agence]||a.agence, me=normMetier(a.metier)||a.metier; return ag===a.agence&&me===a.metier?a:{...a,agence:ag,metier:me};})
     .filter(a=>!agenceExclue(a.agence,rules));   // agences hors production : jamais comptées, anciens comme nouveaux fichiers
   const cM=(rules.corrections||{}).metierAgent||{};
   const src1=Object.keys(cM).length?src.map(a=>{const c=correctionPeriode(cM,personKey(a),parsed.meta.weekId,isoD(days[3]));

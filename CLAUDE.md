@@ -118,7 +118,10 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Lundi…Dimanche, ligne 2 Matricule, Prenom, Nom, Region, Residence, Commentaires, dates ; feuille
   « Corridor … » à côté d'une feuille « Extract » ignorée). Métiers : CDR et « CDR + AFR » =
   CONDUCTEUR, Coordo = COORDO AFR. Agences « Agence X » rattachées automatiquement au nom récent
-  qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP.
+  qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP ; ponctuation finale ignorée (« JF, » = JF).
+  La famille d'un code est relue sur le code écrit à chaque affichage (applyRules) : les semaines importées avec un
+  ancien classement (JF, RF, AT, CSS… rangés dans « AUTRE ») sont reclassées sans réimport.
+  RP compté en jours (une case RP = 1), pas d'après le numéro « RP-n » du fichier (compteur ARP).
 - TTE (temps de travail effectif, anciennement « heures planifiées », renommé à la demande) : amplitude
   moins les pauses « P: » ; une ATCMD compte 5 h de TTE, mais son amplitude reste l'horaire réel inscrit
   dans la case (précisé par l'utilisateur) ; ses paniers se lisent aussi sur cet horaire réel
