@@ -136,7 +136,7 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (validé par l'utilisateur : deux missions de 4 h = 10 h ; réglable, 0 = désactivé). Nuit, dimanche et paniers restent lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
   Calcul blindé : durées recalculées en minutes entières depuis les horaires (`missionMinutes`), pauses = réunion des
   pauses ramenées dans la mission (jamais déduites deux fois), totaux gardés en minutes exactes (`rM`, aucune dérive
-  d'arrondi). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
+  d'arrondi). Ligne de pause vide « P: - » = aucune pause, sans alerte (`RE_PV`). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
   Test aléatoire de 400 semaines contre un calcul de référence indépendant.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.

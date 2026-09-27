@@ -858,6 +858,8 @@ function normMetier(m){
   return u;
 }
 const RE_P=/^P(\d?)\s*:/i;
+/** Ligne de pause vide « P: - » (aucune pause dans la mission) : rien à déduire, pas une anomalie */
+const RE_PV=/^P\d?\s*:[\s\-–—]*$/i;
 const RE_H=/^(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*$/;
 const RE_PF=/^P\d?\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2})\s*\/\s*(\d{1,2}):(\d{2})\s*$/i;
 const H=36e5, DAY=864e5;
@@ -894,6 +896,7 @@ function parseDayCell(raw,mon){
   const lines=t.split('\n').map(x=>x.trim()).filter(Boolean);
   const ms=[]; let cur=null; const anom=[];
   for(const line of lines){
+    if(RE_PV.test(line)) continue;
     if(RE_P.test(line)){
       if(!cur){ anom.push(`pause sans mission « ${line} »`); continue; }
       const m=RE_PF.exec(line);

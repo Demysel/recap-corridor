@@ -597,3 +597,13 @@ test('semaine du lundi 00:00 au dimanche 23:59 : heures sup dans le mois du dima
   assert.equal(E.sliceAgent(a, '2026-10-01', '2026-10-31').heuresSup, 5);
   assert.equal(a.metier, 'AFR');                     // correction du mois du lundi (septembre)
 });
+
+test('pause vide « P: - » : aucune pause, aucune alerte (fichier S39)', () => {
+  const cell = 'VOY-523-SP_ATL\nVAI - SP\n11/10:30 - 11/14:00\nP:  -';
+  const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j: ['RP', 'RP', 'RP', 'RP', cell, 'RP', 'RP'] }]));
+  assert.equal(p.anomalies.length, 0);
+  const a = E.applyRules(p, RES).agents[0];
+  assert.equal(a.nbMissions, 1);
+  assert.equal(a.heuresPlanifiees, 5);          // 3h30 d'amplitude sans pause → comptée 5 h (règle des missions courtes)
+  assert.equal(a.pauseTotaleMin, 0);
+});
