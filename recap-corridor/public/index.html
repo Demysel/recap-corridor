@@ -219,6 +219,10 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .card-h .btns{align-items:center}
 .prose{max-width:78ch}
 .prose p{margin-bottom:11px}.prose p:last-child{margin-bottom:0}
+.mn h3{margin:16px 0 6px;font-size:15px}.mn h3:first-child{margin-top:0}
+.mnf{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 14px}.mnf .mnw{grid-column:1/-1}
+.mnf input,.mnf textarea{width:100%}.mnf textarea{font:inherit;font-size:13.5px;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:10px;padding:7px 11px;resize:vertical}.mnprev{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:8px}
+.mnfoot{text-align:center;margin:18px 0 6px;font-size:13px}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
 @media (max-width:900px){.cols2{grid-template-columns:1fr}}
 /* entrée d'onglet : les blocs arrivent en cascade, une seule fois par changement d'onglet */
@@ -1886,6 +1890,14 @@ const backend={
     if(_journal){ const jo=await ADB.doc('config/journal').get(); await ADB.doc('config/journal').set({list:[...(jo.exists?jo.data().list||[]:[]),{..._journal,le}].slice(-500)}); }
     return {ok:true};
   },
+  async mentions(){
+    if(backend.mode!=='artifact') return backend.call('mentions');
+    const m=await ADB.doc('config/mentions').get(); return m.exists?m.data():{};
+  },
+  async saveMentions(m){
+    if(backend.mode!=='artifact') return backend.call('mentions',{method:'PUT',body:JSON.stringify(m)});
+    const x={...m,majLe:new Date().toISOString()}; await ADB.doc('config/mentions').set(x); return {ok:true,mentions:x};
+  },
   async saveSuivi(su){
     if(backend.mode!=='artifact') return backend.call('suivi',{method:'PUT',body:JSON.stringify(su)});
     await ADB.doc('config/suivi').set({alertes:su.alertes||{},majLe:new Date().toISOString()}); return {ok:true};
@@ -1897,7 +1909,7 @@ const api=backend;
    ========================================================================== */
 const S={
   role:null, tab:'synthese', weeks:[], rules:structuredClone(DEFAULT_RULES), jbFiltre:'comptees',
-  suivi:{alertes:{}}, journal:[], auteur:'',
+  suivi:{alertes:{}}, journal:[], auteur:'', mentions:{}, mnDraft:null,
   selWeek:'__all__', selAgences:null, selMetiers:null, search:'',
   loaded:new Map(), parsedCache:new Map(),
   queue:[], busy:false, err:null, msg:null, delAsk:null,
@@ -2080,21 +2092,24 @@ const TI={synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.
   rhr:'M13 9.5A5.5 5.5 0 1 1 6.5 3a4.3 4.3 0 0 0 6.5 6.5z',blanches:'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3',
   graphiques:'M3 13.5V8M6.5 13.5V3.5M10 13.5V6.5M13.5 13.5V10',stats:'M2 12l3.5-4 3 2.5L14 4M10.5 4H14v3.5',
   comparer:'M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13',vitrine:'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  mentions:'M4 1.5h5.5L12.5 4.5v10H4zM9.5 1.5v3h3M6 7.5h4.5M6 10h4.5M6 12.5h3',
   lecture:'M2.5 3.5c2-.8 3.8-.8 5.5.5v9.5c-1.7-1.3-3.5-1.3-5.5-.5zM13.5 3.5c-2-.8-3.8-.8-5.5.5v9.5c1.7-1.3 3.5-1.3 5.5-.5z',
   exports:'M8 10V2.5M5 5.5l3-3 3 3M2.5 10v3.5h11V10',import:'M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10',
   reglages:'M2.5 4.5h7M12 4.5h1.5M2.5 11.5h2M7 11.5h6.5M10.5 3v3M5.5 10v3'};
+/** Mentions légales : uniquement dans la vue visiteur (l'admin les rédige et les prévisualise dans Réglages) */
+const tabVisible=t=>S.role==='admin'?t.k!=='mentions':['vitrine','lecture','mentions'].includes(t.k);
 const TABS=[
   {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
   {k:'agents',l:'Agents',g:'Détail'},{k:'rhr',l:'RHR',g:'Détail'},{k:'blanches',l:'Journées blanches',g:'Détail'},
   {k:'graphiques',l:'Graphiques',g:'Analyse'},{k:'stats',l:'Statistiques',g:'Analyse'},{k:'comparer',l:'Comparer',g:'Analyse'},
-  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},
+  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},
   {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
-  comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
+  comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
 /** Mesures des statistiques (graphiques) */
@@ -2129,16 +2144,16 @@ function stable(id,cols,rows,opt={}){
 function renderTabs(){
   const sc=scopeAgents();
   const cnt={verifier:S.alN,agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
-  const vis=TABS.filter(t=>S.role==='admin'||['vitrine','lecture'].includes(t.k)), grps=[...new Set(vis.map(t=>t.g))];
+  const vis=TABS.filter(tabVisible), grps=[...new Set(vis.map(t=>t.g))];
   el('tabs').innerHTML=grps.map(g=>`<div class="ngrp">${grps.length>1?`<div class="nglab">${g}</div>`:''}${vis.filter(t=>t.g===g).map(t=>
     `<button class="tab" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}" title="${t.l}"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${TI[t.k]}"/></svg><span class="tl">${t.l}</span>${
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt${t.k==='verifier'&&cnt[t.k]?' hot':''}">${nf(cnt[t.k])}</span>`:''}</button>`).join('')}</div>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
-  el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
+  el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture','mentions'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
   el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}" title="${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}"><span class="bl-t">${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}</span></span>`:'';
 }
 function renderFilters(){
-  if(!S.weeks.length||S.role!=='admin'||['vitrine','lecture'].includes(S.tab)&&S.role!=='admin'||S.tab==='vitrine'){ el('filters').innerHTML=''; return; }
+  if(!S.weeks.length||S.role!=='admin'||S.tab==='vitrine'){ el('filters').innerHTML=''; return; }
   const ags=allAgences(), mets=allMetiers();
   const selA=scopeAgences(), selM=scopeMetiers();
   const resume=`${selA.length===ags.length?'Toutes les agences':selA.length===1?selA[0]:selA.length+' agences'} · ${selM.length===mets.length?'tous métiers':selM.join(', ')}`;
@@ -2931,7 +2946,7 @@ function openPalette(){
 function palRender(q){
   const Q=deacc(q).toLowerCase().trim(), D=S.pal.data, res=[];
   const has=s=>deacc(String(s)).toLowerCase().includes(Q);
-  for(const t of TABS.filter(t=>S.role==='admin'||['vitrine','lecture'].includes(t.k))) if(!Q||has(t.l)) res.push({g:'Aller à',l:t.l,go:()=>{S.tab=t.k;savePrefs();document.querySelector('[data-tab="'+t.k+'"]')?.click();}});
+  for(const t of TABS.filter(tabVisible)) if(!Q||has(t.l)) res.push({g:'Aller à',l:t.l,go:()=>{S.tab=t.k;savePrefs();document.querySelector('[data-tab="'+t.k+'"]')?.click();}});
   if(Q.length>=2){
     D.persons.filter(a=>has(`${a.nom} ${a.prenom} ${a.matricule}`)).slice(0,8).forEach(a=>res.push({g:'Agents',l:`${a.nom} ${a.prenom}`,s:`${a.matricule} · ${a.agence} · ${a.metier}`,go:()=>{S.drawer=a;renderDrawer();}}));
     allAgences().filter(has).slice(0,5).forEach(ag=>res.push({g:'Agences',l:ag,s:'filtrer le périmètre sur cette agence',go:()=>{S.selAgences=[ag];savePrefs();S.tab='synthese';render();}}));
@@ -3862,6 +3877,57 @@ function queueView(){
       <button class="btn" id="clearQ"${S.busy?' disabled':''}>Tout retirer</button></div>`:''}</div>`;
 }
 
+/** Mentions légales : champs saisis par l'admin dans Réglages (rien n'est inventé : un champ vide n'est pas affiché).
+    Même liste de champs dans server.js (MENTIONS). */
+const MENTIONS=[
+  ['site','Nom du site','Récap Corridor'],
+  ['editeur','Éditeur du site (personne ou structure)',''],
+  ['editeurAdresse','Adresse de l’éditeur',''],
+  ['contact','Contact (courriel ou téléphone)',''],
+  ['directeur','Directeur ou directrice de la publication',''],
+  ['redacteur','Rédacteur ou rédactrice',''],
+  ['hebergeur','Hébergeur du site','ex. Render'],
+  ['hebergeurAdresse','Adresse et site de l’hébergeur du site',''],
+  ['hebergeurDonnees','Hébergeur de la base de données','ex. Supabase'],
+  ['hebergeurDonneesAdresse','Adresse et site de l’hébergeur de la base',''],
+  ['rgpdContact','Contact pour les données personnelles',''],
+  ['finalite','Finalité du traitement','',1],
+  ['baseLegale','Base légale du traitement','',1],
+  ['conservation','Durée de conservation des données','',1],
+  ['autres','Autres mentions (propriété intellectuelle, marques…)','',1],
+];
+function mentionsHTML(m){
+  const v=k=>String(m[k]||'').trim(), L=(k,l)=>v(k)?`<p><b>${l}</b> : ${esc(v(k)).replace(/\n/g,'<br>')}</p>`:'';
+  const bloc=(t,x)=>x?`<h3>${t}</h3>${x}`:'';
+  return `<div class="prose mn">
+    ${bloc('Éditeur',L('site','Site')+L('editeur','Éditeur')+L('editeurAdresse','Adresse')+L('contact','Contact')+L('directeur','Directeur ou directrice de la publication')+L('redacteur','Rédaction'))}
+    ${bloc('Hébergement',L('hebergeur','Site hébergé par')+L('hebergeurAdresse','Adresse')+L('hebergeurDonnees','Base de données hébergée par')+L('hebergeurDonneesAdresse','Adresse'))}
+    <h3>Données personnelles</h3>
+    <p>Cette vue ne présente que des statistiques anonymes : aucun nom, matricule ni planning individuel n’y figure. Chaque chiffre porte sur un groupe d’au moins 5 agents ; les groupes plus petits sont regroupés ou écartés. Les trajets et lieux de repos de la carte ne sont affichés que s’ils concernent au moins 5 agents différents.</p>
+    ${L('finalite','Finalité')+L('baseLegale','Base légale')+L('conservation','Durée de conservation')+L('rgpdContact','Pour exercer vos droits ou poser une question')}
+    <h3>Cookies et stockage</h3>
+    <p>Le site ne dépose aucun cookie. Votre navigateur garde localement (stockage local) le code d’accès saisi et vos préférences d’affichage, pour ne pas les redemander ; ils ne sont transmis à personne d’autre que ce site. Les polices de caractères sont chargées depuis Google Fonts, qui reçoit à cette occasion l’adresse IP de votre appareil.</p>
+    ${bloc('Autres mentions',L('autres',''))}
+    ${m.majLe?`<p class="hint">Dernière mise à jour : ${dFull(m.majLe)}</p>`:''}</div>`.replace(/<b><\/b> : /g,'');
+}
+function viewMentions(){
+  return `<section class="card"><div class="card-b">${mentionsHTML(S.mentions||{})}</div></section>`;
+}
+function mentionsCard(){
+  const d=S.mnDraft||S.mentions||{}, manque=['editeur','contact','directeur','hebergeur'].filter(k=>!String(d[k]||'').trim());
+  return `<section class="card"><div class="card-h"><div><h2>Mentions légales</h2>
+    <p class="card-s">page visible uniquement dans la vue visiteur (lien en bas de page et menu) — un champ vide n’est pas affiché</p></div></div>
+    <div class="card-b stack">
+      <div class="mnf">${MENTIONS.map(([k,l,ph,area])=>`<label class="fld${area?' mnw':''}"><span class="flabel">${l}</span>${area
+        ?`<textarea data-mn="${k}" rows="3" maxlength="2000" placeholder="${esc(ph)}"${admin()?'':' disabled'}>${esc(d[k]||'')}</textarea>`
+        :`<input type="text" data-mn="${k}" maxlength="300" value="${esc(d[k]||'')}" placeholder="${esc(ph)}"${admin()?'':' disabled'}>`}</label>`).join('')}</div>
+      ${manque.length?`<div class="note w">À compléter : ${manque.map(k=>MENTIONS.find(x=>x[0]===k)[1].toLowerCase()).join(', ')}.</div>`:''}
+      <div><button class="btn btn-pri" id="mnSave"${admin()&&S.mnDraft?'':' disabled'}>Enregistrer les mentions</button>
+        ${S.mnDraft?'<button class="btn" id="mnUndo">Annuler les modifications</button>':''}
+        ${S.mentions&&S.mentions.majLe?`<span class="hint"> Enregistrées le ${dFull(S.mentions.majLe)}</span>`:''}</div>
+      <details class="qd"><summary>Aperçu de la page visiteur</summary><div class="mnprev">${mentionsHTML(d)}</div></details>
+    </div></section>`;
+}
 /** Agences hors production : cochées = retirées de tous les chiffres (et de la vitrine) */
 function exclusCard(){
   const al=effRules().agencesAlias, R={...DEFAULT_RULES,...S.rules};
@@ -3978,6 +4044,7 @@ function viewReglages(){
       <p class="hint">« Aussi reconnus » : écritures apprises depuis la fiche d'un agent (bouton « … = résidence »). Majuscules et accents sont toujours ignorés.</p></div></section>
   ${exclusCard()}
   ${agencesCard()}
+  ${mentionsCard()}
   ${correctionsCard()}
   ${journalCard()}
   ${sauvegardeCard()}
@@ -4018,11 +4085,11 @@ function render(){
   const v=el('view');
   const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
-    S.tab==='lecture'?viewGuide(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
+    S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
-  v.innerHTML=body;
+  v.innerHTML=body+(S.role!=='admin'&&S.tab!=='mentions'?`<p class="mnfoot"><button class="lnk" data-tab="mentions">Mentions légales</button></p>`:'');
   v.classList.toggle('enter',entering);
   addPngButtons(v);
   if(entering){ countUp(v); }
@@ -4249,7 +4316,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4313,6 +4380,12 @@ document.addEventListener('click',async e=>{
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
   if(t.dataset.dwreset){ S.dwPer=null; renderDrawer(); return; }
   if(t.dataset.dwcode){ S.dwCode=S.dwCode===t.dataset.dwcode?null:t.dataset.dwcode; renderDrawer(); return; }
+  if(t.id==='mnUndo'){ S.mnDraft=null; render(); return; }
+  if(t.id==='mnSave'&&admin()&&S.mnDraft){
+    try{ const r=await withLoad(api.saveMentions(Object.fromEntries(MENTIONS.map(([k])=>[k,String(S.mnDraft[k]||'').trim()]))));
+      S.mentions=r.mentions||S.mnDraft; S.mnDraft=null; S.msg={m:'Mentions légales enregistrées.'}; }
+    catch(err){ S.msg={m:'Enregistrement impossible : '+err.message,t:'c'}; }
+    render(); return; }
   if(t.dataset.agexcl!=null&&admin()){ const a=t.dataset.agexcl, R={...DEFAULT_RULES,...S.rules};
     let L=(R.agencesExclues||[]).slice(); const on=agenceExclue(a,R);
     L=on?L.filter(x=>!agenceExclue(a,{agencesExclues:[x]})):[...L,a];
@@ -4466,6 +4539,8 @@ document.addEventListener('change',async e=>{
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
+  if(e.target.dataset&&e.target.dataset.mn){ const first=!S.mnDraft; S.mnDraft=S.mnDraft||{...(S.mentions||{})}; S.mnDraft[e.target.dataset.mn]=e.target.value;
+    if(first){ const b=el('mnSave'); if(b) b.disabled=false; } return; }
   if(e.target.id==='fSearch'){ S.search=e.target.value; const p=e.target.selectionStart; render();
     const n=el('fSearch'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } }
   if(e.target.id==='agtQ'){ S.agtQ=e.target.value; const p=e.target.selectionStart; render();
@@ -4531,7 +4606,9 @@ async function boot(){
     if(S.selMetiers&&!S.selMetiers.length) S.selMetiers=null;
     if(!S.selAgences){ const pr=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
     if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
-    if(S.role!=='admin'){ if(S.tab!=='lecture') S.tab='vitrine'; render(); await loadVitrine(true); }
+    S.mentions=await api.mentions().catch(()=>({}))||{}; S.mnDraft=null;
+    if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
+    else if(S.tab==='mentions'){ S.tab='reglages'; await ensureLoaded(toLoad()); }
     else if(S.tab==='vitrine'){ render(); await loadVitrine(true); }
     else await ensureLoaded(toLoad());
   }catch(e){ S.msg={m:'Chargement impossible : '+e.message,t:'c'}; }

@@ -125,6 +125,10 @@ async function vitrine(p) {
 const resumePublic = (x) => ({ weekId: x.weekId, year: x.year, week: x.week, monday: x.monday, sunday: x.sunday });
 
 /* ------------------------------------------------------------ API */
+/** Champs des mentions légales (même liste que MENTIONS dans index.html) et longueur maximale */
+const MENTIONS = [['site', 300], ['editeur', 300], ['editeurAdresse', 300], ['contact', 300], ['directeur', 300], ['redacteur', 300],
+  ['hebergeur', 300], ['hebergeurAdresse', 300], ['hebergeurDonnees', 300], ['hebergeurDonneesAdresse', 300], ['rgpdContact', 300],
+  ['finalite', 2000], ['baseLegale', 2000], ['conservation', 2000], ['autres', 2000]];
 const ID = /^\d{4}-S\d{2}$/;
 async function api(req, res, url) {
   const route = url.pathname.replace(/^\/api\/?/, '');
@@ -193,6 +197,18 @@ async function api(req, res, url) {
     }
     vitrineCache = null;
     return json(req, res, 200, { ok: true });
+  }
+  if (route === 'mentions' && req.method === 'GET') {   // mentions légales : lisibles par les deux codes (page du visiteur)
+    const m = await p.query("select valeur from recap.config where cle = 'mentions'");
+    return json(req, res, 200, m.rows[0]?.valeur || {});
+  }
+  if (route === 'mentions' && req.method === 'PUT') {
+    if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier les mentions légales.' });
+    const body = await readBody(req);
+    const m = Object.fromEntries(MENTIONS.map(([k, max]) => [k, String(body[k] ?? '').trim().slice(0, max)]));
+    m.majLe = new Date().toISOString();
+    await p.query("insert into recap.config(cle, valeur) values ('mentions', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()", [m]);
+    return json(req, res, 200, { ok: true, mentions: m });
   }
   if (route === 'suivi' && req.method === 'PUT') {   // suivi des alertes « À vérifier » : vu, corrigé, note
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier le suivi.' });

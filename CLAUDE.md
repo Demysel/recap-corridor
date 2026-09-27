@@ -21,7 +21,8 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
   `GET|PUT|DELETE /api/semaine`, `PUT /api/regles` (avec `_journal` : ligne ajoutée au journal, clé `journal`),
-  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET /api/ping`, `GET /api/vitrine`.
+  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
+  lecture pour les deux codes, écriture admin, champs limités à la liste `MENTIONS`), `GET /api/ping`, `GET /api/vitrine`.
 - **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
   nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
   `/api/vitrine` renvoie des agrégats calculés sur le serveur par le moteur de la page
@@ -35,6 +36,11 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   Agences et métiers de la vitrine sont des menus déroulants sur tous les écrans (bouton qui ouvre la liste ; sur
   ordinateur et tablette elle flotte sous le bouton, sur téléphone elle s'ouvre dans la page ; se ferme en touchant ailleurs ou Échap). Le code visiteur
   ne demande jamais le détail des semaines (`ensureLoaded` s'arrête pour un non-admin).
+- Mentions légales (demandé par l'utilisateur) : onglet « Mentions légales » visible **uniquement dans la vue visiteur**
+  (menu + lien en bas de chaque page visiteur). Éditeur, contact, directeur de la publication, rédacteur, hébergeurs, contact
+  données personnelles, finalité, base légale, durée de conservation, autres mentions : saisis dans Réglages → « Mentions
+  légales » (aperçu de la page visiteur), jamais écrits dans le code ; un champ vide n'est pas affiché. Textes fixes : vitrine
+  anonyme (groupes d'au moins 5 agents), pas de cookie, stockage local du code et des préférences, polices Google Fonts.
 - `recap-corridor/public/icons/` — icône de l'application (carré rouge, rail blanc, deux stations, comme la marque) :
   favicon SVG et PNG, `apple-touch-icon.png` (écran d'accueil iPhone), icônes 192/512 et `manifest.webmanifest`
   (installation en app). Servies par `server.js` (liste fermée `ICONES`, plus `/favicon.ico` et `/apple-touch-icon.png`).
