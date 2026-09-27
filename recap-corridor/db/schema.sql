@@ -51,3 +51,6 @@ revoke all on schema recap from public, anon, authenticated;
 -- alter table recap_dev.config   enable row level security;
 -- reset role;
 -- revoke all on schema recap_dev from public, anon, authenticated;
+-- Rôle dédié (aucun droit sur « recap ») : create role recap_dev_app with login password '…' noinherit;
+-- grant recap_dev_app to postgres; alter schema recap_dev owner to recap_dev_app; puis alter table … owner to recap_dev_app;
+-- DATABASE_URL du site de test : postgresql://recap_dev_app.<ref-projet>:…@aws-1-<region>.pooler.supabase.com:5432/postgres
