@@ -155,6 +155,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Agents en double : une personne (matricule, sinon nom + prénom) n'apparaît jamais deux fois.
   Lignes en double d'un fichier fusionnées jour par jour (service > code > case vide). Missions
   datées hors de leur colonne (ligne d'une autre semaine recopiée) : non comptées, signalées.
+- Nettoyage à l'import (`nettoyerFeuille`, demandé par l'utilisateur après la S35 où des lignes d'anciennes semaines
+  avaient été ajoutées) : avant lecture, sont retirées (1) toute ligne dont toutes les cases datées portent un autre jour
+  que celui de leur colonne (au moins 2 cases, ou la personne a une autre ligne) et (2) toute ligne en double d'une
+  personne qui n'a que des codes ou des cases vides, la première ligne (plus haut dans le fichier) étant gardée. Liste des
+  lignes retirées affichée sous le fichier dans Import (« Fichier nettoyé »). Les autres doublons restent fusionnés.
 
 ## Périodes
 

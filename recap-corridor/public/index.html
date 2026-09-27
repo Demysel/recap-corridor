@@ -1000,6 +1000,36 @@ function findLayout(rows){
   return {h,start,cMat,cNom,cPre,cCor,cAge,cMet,cLun,mon,ex};
 }
 /** Feuille Récap -> structure de semaine brute (sans règles) */
+/** Nettoyage à l'import (demandé par l'utilisateur) : retire les lignes ajoutées par erreur dans le fichier, avant lecture.
+    1. Ligne d'une autre semaine : toutes ses cases datées portent un autre jour que celui de leur colonne (au moins deux
+       cases, ou la personne a une autre ligne dans le fichier) — ligne d'une ancienne semaine recopiée.
+    2. Ligne en double sans horaire : la personne a déjà une ligne plus haut, et celle-ci n'a que des codes ou des cases
+       vides (la première ligne, plus haut dans le fichier, est gardée).
+    Les autres lignes en double (deux lignes avec des services de la semaine) restent fusionnées jour par jour. */
+function nettoyerFeuille(rows){
+  const L=findLayout(rows);
+  if(!L||L.err||L.cMat<0||L.cNom<0) return {rows,retraits:[]};
+  const {cMat,cNom,cLun,mon}=L, cPre=L.cPre<0?cNom+1:L.cPre;
+  const jourCol=d=>new Date(mon.getTime()+d*864e5).getUTCDate();
+  const RE=/(?:^|\n)\s*(\d{1,2})\s*\/\s*\d{1,2}:\d{2}\s*-/;
+  const lignes=[];
+  for(let i=L.start;i<rows.length;i++){
+    const r=rows[i]; if(!r||!r.length) continue;
+    const mat=r[cMat], nom=r[cNom]; if(mat==null&&nom==null) continue;
+    const pk=personKey({matricule:mat==null?'':String(mat).trim(),nom:String(nom??'').trim(),prenom:String(r[cPre]??'').trim()});
+    let datees=0, bonnes=0;
+    for(let d=0;d<7;d++){ const t=normTxt(String(r[cLun+d]??'')); const m=RE.exec(t.split('\n').filter(x=>!/^P\d?\s*:/i.test(x.trim())).join('\n'));
+      if(m){ datees++; if(+m[1]===jourCol(d)) bonnes++; } }
+    lignes.push({i,pk,agent:`${nom??''} ${r[cPre]??''}`.trim(),datees,bonnes});
+  }
+  const parPk=groupBy(lignes,x=>x.pk), retirer=new Map();
+  for(const [,l] of parPk) for(const x of l){
+    if(x.datees&&!x.bonnes&&(x.datees>=2||l.length>1)) retirer.set(x.i,{ligne:x.i+1,agent:x.agent,raison:`ligne d’une autre semaine : ${x.datees} case${x.datees>1?'s':''} datée${x.datees>1?'s':''} d’autres jours que ceux de la semaine`});
+  }
+  for(const [,l] of parPk){ const gardees=l.filter(x=>!retirer.has(x.i)); if(gardees.length<2) continue;
+    for(const x of gardees.slice(1)) if(!x.datees) retirer.set(x.i,{ligne:x.i+1,agent:x.agent,raison:`ligne en double sans horaire (ligne ${gardees[0].i+1} gardée)`}); }
+  return {rows:rows.filter((_,i)=>!retirer.has(i)),retraits:[...retirer.values()].sort((a,b)=>a.ligne-b.ligne)};
+}
 function parseWeek(rows){
   if(!rows.length) throw new Error('Feuille vide.');
   const L=findLayout(rows);
@@ -3988,6 +4018,7 @@ function queueView(){
         <div class="rs">${q.view
           ? `${esc(q.name)} · ${taille(q.size)} · ${dFull(q.view.meta.monday)} → ${dFull(q.view.meta.sunday)} · ${nf(q.view.agents.length)} agents${q.view.meta.fusions?` (${q.view.meta.fusions} en double, fusionnés)`:''} · ${nf(q.stats.nbRHR)} RHR · ${nf(q.stats.journeesBlanches)} journées blanches · ${fmtH(q.stats.heuresSup)} d'heures sup${q.anom?` · ${q.anom} cellule${q.anom>1?'s':''} illisible${q.anom>1?'s':''}`:''}`
           : esc(q.err||q.name)}</div>
+          ${q.retraits&&q.retraits.length?`<details class="qd note" style="margin-top:8px"><summary><b>Fichier nettoyé :</b> ${q.retraits.length} ligne${q.retraits.length>1?'s':''} ajoutée${q.retraits.length>1?'s':''} par erreur retirée${q.retraits.length>1?'s':''} avant lecture</summary><ul>${q.retraits.map(x=>`<li>ligne ${x.ligne} · <b>${esc(x.agent)}</b> — ${esc(x.raison)}</li>`).join('')}</ul></details>`:''}
           ${q.susp&&q.susp.length?`<div class="note w" style="margin-top:8px"><b>Fichier à vérifier</b> par rapport à la semaine précédente : ${q.susp.map(esc).join(' · ')}</div>`:''}
           ${q.rpd&&q.rpd.length?`<details class="qd note w" style="margin-top:8px"><summary><b>${q.rpd.length} numéro${q.rpd.length>1?'s':''} de RP déjà lu${q.rpd.length>1?'s':''}</b> ailleurs : compté${q.rpd.length>1?'s':''} une seule fois</summary><ul>${q.rpd.slice(0,200).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
           ${q.parsed?`<div style="margin-top:6px">${gauge(controleOf(q.parsed))}</div>${q.parsed.anomalies.length?anomList(q.parsed.anomalies):''}${q.view.meta.horsColonne.length?`<details class="qd" style="margin-top:6px"><summary>Voir les ${q.view.meta.horsColonne.length} mission${q.view.meta.horsColonne.length>1?'s':''} hors colonne</summary><ul>${q.view.meta.horsColonne.slice(0,200).map(h=>`<li><b>${esc(h.agent)}</b> · ${esc(h.jour)} — ${esc(h.label)} du ${dtISO(h.start)}</li>`).join('')}</ul></details>`:''}`:''}</div>
@@ -4377,8 +4408,9 @@ async function handleFiles(list){
     const q={name:f.name,size:f.size,state:'lecture'}; S.queue.push(q); render();
     if(!/\.xlsx$/i.test(f.name)){ q.state='erreur'; q.err=`${f.name} — seuls les .xlsx sont lus.`; render(); continue; }
     try{
-      const {rows}=await readRecapSheet(await f.arrayBuffer());
-      const parsed=parseWeek(rows);
+      const {rows:brutes}=await readRecapSheet(await f.arrayBuffer());
+      const net=nettoyerFeuille(brutes), rows=net.rows;
+      const parsed=parseWeek(rows); q.retraits=net.retraits;
       const view=applyRules(parsed,effRules([...new Set(parsed.agents.map(a=>a.agence))]));
       view.agents.forEach(a=>a.weekId=parsed.meta.weekId);
       q.parsed=parsed; q.view=view; q.anom=parsed.anomalies.length;

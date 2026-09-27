@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -606,4 +606,23 @@ test('pause vide « P: - » : aucune pause, aucune alerte (fichier S39)', () => 
   assert.equal(a.nbMissions, 1);
   assert.equal(a.heuresPlanifiees, 5);          // 3h30 d'amplitude sans pause → comptée 5 h (règle des missions courtes)
   assert.equal(a.pauseTotaleMin, 0);
+});
+
+test('nettoyage à l’import : lignes d’autres semaines et doublons sans horaire retirés, vraie ligne gardée', () => {
+  const s35 = [svc(['A', 'HENDAYE', 'HENDAYE', 7, '10:00', 7, '17:00']), svc(['B', 'HENDAYE', 'HENDAYE', 8, '10:00', 8, '17:00']), 'RP-77', 'RP-78', 'CP', 'CP', 'CP'];
+  const ancienne = [svc(['A', 'HENDAYE', 'HENDAYE', 17, '10:00', 17, '17:00']), svc(['B', 'HENDAYE', 'HENDAYE', 18, '10:00', 18, '17:00']), 'RP-75', 'RP-76', 'CP', 'CP', 'CP'];
+  const rows = week([2026, 9, 7], [
+    { mat: '1', nom: 'GARDE', j: s35 }, { mat: '2', nom: 'CODES', j: ['CP', 'CP', 'CP', 'CP', 'CP', 'RP-78', 'RP-79'] },
+    { mat: '1', nom: 'GARDE', j: ancienne }, { mat: '2', nom: 'CODES', j: ['CP', 'CP', 'CP', 'CP', 'CP', 'RP-76', 'RP-77'] },
+    { mat: '3', nom: 'SEUL', j: [svc(['N', 'HENDAYE', 'HENDAYE', 13, '22:00', 14, '06:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]);
+  const n = E.nettoyerFeuille(rows);
+  assert.equal(n.retraits.length, 2);
+  assert.equal(n.retraits[0].ligne, 5);          // ancienne semaine de GARDE
+  assert.match(n.retraits[1].raison, /double sans horaire/);
+  const p = E.parseWeek(n.rows);
+  assert.equal(p.agents.length, 3);
+  assert.equal(p.anomalies.length, 0);
+  assert.equal(p.agents.find((a) => a.nom === 'CODES').jours[6].code, 'RP-79');
+  // un agent seul avec une seule case datée d'un autre jour n'est pas retiré (simple erreur de saisie, signalée à la lecture)
+  assert.ok(p.agents.some((a) => a.nom === 'SEUL'));
 });
