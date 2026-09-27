@@ -1523,8 +1523,27 @@ function reconcile(weeks,rulesIn){
     }
   }
   reconcileJB(weeks,rules);
+  reconcileRP(weeks);
 }
 
+/** Numéro de RP du fichier (« RP-24 ») : lu une seule fois par agent et par année civile (le compteur ARP repart en janvier).
+    Le même numéro inscrit une seconde fois (même semaine ou autre semaine) n'est pas recompté : le jour est marqué
+    rpDouble avec la première lecture. Demandé par l'utilisateur. RP sans numéro : un jour = un RP. */
+const rpNum=c=>{const m=/^RP\s*-\s*(\d+)/i.exec(String(c||'').trim());return m?+m[1]:null;};
+function reconcileRP(weeks){
+  const seen=new Map();
+  for(const id of [...weeks.keys()].sort()) for(const a of weeks.get(id).agents){
+    if(a.rpBase==null){ a.rpBase=(a.codeCounts||{}).RP||0; a.joursReposBase=a.joursRepos||0; }
+    let n=0; const pk=personKey(a);
+    for(const j of a.jours||[]){ if(j.kind!=='CODE') continue; delete j.rpDouble;
+      const num=j.family==='RP'?rpNum(j.code):null; if(num==null) continue;
+      const k=pk+'|'+j.date.slice(0,4)+'|'+num, f=seen.get(k);
+      if(f){ j.rpDouble={weekId:f.w,date:f.date}; n++; } else seen.set(k,{w:id,date:j.date}); }
+    a.rpDoubles=n;
+    if(a.codeCounts&&(n||a.codeCounts.RP!==a.rpBase)){ a.codeCounts={...a.codeCounts,RP:a.rpBase-n}; if(!a.codeCounts.RP) delete a.codeCounts.RP; }
+    a.joursRepos=a.joursReposBase-n;
+  }
+}
 function reconcileJB(weeks,rules){
   if(!rules.jbRequireFramed) return;
   const ids=[...weeks.keys()].sort(), mon=w=>Date.parse(w.meta.monday+'T00:00:00Z');
@@ -2740,7 +2759,7 @@ function sauvegardeCard(){
 
 /* ---------- à vérifier : toutes les alertes au même endroit, avec leur suivi ---------- */
 const AL_TYPES={lecture:'Lecture du fichier',horscol:'Mission hors colonne',long:'RHR de plus de 44 h',ailleurs:'Agent basé ailleurs',
-  jamais:'Jamais en résidence',chevauche:'Missions qui se chevauchent',residence:'Résidence à confirmer',ecart:'Écart inhabituel (agent)',ecartag:'Écart inhabituel (agence)',fichier:'Fichier suspect'};
+  jamais:'Jamais en résidence',chevauche:'Missions qui se chevauchent',residence:'Résidence à confirmer',ecart:'Écart inhabituel (agent)',ecartag:'Écart inhabituel (agence)',fichier:'Fichier suspect',rpdouble:'Numéro de RP en double'};
 const AL_NIV={haute:['Haute','pill-c'],moyenne:['Moyenne','pill-w'],info:['Info','pill-n']};
 /** Écarts à sa propre habitude : valeur d'une semaine à plus de 2 écarts-types de la moyenne, avec un écart minimal */
 const ECARTS=[['nbRHR','RHR',2,nf],['heuresSup','Heures sup',4,fmtH],['heuresPlanifiees','TTE',8,fmtH],['journeesBlanches','Journées blanches',2,nf]];
@@ -2779,6 +2798,8 @@ function collectAlertes(){
       for(const c of a.coupures||[]) if(c.long&&!c.manuel) add({key:`long|${c.key}`,type:'long',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`arrêt de ${fmtH(c.dureeH)} à ${c.lieu} (${dtISO(c.debut)} → ${dtISO(c.fin)}) : au-delà de l’absence maximale de l’accord`,fix:{coupure:c.key}});
       for(const c of a.chevauchements||[]) add({key:`chev|${pk}|${c.debut}`,type:'chevauche',niv:'haute',w:id,ag:a.agence,pk,titre:nm,fix:c.aStart?{chev:{pk,a:c.a,aStart:c.aStart,b:c.b,bStart:c.bStart}}:null,
         detail:`« ${c.a} » et « ${c.b} » se chevauchent de ${fmtH(c.min/60)} (${dtISO(c.debut)} → ${hm(c.fin)}) : ce temps est compté deux fois en amplitude et en TTE ; vérifiez le fichier`});
+      for(const j of a.jours||[]) if(j.rpDouble) add({key:`rpd|${pk}|${j.date}`,type:'rpdouble',niv:'info',w:id,ag:a.agence,pk,titre:nm,
+        detail:`${j.code} inscrit le ${dFull(j.date)} alors qu’il a déjà été lu le ${dFull(j.rpDouble.date)} (${j.rpDouble.weekId}) : compté une seule fois`});
       const fr=a.lieuHabituel&&!a.rattachement?{res:{pk,w:id,lieu:a.lieuHabituel}}:null;
       if(a.jamaisEnResidence) add({key:`jr|${pk}|${id}`,type:'jamais',niv:'haute',w:id,ag:a.agence,pk,titre:nm,detail:`aucune mission ne passe par la résidence ${a.residence} : tous ses arrêts comptent en RHR`,fix:fr});
       else if(a.basAilleurs) add({key:`ail|${pk}|${id}`,type:'ailleurs',niv:'moyenne',w:id,ag:a.agence,pk,titre:nm,detail:`surtout à ${a.lieuHabituel}, résidence ${a.residence} : détachement ou rattachement temporaire ?`,fix:fr}); }
@@ -3875,6 +3896,7 @@ function queueView(){
           ? `${esc(q.name)} · ${taille(q.size)} · ${dFull(q.view.meta.monday)} → ${dFull(q.view.meta.sunday)} · ${nf(q.view.agents.length)} agents${q.view.meta.fusions?` (${q.view.meta.fusions} en double, fusionnés)`:''} · ${nf(q.stats.nbRHR)} RHR · ${nf(q.stats.journeesBlanches)} journées blanches · ${fmtH(q.stats.heuresSup)} d'heures sup${q.anom?` · ${q.anom} cellule${q.anom>1?'s':''} illisible${q.anom>1?'s':''}`:''}`
           : esc(q.err||q.name)}</div>
           ${q.susp&&q.susp.length?`<div class="note w" style="margin-top:8px"><b>Fichier à vérifier</b> par rapport à la semaine précédente : ${q.susp.map(esc).join(' · ')}</div>`:''}
+          ${q.rpd&&q.rpd.length?`<details class="qd note w" style="margin-top:8px"><summary><b>${q.rpd.length} numéro${q.rpd.length>1?'s':''} de RP déjà lu${q.rpd.length>1?'s':''}</b> ailleurs : compté${q.rpd.length>1?'s':''} une seule fois</summary><ul>${q.rpd.slice(0,200).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
           ${q.parsed?`<div style="margin-top:6px">${gauge(controleOf(q.parsed))}</div>${q.parsed.anomalies.length?anomList(q.parsed.anomalies):''}${q.view.meta.horsColonne.length?`<details class="qd" style="margin-top:6px"><summary>Voir les ${q.view.meta.horsColonne.length} mission${q.view.meta.horsColonne.length>1?'s':''} hors colonne</summary><ul>${q.view.meta.horsColonne.slice(0,200).map(h=>`<li><b>${esc(h.agent)}</b> · ${esc(h.jour)} — ${esc(h.label)} du ${dtISO(h.start)}</li>`).join('')}</ul></details>`:''}`:''}</div>
         <div class="ract">${s!=='enregistre'?`<button class="btn btn-sm" data-qdel="${i}">Retirer</button>`:''}</div></div>`;}).join('')}</div>
     ${ok?`<div><button class="btn btn-pri" id="saveAll"${S.busy?' disabled':''}>${S.busy?'Enregistrement…':`Enregistrer ${ok} semaine${ok>1?'s':''}`}</button>
@@ -4156,16 +4178,17 @@ const codeOrd=k=>FAM_REPOS.includes(k)?0:FAM_CONGES.includes(k)?1:2;
 /** Tuile « Codes » de la fiche : acronyme + nombre ; au survol ou au clic, les jours décomptés avec le code du fichier */
 function codesTile(weeks,a){
   const jours={};
-  for(const x of weeks) for(const j of x.jours||[]) if(j.kind==='CODE'&&j.family!=='HORS') (jours[j.family]=jours[j.family]||[]).push({date:j.date,code:j.code,sh:!!j.sansHoraire});
+  for(const x of weeks) for(const j of x.jours||[]) if(j.kind==='CODE'&&j.family!=='HORS') (jours[j.family]=jours[j.family]||[]).push({date:j.date,code:j.code,sh:!!j.sansHoraire,dbl:j.rpDouble||null});
   const fam=Object.keys(jours).sort((p,q)=>codeOrd(p)-codeOrd(q)||p.localeCompare(q));
   if(!fam.length) return `<div class="codes"><div class="k">Codes (repos, congés, absences)</div><div class="v"><span class="mut" style="font-size:13px">aucun</span></div></div>`;
   const lab=k=>k==='AUTRE'?'Autres codes (absences)':CODEL[k]||k;
-  const line=d=>`${JS[(new Date(d.date+'T00:00:00Z').getUTCDay()+6)%7]} ${dFull(d.date)} · ${d.code}${d.sh?' (mission sans horaire lisible)':''}`;
+  const line=d=>`${JS[(new Date(d.date+'T00:00:00Z').getUTCDay()+6)%7]} ${dFull(d.date)} · ${d.code}${d.sh?' (mission sans horaire lisible)':''}${d.dbl?` — déjà lu le ${dFull(d.dbl.date)}, non recompté`:''}`;
+  const nb=k=>jours[k].filter(d=>!d.dbl).length;
   const sel=S.dwCode&&jours[S.dwCode]?S.dwCode:null;
   return `<div class="codes"><div class="k">Codes (repos, congés, absences) · touchez un code pour voir ses jours</div><div class="v">${fam.map(k=>{
       const l=jours[k].sort((x,y)=>x.date.localeCompare(y.date));
-      return `<button class="cd-b" data-dwcode="${esc(k)}" aria-pressed="${sel===k}" title="${esc(lab(k)+'\n'+l.map(line).join('\n'))}">${esc(k)} <b>${l.length}</b></button>`;}).join('')}</div>
-    ${sel?`<div class="cd-l"><div class="sub-h" style="margin:8px 0 4px">${esc(lab(sel))} — ${jours[sel].length} jour${jours[sel].length>1?'s':''}</div>${jours[sel].map(d=>`<div class="mono sm">${esc(line(d))}</div>`).join('')}</div>`:''}</div>`;
+      return nb(k)||l.length?`<button class="cd-b" data-dwcode="${esc(k)}" aria-pressed="${sel===k}" title="${esc(lab(k)+'\n'+l.map(line).join('\n'))}">${esc(k)} <b>${nb(k)}</b></button>`:'';}).join('')}</div>
+    ${sel?`<div class="cd-l"><div class="sub-h" style="margin:8px 0 4px">${esc(lab(sel))} — ${nb(sel)} jour${nb(sel)>1?'s':''}${nb(sel)!==jours[sel].length?` (+ ${jours[sel].length-nb(sel)} numéro${jours[sel].length-nb(sel)>1?'s':''} déjà lu${jours[sel].length-nb(sel)>1?'s':''})`:''}</div>${jours[sel].map(d=>`<div class="mono sm">${esc(line(d))}</div>`).join('')}</div>`:''}</div>`;
 }
 function renderDrawer(){
   if(!S.drawer) return;
@@ -4241,6 +4264,17 @@ function renderDrawer(){
 /* ==========================================================================
    13. IMPORT
    ========================================================================== */
+/** Import : numéros de RP de la semaine déjà lus dans une autre semaine enregistrée (ou deux fois dans le fichier) */
+async function rpDejaLus(view){
+  const id=view.meta.weekId, y=new Set([view.meta.monday.slice(0,4),view.meta.sunday.slice(0,4)]);
+  await ensureLoaded(S.weeks.filter(w=>w.weekId!==id&&(y.has(w.monday.slice(0,4))||y.has(w.sunday.slice(0,4)))).map(w=>w.weekId));
+  const m=new Map([...S.loaded.entries()].filter(([k])=>k!==id).map(([k,v])=>[k,{agents:v.agents.map(a=>({...a,jours:(a.jours||[]).map(j=>({...j}))}))}]));
+  m.set(id,{agents:view.agents.map(a=>({...a,jours:(a.jours||[]).map(j=>({...j}))}))});
+  reconcileRP(new Map([...m.entries()].sort((a,b)=>a[0].localeCompare(b[0]))));
+  const out=[];
+  for(const [k,v] of m) for(const a of v.agents) for(const j of a.jours) if(j.rpDouble&&(k===id||j.rpDouble.weekId===id)) out.push(`${a.nom} ${a.prenom} : ${j.code} le ${dFull(j.date)}, déjà lu le ${dFull(j.rpDouble.date)}`);
+  return out;
+}
 async function handleFiles(list){
   S.err=null; S.msg=null;
   const files=[...list].filter(Boolean);
@@ -4260,6 +4294,7 @@ async function handleFiles(list){
       const pm=isoD(new Date(Date.parse(parsed.meta.monday)-7*DAY)), prevW=S.weeks.find(w=>w.monday===pm);
       q.susp=suspicions({nbAgents:parsed.agents.length,agences:[...new Set(parsed.agents.map(a=>a.agence))],fusions:view.meta.fusions,
         vides:parsed.agents.filter(a=>a.jours.every(j=>j.kind==='VIDE')).length,extractDate:parsed.meta.extractDate,monday:parsed.meta.monday},prevW||null);
+      q.rpd=await rpDejaLus(view);
       const dup=S.queue.find(o=>o!==q&&o.view&&o.view.meta.weekId===parsed.meta.weekId);
       if(dup){ q.state='erreur'; q.err=`${f.name} — ${weekLabel(parsed.meta)} est déjà dans la liste.`; }
       else q.state='pret';

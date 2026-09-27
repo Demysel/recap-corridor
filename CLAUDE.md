@@ -121,7 +121,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   qui commence pareil (modifiable dans Réglages). Codes « CP/CP » lus comme CP ; ponctuation finale ignorée (« JF, » = JF).
   La famille d'un code est relue sur le code écrit à chaque affichage (applyRules) : les semaines importées avec un
   ancien classement (JF, RF, AT, CSS… rangés dans « AUTRE ») sont reclassées sans réimport.
-  RP compté en jours (une case RP = 1), pas d'après le numéro « RP-n » du fichier (compteur ARP).
+  RP : une case RP = 1 jour, mais un numéro « RP-n » du fichier n'est lu qu'une fois par agent et par année civile
+  de la date (demandé par l'utilisateur ; `reconcileRP`, rejoué à chaque affichage) : s'il réapparaît (même semaine ou
+  autre semaine), le jour est marqué `rpDouble`, non compté, visible dans la tuile « Codes » de la fiche (« déjà lu le… »),
+  alerte « Numéro de RP en double » (niveau info) dans « À vérifier », et signalé à l'import (`rpDejaLus`, comparé aux
+  semaines enregistrées de la même année). RP sans numéro : chaque case compte.
 - TTE (temps de travail effectif, anciennement « heures planifiées », renommé à la demande) : amplitude
   moins les pauses « P: » ; une ATCMD compte 5 h de TTE, mais son amplitude reste l'horaire réel inscrit
   dans la case (précisé par l'utilisateur) ; ses paniers se lisent aussi sur cet horaire réel

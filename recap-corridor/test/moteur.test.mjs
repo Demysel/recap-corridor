@@ -537,3 +537,15 @@ test('codes : « JF, » reste un JF, et une semaine lue avec un ancien classemen
   p.agents[0].jours[0] = { ...p.agents[0].jours[0], family: 'AUTRE' };
   assert.equal(E.applyRules(p, RES).agents[0].jours[0].family, 'JF');
 });
+
+test('RP : un numéro de RP n’est lu qu’une fois, même inscrit sur deux semaines (demandé par l’utilisateur)', () => {
+  const w1 = E.parseWeek(week([2026, 3, 2], [{ mat: '1', nom: 'TEST', j: ['RP-20', 'RP-21', 'RP-21', 'RP', 'CP', 'RP', 'RP-24'] }]));
+  const w2 = E.parseWeek(week([2026, 3, 9], [{ mat: '1', nom: 'TEST', j: ['RP-24', 'RP-25', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  const m = new Map([['2026-S10', E.applyRules(w1, RES)], ['2026-S11', E.applyRules(w2, RES)]]);
+  E.reconcile(m, RES); E.reconcile(m, RES);   // rejoué : pas de double retrait
+  const a = m.get('2026-S10').agents[0], b = m.get('2026-S11').agents[0];
+  assert.equal(a.codeCounts.RP, 5);           // RP-21 en double dans la semaine : 6 cases, 5 comptées
+  assert.equal(b.codeCounts.RP, 6);           // RP-24 déjà lu en S10
+  assert.equal(b.jours[0].rpDouble.weekId, '2026-S10');
+  assert.equal(a.joursRepos, 5);
+});
