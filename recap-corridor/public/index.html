@@ -1290,17 +1290,21 @@ function computeAgent(a,days,rules,residence,weekId){
   let joursService=0,nbMissions=0,amp=0,pauseMin=0,plan=0,nuit=0,dim=0,ampMax=0,wk=0,priseMin=null,finMax=null;
   let nbMHIS=0,nbDISPO=0,nbATCMD=0,nbTrajetsSeuls=0,pausesInconnues=0;
   const codeCounts={}, types={}, dests={};
+  // ventilation jour par jour (jour de la case = jour de début de la mission) : un mois ou une année
+  // se coupe au jour près (sliceAgent), les heures sup restant à la semaine
+  const parJour=Array.from({length:7},()=>({js:0,wk:0,nb:0,amp:0,pause:0,plan:0,nuit:0,dim:0,mhis:0,dispo:0,atcmd:0,traj:0,pinc:0,ampMax:0,prise:null,fin:null,types:{},dests:{}}));
   const sun0=days[6].getTime(), sun1=sun0+DAY;
   for(const j of jours){
     if(j.kind==='CODE') codeCounts[j.family]=(codeCounts[j.family]||0)+1;
     else if(j.kind==='SERVICE'){
       joursService++; if(j.d>=5) wk++;
+      const pj=parJour[j.d]; pj.js=1; if(j.d>=5) pj.wk=1;
       j.amplitude=rM(j.missions.reduce((s,m)=>s+missionAmp(m,rules),0));
       let hj=0;
       for(const m of j.missions){
         const S=new Date(m.start), E=new Date(m.end), Sm=S.getTime(), Em=E.getTime();
         const atcmd=/ATCMD/i.test(m.label), segs=workSegments(m);
-        if(m.pauseMin>0&&!(m.pauses&&m.pauses.length&&Array.isArray(m.pauses[0]))) pausesInconnues++;
+        if(m.pauseMin>0&&!(m.pauses&&m.pauses.length&&Array.isArray(m.pauses[0]))){ pausesInconnues++; pj.pinc++; }
         const hPlan=missionTTE(m,rules);
         // ATCMD : heures de nuit et du dimanche ramenées à ses heures fixes, au prorata de l'horaire réel (validé par l'utilisateur)
         const hNuitR=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
@@ -1319,6 +1323,10 @@ function computeAgent(a,days,rules,residence,weekId){
         if(/DISPO/i.test(m.label)) nbDISPO++;
         if(atcmd) nbATCMD++;
         if(isTrajetSeul(m.label,trajTypes)) nbTrajetsSeuls++;
+        pj.nb++; pj.amp+=mAmp; pj.pause+=missionMinutes(m).pause; pj.plan+=hPlan; pj.nuit+=hNuit; pj.dim+=hDim;
+        if(mAmp>pj.ampMax) pj.ampMax=mAmp; if(pj.prise===null||sh<pj.prise) pj.prise=sh; if(pj.fin===null||eh>pj.fin) pj.fin=eh;
+        pj.types[m.type]=(pj.types[m.type]||0)+1; if(m.to) pj.dests[m.to]=(pj.dests[m.to]||0)+1;
+        if(/MHIS/i.test(m.label)) pj.mhis++; if(/DISPO/i.test(m.label)) pj.dispo++; if(atcmd) pj.atcmd++; if(isTrajetSeul(m.label,trajTypes)) pj.traj++;
       }
       j.heures=rM(hj);
     }
@@ -1444,10 +1452,58 @@ function computeAgent(a,days,rules,residence,weekId){
     jamaisEnResidence: rhrOk&&!!residence&&all.length>0&&!toucheRes,
     lieuHabituel, basAilleurs: rhrOk&&!!residence&&!!lieuHabituel&&!isRes(lieuHabituel),
     premiereMission: all.length?{label:all[0].label,from:all[0].from,start:all[0].start}:null,
-    missions: all.map(m=>({label:m.label,from:m.from,to:m.to,start:m.start,end:m.end,d:m.d}))
+    missions: all.map(m=>({label:m.label,from:m.from,to:m.to,start:m.start,end:m.end,d:m.d})), parJour
   };
   setBands(out);
   return out;
+}
+/** Partie d'une ligne agent-semaine comprise entre deux dates (incluses) : un mois ou une année s'arrête au
+    dernier jour, pas à la semaine du jeudi (demandé par l'utilisateur). Missions, heures, nuit, dimanche, codes et
+    journées blanches au jour de la case ; RHR (et ses paniers) au jour où il commence ; heures sup comptées à la
+    semaine, entières dans la partie qui contient le jeudi. Semaine entière dans la période : ligne inchangée. */
+function sliceAgent(a,d0,d1){
+  const inR=dt=>dt>=d0&&dt<=d1, dOf=x=>String(x).slice(0,10);
+  const inD=a.jours.map(j=>inR(j.date));
+  if(inD.every(Boolean)) return a;
+  if(!inD.some(Boolean)) return null;
+  const P=(a.parJour||[]).filter((_,d)=>inD[d]), sum=k=>P.reduce((s,x)=>s+(x[k]||0),0);
+  const sumO=k=>P.reduce((o,x)=>{for(const [y,v] of Object.entries(x[k]||{})) o[y]=(o[y]||0)+v; return o;},{});
+  const jours=a.jours.map((j,d)=>inD[d]?j:{...j,horsPeriode:true});
+  const cc={}; for(const j of jours) if(!j.horsPeriode&&j.kind==='CODE'&&!j.rpDouble) cc[j.family]=(cc[j.family]||0)+1;
+  const rhrDe=p=>a.rhr.find(x=>dOf(x.debut)<=p.date&&(!x.fin||p.date<=dOf(x.fin)));
+  const paniers=(a.paniers||[]).filter(p=>{ const r=p.source==='RHR'?rhrDe(p):null; return inR(r?dOf(r.debut):p.date); });
+  const rhr=a.rhr.filter(x=>inR(dOf(x.debut))), js=sum('js'), amp=sum('amp');
+  const pr=P.map(x=>x.prise).filter(x=>x!=null), fi=P.map(x=>x.fin).filter(x=>x!=null);
+  const o={...a, partiel:{d0,d1}, jours,
+    joursService:js, weekendTravaille:sum('wk'), nbMissions:sum('nb'),
+    amplitudeTotale:rM(amp), amplitudeMoyenne:js?r2(amp/js):0, amplitudeMax:rM(Math.max(0,...P.map(x=>x.ampMax))),
+    pauseTotaleMin:sum('pause'), heuresPlanifiees:rM(sum('plan')), heuresNuit:rM(sum('nuit')), heuresDimanche:rM(sum('dim')),
+    heuresSup:inR(a.jours[3].date)?a.heuresSup:0,
+    nbMHIS:sum('mhis'), nbDISPO:sum('dispo'), nbATCMD:sum('atcmd'), nbTrajetsSeuls:sum('traj'), pausesInconnues:sum('pinc'),
+    priseServicePlusTot:pr.length?Math.min(...pr):null, finServicePlusTard:fi.length?Math.max(...fi):null,
+    typesMission:sumO('types'), destinations:sumO('dests'),
+    codeCounts:cc, joursRepos:FAM_REPOS.reduce((s,k)=>s+(cc[k]||0),0), joursCP:FAM_CONGES.reduce((s,k)=>s+(cc[k]||0),0),
+    joursAbsence:Object.entries(cc).reduce((s,[k,v])=>s+(FAM_REPOS.includes(k)||FAM_CONGES.includes(k)||k==='HORS'?0:v),0),
+    joursVides:jours.filter(j=>!j.horsPeriode&&j.kind==='VIDE').length,
+    rhr, nbRHR:rhr.length, rhrEnCours:rhr.some(x=>x.enCours&&!x.fin)?1:0, rhrHeures:rM(rhr.reduce((s,x)=>s+(x.dureeH||0),0)),
+    rhrNuits:rhr.reduce((s,x)=>s+(x.nuits||0),0), rhrLieux:[...new Set(rhr.map(x=>x.lieu))],
+    coupures:(a.coupures||[]).filter(c=>inR(dOf(c.debut))),
+    blanches:a.blanches.filter(b=>inR(b.date)), casesVides:(a.casesVides||[]).filter(b=>inR(b.date)),
+    paniers, nbPaniers:paniers.length, paniersMidi:paniers.filter(p=>p.plage==='midi').length, paniersSoir:paniers.filter(p=>p.plage==='soir').length,
+    paniersNuit:paniers.filter(p=>p.plage==='nuit').length, paniersRHR:paniers.filter(p=>p.source==='RHR').length,
+    chevauchements:(a.chevauchements||[]).filter(c=>inR(dOf(c.debut))),
+    nbHorsColonne:jours.reduce((s,j)=>s+(!j.horsPeriode&&j.horsColonne?j.horsColonne.length:0),0),
+    missions:(a.missions||[]).filter(m=>inD[m.d])};
+  o.journeesBlanches=o.blanches.length;
+  o.premiereMission=o.missions[0]?{label:o.missions[0].label,from:o.missions[0].from,start:o.missions[0].start}:null;
+  setBands(o);
+  return o;
+}
+/** Parties d'une ligne agent-semaine par mois civil (une semaine touche au plus deux mois) */
+function moisParts(a){
+  const ms=[...new Set(a.jours.map(j=>j.date.slice(0,7)))];
+  if(ms.length<2) return [[a,ms[0]]];
+  return ms.map(m=>[sliceAgent(a,m+'-01',m+'-31'),m]).filter(x=>x[0]);
 }
 /** Paniers : 1 h en service (horaire de la mission, pauses comprises) entre 11h30 et 13h30, 1 h entre 18h30 et 20h30, 3 h entre 22h et 5h,
     ou un RHR qui touche la plage du midi et/ou du soir (un panier par plage). Un panier au plus par plage et par jour. */
@@ -1710,7 +1766,7 @@ function cellStats(list,w,ag,me){
     if(a.journeesBlanches>0) c.avecJB++; if(a.heuresSup>0) c.avecSup++;
     c.dist.jbN[Math.min(3,a.journeesBlanches)]++;
     if(a.joursService) c.dist.hp[binOf(a.heuresPlanifiees,V_HP)]++;
-    for(const j of a.jours){ if(j.kind!=='SERVICE') continue;
+    for(const j of a.jours){ if(j.kind!=='SERVICE'||j.horsPeriode) continue;
       c.dist.amp[binOf(j.amplitude,V_AMP)]++;
       const p=new Date(j.missions[0].start), e=new Date(j.missions[j.missions.length-1].end);
       c.heat.prise[p.getUTCHours()]++; c.dow.prise[(p.getUTCDay()+6)%7][p.getUTCHours()]++; c.heat.fin[e.getUTCHours()]++;
@@ -1733,14 +1789,20 @@ function vitrineData(weeks,rulesIn,K=VITRINE_K){
   for(const [id,v] of map){
     const autres=[];
     v.agents=v.agents.filter(a=>!a.exclu);
+    // semaine à cheval sur deux mois : en plus de la semaine entière, une cellule par mois (mêmes groupes, mêmes
+    // agents, chiffres coupés au jour près) pour les mois et années civils (demandé par l'utilisateur)
+    const parts=[...new Set([v.meta.monday.slice(0,7),v.meta.sunday.slice(0,7)])], cellsW=cells;
+    const cellStatsW=(list,w,ag,me)=>{ if(parts.length>1) for(const m of parts){
+        const sl=list.map(a=>sliceAgent(a,m+'-01',m+'-31')).filter(Boolean); if(sl.length) cellsW.push({...cellStats(sl,w,ag,me),p:m}); }
+      return cellStats(list,w,ag,me); };
     for(const [ag,l] of groupBy(v.agents,a=>a.agence)){
       if(l.length<K){ autres.push(...l); continue; }
       const byMe=[...groupBy(l,a=>a.metier)], big=byMe.filter(([,x])=>x.length>=K), small=byMe.filter(([,x])=>x.length<K).flatMap(([,x])=>x);
-      if(!small.length) big.forEach(([me,x])=>cells.push(cellStats(x,id,ag,me)));
-      else if(small.length>=K){ big.forEach(([me,x])=>cells.push(cellStats(x,id,ag,me))); cells.push(cellStats(small,id,ag,'Autres métiers')); }
-      else cells.push(cellStats(l,id,ag,'Tous métiers'));
+      if(!small.length) big.forEach(([me,x])=>cells.push(cellStatsW(x,id,ag,me)));
+      else if(small.length>=K){ big.forEach(([me,x])=>cells.push(cellStatsW(x,id,ag,me))); cells.push(cellStatsW(small,id,ag,'Autres métiers')); }
+      else cells.push(cellStatsW(l,id,ag,'Tous métiers'));
     }
-    if(autres.length>=K) cells.push(cellStats(autres,id,'Autres agences','Tous métiers')); else ecartes+=autres.length;
+    if(autres.length>=K) cells.push(cellStatsW(autres,id,'Autres agences','Tous métiers')); else ecartes+=autres.length;
     // flux entre lieux et lieux de RHR : publiés seulement si au moins K agents différents y passent
     const E=new Map(), R=new Map(), RS=new Set(Object.values(v.meta.residences||{}).filter(Boolean).map(normLieu));
     for(const a of v.agents){ const pk=personKey(a);
@@ -1959,7 +2021,19 @@ const agName=a=>effRules().agencesAlias[a]||a;
 const allAgences=()=>{const R=effRules(), al=R.agencesAlias;return [...new Set(S.weeks.flatMap(w=>w.agences||[]).map(a=>al[a]||a))].filter(a=>!agenceExclue(a,{...DEFAULT_RULES,...R})).sort();};
 const allMetiers=()=>[...new Set(S.weeks.flatMap(w=>w.metiers||[]).map(m=>normMetier(m)||m))].sort();
 /* Périodes : une semaine, un mois, une année, ou un échantillon glissant compté depuis la dernière semaine enregistrée.
-   Une semaine appartient au mois et à l'année de son jeudi (règle ISO : c'est là qu'elle a le plus de jours). */
+   Mois et années au jour près (demandé par l'utilisateur) : 2025 s'arrête au 31/12, 2026 commence au 01/01 ; une semaine
+   à cheval est coupée (sliceAgent). Le jeudi (règle ISO) ne sert plus qu'aux heures sup, comptées à la semaine. */
+const finMois=m=>isoD(new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7),0)));
+function periodRange(code){
+  if(!code||!code.includes(':')) return null;
+  const [t,v]=code.split(/:(.*)/);
+  return t==='m'?[v+'-01',finMois(v)]:t==='y'?[v+'-01-01',v+'-12-31']:null;
+}
+/** Lignes agent-semaine d'une période, coupées au jour près pour un mois ou une année */
+function rowsOfPeriod(rows,code){
+  const ids=new Set(periodWeeks(code,S.weeks)), r=periodRange(code);
+  return rows.filter(a=>ids.has(a.weekId)).map(a=>r?sliceAgent(a,r[0],r[1]):a).filter(Boolean);
+}
 const jeudi=w=>isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+3*DAY));
 const MOISF=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const ECHANT=[['n:2','2 dernières semaines'],['n:4','4 dernières semaines'],['r:1','Dernier mois'],['r:3','3 derniers mois'],['r:6','6 derniers mois'],['r:12','12 derniers mois'],['__all__','Toujours (toutes les semaines)']];
@@ -1968,8 +2042,7 @@ function periodWeeks(code,weeks){
   if(!code||code==='__all__') return all;
   const [t,v]=code.includes(':')?code.split(/:(.*)/):['w',code];
   if(t==='w') return all.includes(v)?[v]:[];
-  if(t==='m') return L.filter(w=>jeudi(w).slice(0,7)===v).map(w=>w.weekId);
-  if(t==='y') return L.filter(w=>jeudi(w).slice(0,4)===v).map(w=>w.weekId);
+  if(t==='m'||t==='y'){ const r=periodRange(code); return L.filter(w=>w.monday<=r[1]&&w.sunday>=r[0]).map(w=>w.weekId); }
   if(t==='n') return all.slice(-(+v||1));
   if(t==='r'&&L.length){ const last=new Date(L[L.length-1].sunday+'T00:00:00Z'); const c=new Date(last); c.setUTCMonth(c.getUTCMonth()-(+v||1));
     return L.filter(w=>Date.parse(w.sunday+'T00:00:00Z')>c.getTime()).map(w=>w.weekId); }
@@ -1977,7 +2050,7 @@ function periodWeeks(code,weeks){
 }
 function periodOptions(code,weeks){
   const L=weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)), sel=v=>v===code||(!code.includes(':')&&v==='w:'+code)?' selected':'';
-  const ys=[...new Set(L.map(w=>jeudi(w).slice(0,4)))], ms=[...new Set(L.map(w=>jeudi(w).slice(0,7)))];
+  const ms=[...new Set(L.flatMap(w=>[w.sunday.slice(0,7),w.monday.slice(0,7)]))], ys=[...new Set(ms.map(m=>m.slice(0,4)))];
   const n=c=>periodWeeks(c,weeks).length;
   return `<optgroup label="Échantillons">${ECHANT.map(([v,l])=>`<option value="${v}"${sel(v)}>${l} (${n(v)} sem.)</option>`).join('')}</optgroup>
     <optgroup label="Années">${ys.map(y=>`<option value="y:${y}"${sel('y:'+y)}>${y} (${n('y:'+y)} sem.)</option>`).join('')}</optgroup>
@@ -1987,7 +2060,8 @@ function periodOptions(code,weeks){
 function periodLabel(code,weeks){
   const ids=periodWeeks(code,weeks), W=id=>weeks.find(w=>w.weekId===id);
   if(!ids.length) return 'aucune semaine';
-  const a=W(ids[0]), b=W(ids[ids.length-1]);
+  const a=W(ids[0]), b=W(ids[ids.length-1]), r=periodRange(code);
+  if(r) return `${ids.length} semaine${ids.length>1?'s':''} · du ${dFull(a.monday>r[0]?a.monday:r[0])} au ${dFull(b.sunday<r[1]?b.sunday:r[1])}`;
   return ids.length===1?`${weekLabel(a)} · du ${dFull(a.monday)} au ${dFull(a.sunday)}`:`${ids.length} semaines · du ${dFull(a.monday)} au ${dFull(b.sunday)}`;
 }
 const activeWeeks=()=>periodWeeks(S.selWeek,S.weeks);
@@ -1996,7 +2070,7 @@ const agenceColor=ag=>`var(${SER[Math.max(0,allAgences().indexOf(ag))%8]})`;
 
 /** Lignes agent-semaine du périmètre (une par personne et par semaine, doublons du fichier déjà fusionnés) */
 function scopeAgents(opts={}){
-  const out=[];
+  const out=[], rg=opts.allWeeks?null:periodRange(S.selWeek);
   for(const id of (opts.allWeeks?S.weeks.map(w=>w.weekId):activeWeeks())){
     const w=S.loaded.get(id); if(!w) continue;
     for(const a of w.agents){
@@ -2005,7 +2079,8 @@ function scopeAgents(opts={}){
       if(S.selMetiers&&!S.selMetiers.includes(a.metier)) continue;
       if(S.search&&!deacc(`${a.nom} ${a.prenom} ${a.matricule}`).toLowerCase().includes(deacc(S.search).toLowerCase())) continue;
       if(!opts.tousAgents&&S.selAgents&&S.selAgents.length&&!S.selAgents.includes(personKey(a))) continue;
-      out.push(a.weekId?a:Object.assign(a,{weekId:id}));
+      if(!a.weekId) a.weekId=id;
+      const x=rg?sliceAgent(a,rg[0],rg[1]):a; if(x) out.push(x);
     }
   }
   return out;
@@ -2386,7 +2461,8 @@ const COLS=[
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
 /** Année du compte « CP de l'année » : celle (jeudi) de la dernière semaine de la période sélectionnée */
-const anneeCP=()=>{ const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?jeudi(w).slice(0,4):String(new Date().getUTCFullYear()); };
+const anneeCP=()=>{ const r=periodRange(S.selWeek); if(r) return r[1].slice(0,4);
+  const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?jeudi(w).slice(0,4):String(new Date().getUTCFullYear()); };
 function sortAgents(list){
   const {k,dir}=S.sort, col=COLS.find(c=>c.k===k);
   const val=a=>col&&col.t?col.t(a):(typeof a[k]==='number'?pv(a,k):a[k]);
@@ -2397,8 +2473,8 @@ function sortAgents(list){
 function viewAgents(){
   const sc=scopeAgents(); if(!sc.length) return emptyScope();
   // détail des codes (RP, RF, JF, RCL, RCC, CP) et CP pris sur toute l'année de la période
-  const yr=anneeCP(), yIds=new Set(periodWeeks('y:'+yr,S.weeks)), cpY=new Map();
-  for(const [id,v] of S.loaded) if(yIds.has(id)) for(const x of v.agents) if(!x.exclu){ const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); }
+  const yr=anneeCP(), cpY=new Map();
+  for(const x of rowsOfPeriod([...S.loaded.entries()].flatMap(([id,v])=>v.agents.map(a=>a.weekId?a:Object.assign(a,{weekId:id}))),'y:'+yr)) if(!x.exclu){ const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); }
   const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0; return o; });
   const list=sortAgents(merged), cols=visCols().map(c=>c.k==='cpAnnee'?{...c,l:'CP '+yr}:c), nW=nbWeeksLoaded();
   S.rows_agents=list;
@@ -3257,8 +3333,8 @@ function statVal(list,k,mode){
   return r2(MED(v));
 }
 const stGroup=g=>g==='metier'?a=>a.metier:g==='agmet'?a=>a.agence+' · '+a.metier:a=>a.agence;
-function perKey(weekId,e){
-  const w=S.weeks.find(x=>x.weekId===weekId), m=w?jeudi(w):String(weekId);   // semaine rattachée au mois de son jeudi
+function perKey(a,e){
+  const weekId=a.weekId, m=a._mois||String(weekId);   // partie de semaine rattachée à son mois civil (moisParts)
   return e==='semaine'?weekId:e==='mois'?m.slice(0,7):e==='trimestre'?`${m.slice(0,4)}-T${Math.floor((+m.slice(5,7)-1)/3)+1}`:m.slice(0,4);
 }
 function perLabel(k,e){
@@ -3298,9 +3374,10 @@ function viewStats(){
       return `<td class="${c.trim()}">${v==null?'<span class="z">n/a</span>':stFmt(r.f.k)(v)}</td>`;}).join('')}<td><b>${r.tot==null?'—':stFmt(r.f.k)(r.tot)}</b></td></tr>`).join('')}
   </tbody></table></div>`;
   /* évolution par période, sur toutes les semaines enregistrées */
-  const all=scopeAgents({allWeeks:true});
-  const pers=[...new Set(all.map(a=>perKey(a.weekId,st.echelle)))].sort();
-  const byP=groupBy(all,a=>perKey(a.weekId,st.echelle));
+  const all0=scopeAgents({allWeeks:true});
+  const all=st.echelle==='semaine'?all0:all0.flatMap(a=>moisParts(a).map(([p,m])=>({...p,_mois:m})));
+  const pers=[...new Set(all.map(a=>perKey(a,st.echelle)))].sort();
+  const byP=groupBy(all,a=>perKey(a,st.echelle));
   const topG=[...groupBy(all,gf)].map(([g,l])=>[g,statVal(l,K,'total')||0]).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
   const series=topG.map((g,i)=>({name:g,short:g.length>10?g.slice(0,9)+'…':g,color:`var(${SER[i%8]})`,
     values:pers.map(p=>{const l=(byP.get(p)||[]).filter(a=>gf(a)===g);return l.length?statVal(l,K,mode):null;})}));
@@ -3428,8 +3505,11 @@ function viewVitrine(){
   const AG=[...new Set(V.cells.map(c=>c.ag))].sort((a,b)=>a==='Autres agences'?1:b==='Autres agences'?-1:a.localeCompare(b,'fr'));
   const ME=[...new Set(V.cells.map(c=>c.me))].sort();
   const inAg=c=>!vf.ags||vf.ags.includes(c.ag), inMe=c=>!vf.me||vf.me.includes(c.me);
-  const selW=new Set(periodWeeks(vf.w,sem)), multi=selW.size>1;
-  const scopeC=V.cells.filter(c=>inAg(c)&&inMe(c)), cur=scopeC.filter(c=>selW.has(c.w));
+  const selW=new Set(periodWeeks(vf.w,sem)), multi=selW.size>1, rg=periodRange(vf.w), WS=new Map(sem.map(w=>[w.weekId,w]));
+  // semaine entière dans la période : cellule de la semaine ; semaine coupée par le mois ou l'année : sa part du mois
+  const dansPer=c=>{ if(!selW.has(c.w)) return false; if(!rg) return !c.p; const w=WS.get(c.w);
+    return w.monday>=rg[0]&&w.sunday<=rg[1]?!c.p:!!c.p&&c.p>=rg[0].slice(0,7)&&c.p<=rg[1].slice(0,7); };
+  const cellsP=V.cells.filter(c=>inAg(c)&&inMe(c)), scopeC=cellsP.filter(c=>!c.p), cur=cellsP.filter(dansPer);
   if(!cur.length) return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Rien à afficher pour ce choix</h3><p>Élargissez les agences ou les métiers.</p></div></section>`;
   const g=vAgg(cur), perW=sem.filter(w=>selW.has(w.weekId)).map(w=>{const l=scopeC.filter(c=>c.w===w.weekId);return l.length?vAgg(l):null;});
   const wl=w=>`S${String(w.week).padStart(2,'0')} ${w.year}`;
@@ -3531,7 +3611,7 @@ function viewComparer(){
     const inR=(id,x,y)=>id>=(x<y?x:y)&&id<=(x<y?y:x);
     const wsOf=(p,x,y)=>p==='perso'?ids.filter(id=>inR(id,x,y)):periodWeeks(p,S.weeks);
     const wa=new Set(wsOf(c.pa,c.a0,c.a1)), wb=new Set(wsOf(c.pb,c.b0,c.b1));
-    const la=all.filter(a=>wa.has(a.weekId)), lb=all.filter(a=>wb.has(a.weekId));
+    const la=c.pa==='perso'?all.filter(a=>wa.has(a.weekId)):rowsOfPeriod(all,c.pa), lb=c.pb==='perso'?all.filter(a=>wb.has(a.weekId)):rowsOfPeriod(all,c.pb);
     const lab0=(x,y)=>x===y?weekLabel(W(x)):`${weekLabel(W(x<y?x:y))} → ${weekLabel(W(x<y?y:x))}`;
     const labP=(p,x,y)=>p==='perso'?lab0(x,y):(p==='__all__'||/^[nr]:/.test(p))?(ECHANT.find(e=>e[0]===p)||[,''])[1]:p.startsWith('y:')?p.slice(2):p.startsWith('m:')?`${MOISF[+p.slice(7)-1]} ${p.slice(2,6)}`:weekLabel(W(p.replace(/^w:/,'')));
     const la_=labP(c.pa,c.a0,c.a1), lb_=labP(c.pb,c.b0,c.b1);
@@ -3544,7 +3624,7 @@ function viewComparer(){
   } else if(c.mode==='agences'){
     const ags=[...new Set(all.map(a=>a.agence))].sort();
     c.gA=ags.includes(c.gA)?c.gA:ags[0]; c.gB=ags.includes(c.gB)&&c.gB!==c.gA?c.gB:(ags.find(x=>x!==c.gA)||ags[0]);
-    const act=new Set(activeWeeks()), la=all.filter(a=>a.agence===c.gA&&act.has(a.weekId)), lb=all.filter(a=>a.agence===c.gB&&act.has(a.weekId));
+    const act=rowsOfPeriod(all,S.selWeek), la=act.filter(a=>a.agence===c.gA), lb=act.filter(a=>a.agence===c.gB);
     const o=v=>ags.map(a=>`<option${a===v?' selected':''}>${esc(a)}</option>`).join('');
     ctrls=`<div class="fld"><span class="flabel">Agence A</span><select data-cmpf="gA">${o(c.gA)}</select></div><div class="fld"><span class="flabel">Agence B</span><select data-cmpf="gB">${o(c.gB)}</select></div>`;
     const hA=profilH(la), hB=profilH(lb);
@@ -3556,7 +3636,7 @@ function viewComparer(){
   } else {
     // agents choisis dans le sélecteur « Agent » du haut, tous côte à côte, sur une période au choix (mêmes options que le filtre)
     const per=c.per||S.selWeek, wk=new Set(periodWeeks(per,S.weeks));
-    const rows=all.filter(a=>wk.has(a.weekId)), G=groupBy(rows,personKey), ks=selAg().filter(k=>G.has(k));
+    const rows=rowsOfPeriod(all,per), G=groupBy(rows,personKey), ks=selAg().filter(k=>G.has(k));
     const who=k=>{const a=G.get(k)[0];return `${a.nom} ${a.prenom}`;};
     ctrls=`<div class="fld"><span class="flabel">Période</span><select data-cmpf="per" style="max-width:300px">${periodOptions(per,S.weeks)}</select></div>
       <div class="fld"><span class="flabel">Agents</span><span class="mut sm" style="padding-top:8px">choisis dans « Agent » en haut (${nf(selAg().length)})</span></div>`;
@@ -4178,7 +4258,7 @@ const codeOrd=k=>FAM_REPOS.includes(k)?0:FAM_CONGES.includes(k)?1:2;
 /** Tuile « Codes » de la fiche : acronyme + nombre ; au survol ou au clic, les jours décomptés avec le code du fichier */
 function codesTile(weeks,a){
   const jours={};
-  for(const x of weeks) for(const j of x.jours||[]) if(j.kind==='CODE'&&j.family!=='HORS') (jours[j.family]=jours[j.family]||[]).push({date:j.date,code:j.code,sh:!!j.sansHoraire,dbl:j.rpDouble||null});
+  for(const x of weeks) for(const j of x.jours||[]) if(j.kind==='CODE'&&j.family!=='HORS'&&!j.horsPeriode) (jours[j.family]=jours[j.family]||[]).push({date:j.date,code:j.code,sh:!!j.sansHoraire,dbl:j.rpDouble||null});
   const fam=Object.keys(jours).sort((p,q)=>codeOrd(p)-codeOrd(q)||p.localeCompare(q));
   if(!fam.length) return `<div class="codes"><div class="k">Codes (repos, congés, absences)</div><div class="v"><span class="mut" style="font-size:13px">aucun</span></div></div>`;
   const lab=k=>k==='AUTRE'?'Autres codes (absences)':CODEL[k]||k;
@@ -4195,7 +4275,8 @@ function renderDrawer(){
   // après une correction, la fiche est reconstruite à partir des chiffres recalculés
   // période de la fiche : celle du filtre principal, sauf si une autre est choisie dans la fiche (jusqu'à sa fermeture)
   const per=S.dwPer||S.selWeek, ids=new Set(periodWeeks(per,S.weeks));
-  const pk0=personKey(S.drawer), rows=[...S.loaded.entries()].filter(([id])=>ids.has(id)).flatMap(([,v])=>v.agents).filter(x=>personKey(x)===pk0);
+  const pk0=personKey(S.drawer), rg=periodRange(per), rows=[...S.loaded.entries()].filter(([id])=>ids.has(id)).flatMap(([,v])=>v.agents).filter(x=>personKey(x)===pk0)
+    .map(x=>rg?sliceAgent(x,rg[0],rg[1]):x).filter(Boolean);
   const upd=mergeAcrossWeeks(rows).find(Boolean);
   const vide=!upd;
   if(upd) S.drawer=upd;

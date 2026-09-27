@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -548,4 +548,41 @@ test('RP : un numéro de RP n’est lu qu’une fois, même inscrit sur deux sem
   assert.equal(b.codeCounts.RP, 6);           // RP-24 déjà lu en S10
   assert.equal(b.jours[0].rpDouble.weekId, '2026-S10');
   assert.equal(a.joursRepos, 5);
+});
+
+test('périodes au jour près : une semaine à cheval sur deux années se coupe au 31/12 (demandé par l’utilisateur)', () => {
+  // semaine du lundi 29/12/2025 au dimanche 04/01/2026
+  const j = [svc(['A', 'HENDAYE', 'HENDAYE', 29, '06:00', 29, '14:00']), 'RP-117', svc(['N', 'HENDAYE', 'HENDAYE', 31, '22:00', 1, '06:00']),
+    'JF', svc(['B', 'HENDAYE', 'HENDAYE', 2, '08:00', 2, '16:00']), 'RP-1', svc(['C', 'HENDAYE', 'HENDAYE', 4, '06:00', 4, '20:00'])];
+  const a = run(week([2025, 12, 29], [{ mat: '1', nom: 'TEST', j }]), RES).agents[0];
+  const y25 = E.sliceAgent(a, '2025-01-01', '2025-12-31'), y26 = E.sliceAgent(a, '2026-01-01', '2026-12-31');
+  assert.equal(y25.nbMissions, 2);                 // la nuit du 31/12 → 01/01 reste au jour de début
+  assert.equal(y25.heuresPlanifiees, 16);
+  assert.equal(y25.heuresNuit, 7);
+  assert.equal(y25.codeCounts.RP, 1);
+  assert.equal(y25.codeCounts.JF, undefined);
+  assert.equal(y26.nbMissions, 2);
+  assert.equal(y26.codeCounts.JF, 1);
+  assert.equal(y26.codeCounts.RP, 1);
+  assert.equal(y26.heuresDimanche, a.heuresDimanche);
+  // les deux parties redonnent la semaine entière ; heures sup entières dans la partie du jeudi (01/01)
+  for (const k of ['nbMissions', 'heuresPlanifiees', 'amplitudeTotale', 'heuresNuit', 'joursService', 'nbPaniers', 'joursRepos'])
+    assert.equal(Math.round((y25[k] + y26[k]) * 60), Math.round(a[k] * 60), k);
+  assert.equal(y25.heuresSup, 0);
+  assert.equal(y26.heuresSup, a.heuresSup);
+  assert.equal(E.sliceAgent(a, '2025-12-29', '2026-01-04'), a);
+  assert.equal(E.sliceAgent(a, '2026-02-01', '2026-02-28'), null);
+  assert.equal(E.moisParts(a).map(([, m]) => m).join(), '2025-12,2026-01');
+});
+
+test('vitrine : une semaine à cheval sur deux années a aussi une cellule par partie, mêmes groupes (≥ 5 agents)', () => {
+  const ag = (i) => ({ mat: '9' + i, nom: 'X' + i, ag: 'Hendaye', met: 'CONDUCTEUR',
+    j: [svc(['A', 'HENDAYE', 'HENDAYE', 29, '06:00', 29, '14:00']), 'RP', svc(['B', 'HENDAYE', 'HENDAYE', 31, '06:00', 31, '14:00']), 'JF', svc(['C', 'HENDAYE', 'HENDAYE', 2, '06:00', 2, '14:00']), 'RP', 'RP'] });
+  const v = E.vitrineData([E.parseWeek(week([2025, 12, 29], [1, 2, 3, 4, 5].map(ag)))], E.loadRules({ residences: { Hendaye: 'HENDAYE' } }));
+  const full = v.cells.find((c) => !c.p), p25 = v.cells.find((c) => c.p === '2025-12'), p26 = v.cells.find((c) => c.p === '2026-01');
+  assert.equal(v.cells.length, 3);
+  assert.ok(v.cells.every((c) => c.n >= 5));
+  assert.equal(full.s.nbMissions, 15);
+  assert.equal(p25.s.nbMissions, 10);
+  assert.equal(p26.s.nbMissions, 5);
 });

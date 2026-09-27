@@ -159,8 +159,14 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 Sélecteur « Période » en haut (et dans la Vitrine, et pour les périodes A et B de l’onglet Comparer, qui gardent aussi le choix « du… au… ») : échantillons glissants comptés depuis la dernière
 semaine enregistrée (2 et 4 dernières semaines, dernier mois, 3, 6 et 12 derniers mois, toujours),
-années, mois, semaines. Une semaine appartient au mois et à l'année de son jeudi (règle ISO), y compris
-pour les regroupements par mois / trimestre / année de l'onglet Statistiques.
+années, mois, semaines. **Mois et années au jour près** (demandé par l'utilisateur : 2025 s'arrête au 31/12, 2026
+commence au 01/01) : une semaine à cheval est coupée (`sliceAgent`, ventilation `parJour` de computeAgent ; `periodRange`,
+`rowsOfPeriod`, `moisParts`) — missions, heures, nuit, dimanche, codes, journées blanches au jour de la case (une
+mission ou un RHR à cheval sur minuit compte au jour où il commence, paniers du RHR avec lui) ; **heures sup comptées
+à la semaine**, entières dans la partie qui contient le jeudi. S'applique au filtre principal, à la fiche, à Comparer,
+au « CP <année> », aux regroupements mois / trimestre / année des Statistiques et à la vitrine (cellules en plus par
+mois pour une semaine à cheval, champ `p`, mêmes groupes ≥ 5 agents ; la carte des flux reste par semaine entière).
+Les échantillons glissants (2, 4 semaines, n mois) restent en semaines entières.
 Sélecteur « Agent » du filtre principal : choix multiple (liste avec recherche, puces retirables, « Effacer ») ;
 toutes les vues se limitent aux agents choisis ; Comparer → « Agents » (plus d'agents A / B) : les agents choisis
 s'affichent côte à côte (valeur la plus haute en ambre, la plus basse en rose), sur une période au choix avec les mêmes
