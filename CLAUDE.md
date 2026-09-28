@@ -21,7 +21,7 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
   `GET|PUT|DELETE /api/semaine`, `PUT /api/regles` (avec `_journal` : ligne ajoutée au journal, clé `journal`),
-  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
+  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET /api/source` (admin : fichier conservé d'une semaine), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
   lecture pour les deux codes, écriture admin, champs limités à la liste `MENTIONS`), `GET /api/ping`, `GET /api/vitrine`.
 - **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
   nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
@@ -136,7 +136,13 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (validé par l'utilisateur : deux missions de 4 h = 10 h ; réglable, 0 = désactivé). Nuit, dimanche et paniers restent lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
   Calcul blindé : durées recalculées en minutes entières depuis les horaires (`missionMinutes`), pauses = réunion des
   pauses ramenées dans la mission (jamais déduites deux fois), totaux gardés en minutes exactes (`rM`, aucune dérive
-  d'arrondi). Ligne de pause vide « P: - » = aucune pause, sans alerte (`RE_PV`). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
+  d'arrondi). **Anciens fichiers (S01 à S19, onglet « Corridor Atlantique ») : les pauses ne sont pas dans les cases** ; elles
+  viennent de l'onglet « Extract » (une ligne par agent et par jour, clé matricule|date, `readExtract`) : pause de la journée =
+  WorkDuration (T) − WorkDurationEffective (U) (précisé par l'utilisateur), répartie entre les JS du jour au prorata de leur
+  durée, placée au milieu de chaque mission (donc retirée des heures de nuit et du dimanche là où elle tombe) — `pausesExtract`.
+  Jamais de pause sur une ATCMD (5 h fixes) ni sur un trajet VOY (l'écart T − U y est un coefficient ≈ 58,7 %, pas une pause :
+  horaire complet gardé ; jour VOY + autre JS : la pause va à l'autre JS) — choix de l'utilisateur. Rien n'est ajouté si la case
+  a déjà ses pauses « P: ». Ligne de pause vide « P: - » = aucune pause, sans alerte (`RE_PV`). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
   Test aléatoire de 400 semaines contre un calcul de référence indépendant.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
@@ -160,6 +166,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   que celui de leur colonne (au moins 2 cases, ou la personne a une autre ligne) et (2) toute ligne en double d'une
   personne qui n'a que des codes ou des cases vides, la première ligne (plus haut dans le fichier) étant gardée. Liste des
   lignes retirées affichée sous le fichier dans Import (« Fichier nettoyé »). Les autres doublons restent fusionnés.
+- Fichier conservé et « Relire » (demandé par l'utilisateur) : à chaque import, la feuille lue (lignes brutes, 60 colonnes au
+  plus) et les durées T / U de l'Extract pour les jours de la semaine sont enregistrées avec la semaine (document `details`
+  d'`agence_slug` `~source`, jamais envoyé au visiteur ni à la vitrine ; `GET /api/source`). Import → « Relire » (par semaine)
+  ou « Tout relire » : refait la lecture avec les règles actuelles (nettoyage, pauses, Extract), place la semaine dans la file
+  avec l'écart avant → après (TTE, heures sup, missions, RHR, paniers, nuit) ; rien n'est enregistré sans « Enregistrer ».
+  Semaines importées avant cette version : à réimporter une fois.
 
 ## Périodes
 

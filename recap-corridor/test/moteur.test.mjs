@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -625,4 +625,28 @@ test('nettoyage à l’import : lignes d’autres semaines et doublons sans hora
   assert.equal(p.agents.find((a) => a.nom === 'CODES').jours[6].code, 'RP-79');
   // un agent seul avec une seule case datée d'un autre jour n'est pas retiré (simple erreur de saisie, signalée à la lecture)
   assert.ok(p.agents.some((a) => a.nom === 'SEUL'));
+});
+
+test('anciens fichiers : pause = WorkDuration (T) − WorkDurationEffective (U) de l’onglet Extract', () => {
+  // en-tête de l'Extract, puis une ligne par agent et par jour (durées en fraction de jour, comme Excel)
+  const h = (x) => x / 24, d = (j) => serial(2026, 9, j);
+  const HX = ['CodeID', 'Code', 'FullName', 'ID', 'Date', 'Nbr', null, 'JS1', 'D1', 'F1', 'From', 'To', 'JS2', 'D2', 'F2', 'From', 'To', 'DayType', 'Shift', 'WorkDuration', 'WorkDurationEffective'];
+  const ligne = (id, j, T, U) => { const r = Array(21).fill(null); r[3] = id; r[4] = d(j); r[19] = h(T); r[20] = h(U); return r; };
+  const ex = E.readExtract([HX, ligne('1', 7, 8, 7), ligne('1', 8, 11, 10.5), ligne('1', 9, 7, 2.5), ligne('1', 10, 5, 3), ligne('1', 13, 8, 7.5)]);
+  assert.equal(ex['1|2026-09-07'].join(), '480,420');
+  const j = [svc(['MHIS', 'HENDAYE', 'HENDAYE', 7, '08:00', 7, '16:00']),
+    svc(['A', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '07:00'], ['B', 'HENDAYE', 'HENDAYE', 8, '14:00', 8, '23:00']),
+    svc(['ATCMD-1', 'HENDAYE', 'HENDAYE', 9, '10:00', 9, '17:00']), svc(['VOY-7', 'HENDAYE', 'BORDEAUX', 10, '10:00', 10, '15:00']), 'RP', 'RP',
+    svc(['N', 'HENDAYE', 'HENDAYE', 13, '06:00', 13, '14:00'])];
+  const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }]), ex);
+  const js = p.agents[0].jours;
+  assert.equal(js[0].missions[0].pauseMin, 60);                          // 8 h − 7 h
+  assert.equal(js[0].missions[0].pauses[0][0], new Date(Date.UTC(2026, 8, 7, 11, 30)).toISOString());   // au milieu de la mission
+  assert.equal(js[1].missions[0].pauseMin + js[1].missions[1].pauseMin, 30);   // 30 min pour la journée…
+  assert.equal(js[1].missions[1].pauseMin, 25);                          // …au prorata des JS (2 h et 9 h)
+  assert.equal(js[2].missions[0].pauseMin, 0);                           // ATCMD : jamais de pause
+  assert.equal(js[3].missions[0].pauseMin, 0);                           // trajet VOY : horaire complet
+  const a = E.applyRules(p, RES).agents[0];
+  assert.equal(a.heuresDimanche, 7.5);                                   // pause retirée du dimanche
+  assert.equal(E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }])).agents[0].jours[0].missions[0].pauseMin, 0);   // sans Extract : rien
 });

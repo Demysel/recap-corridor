@@ -798,6 +798,23 @@ const serialDate=n=>{ if(typeof n!=='number'||!isFinite(n))return null;
   return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); };
 const deacc=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
 
+/** Onglet « Extract » (anciens fichiers, S01 à S19) : une ligne par agent et par jour. Pause de la journée = WorkDuration (T)
+    − WorkDurationEffective (U), précisé par l'utilisateur. Clé : matricule|date → [T, U] en minutes. */
+function readExtract(rows){
+  const low=r=>(r||[]).map(c=>c==null?'':String(c).toLowerCase().replace(/\s+/g,''));
+  let h=-1; for(let i=0;i<Math.min(rows.length,10);i++){ const r=low(rows[i]); if(r.includes('workduration')&&r.includes('workdurationeffective')){h=i;break;} }
+  if(h<0) return null;
+  const hd=low(rows[h]), cT=hd.indexOf('workduration'), cU=hd.indexOf('workdurationeffective'), cId=hd.indexOf('id'), cD=hd.indexOf('date');
+  if(cId<0||cD<0) return null;
+  const dur=v=>{ if(typeof v==='number'&&isFinite(v)) return Math.round(v*1440);
+    const m=/^\s*(\d+):(\d{2})(?::\d{2})?\s*$/.exec(String(v??'')); return m?+m[1]*60+ +m[2]:null; };
+  const out={};
+  for(let i=h+1;i<rows.length;i++){ const r=rows[i]; if(!r||!r.length) continue;
+    const id=String(r[cId]??'').trim(), d=typeof r[cD]==='number'?serialDate(r[cD]):(Date.parse(r[cD])?new Date(Date.parse(String(r[cD]).slice(0,10)+'T00:00:00Z')):null);
+    const T=dur(r[cT]), U=dur(r[cU]);
+    if(id&&d&&T!=null&&U!=null) out[id+'|'+isoD(d)]=[T,U]; }
+  return Object.keys(out).length?out:null;
+}
 async function readRecapSheet(ab){
   const zip=await readZip(ab);
   const wb=await zip.text('xl/workbook.xml');
@@ -823,7 +840,12 @@ async function readRecapSheet(ab){
     if(!sx) continue;
     const rows=parseSheet(sx,ss);
     if(!first) first={sheetName:tgt.name,rows};
-    if(findLayout(rows)) return {sheetName:tgt.name,rows};
+    if(findLayout(rows)){
+      // anciens fichiers : l'onglet « Extract » donne WorkDuration (T) et WorkDurationEffective (U) de chaque journée
+      const ex=sheets.find(x=>nm(x)==='extract'&&x!==tgt); let extract=null;
+      if(ex){ const xx=(await zip.text('xl/'+ex.path))||(await zip.text(ex.path)); if(xx) extract=readExtract(parseSheet(xx,ss,40)); }
+      return {sheetName:tgt.name,rows,extract};
+    }
   }
   if(!first) throw new Error("Aucune feuille lisible dans le classeur.");
   return first;   // parseWeek expliquera ce qui manque
@@ -1030,7 +1052,22 @@ function nettoyerFeuille(rows){
     for(const x of gardees.slice(1)) if(!x.datees) retirer.set(x.i,{ligne:x.i+1,agent:x.agent,raison:`ligne en double sans horaire (ligne ${gardees[0].i+1} gardée)`}); }
   return {rows:rows.filter((_,i)=>!retirer.has(i)),retraits:[...retirer.values()].sort((a,b)=>a.ligne-b.ligne)};
 }
-function parseWeek(rows){
+/** Pause de la journée lue dans l'Extract (T − U) : répartie entre les JS du jour au prorata de leur durée, placée au milieu
+    de chaque mission (retirée des heures de nuit et du dimanche là où elle tombe). Jamais de pause pendant une ATCMD, ni
+    sur un trajet VOY (horaire complet ; un jour VOY + autre JS : la pause va à l'autre JS). Choix de l'utilisateur. Rien n'est ajouté si la case a déjà ses pauses « P: ». */
+function pausesExtract(c,e){
+  if(!e||!(e[0]>e[1])) return;
+  // ATCMD : 5 h fixes, jamais de pause ; trajets VOY : l'écart T − U est un coefficient, pas une pause → horaire complet gardé
+  const ms=c.missions.filter(m=>!/ATCMD|VOY/i.test(m.label)); if(!ms.length||c.missions.some(m=>m.pauses&&m.pauses.length)) return;
+  const t0=m=>Date.parse(m.start), len=m=>Math.max(0,Date.parse(m.end)-t0(m)), tot=ms.reduce((s,m)=>s+len(m),0); if(!tot) return;
+  const P=(e[0]-e[1])*6e4; let reste=P;
+  ms.forEach((m,i)=>{ const p=i===ms.length-1?reste:Math.round(P*len(m)/tot/6e4)*6e4; reste-=p;
+    const q=Math.min(p,len(m)); if(q<=0) return;
+    const mid=t0(m)+len(m)/2;
+    m.pauses=[[new Date(mid-q/2).toISOString(),new Date(mid+q/2).toISOString()]];
+    const mm=missionMinutes(m); m.pauseMin=mm.pause; m.travail=(mm.amp-mm.pause)/60; m.nbPauses=1; m.pauseExtract=Math.round(q/6e4); });
+}
+function parseWeek(rows,extract){
   if(!rows.length) throw new Error('Feuille vide.');
   const L=findLayout(rows);
   if(!L) throw new Error("En-têtes introuvables : aucune ligne ne contient « Matricule » et « Nom » dans les 15 premières lignes de la feuille.");
@@ -1055,7 +1092,9 @@ function parseWeek(rows){
       const c=parseDayCell(r[cLun+d],mon);
       const pkA=personKey({matricule:mat==null?'':String(mat).trim(),nom:String(nom??'').trim(),prenom:String(r[cPre]??'').trim()});
       (c.anom||[]).forEach(a=>anomalies.push({agent:`${nom??''} ${r[cPre]??''}`.trim(),jour:JN[d],message:a,pk:pkA,date:isoD(days[d]),brut:normTxt(String(r[cLun+d]??'')).slice(0,600)}));
-      delete c.anom; jours.push(c);
+      delete c.anom;
+      if(extract&&c.kind==='SERVICE') pausesExtract(c,extract[String(mat??'').trim()+'|'+isoD(days[d])]);
+      jours.push(c);
     }
     agents.push({
       matricule: mat==null?'':String(mat).trim(),
@@ -1993,6 +2032,11 @@ const backend={
     const s=await ADB.collection('detail').where('weekId','==',id).get();
     return {docs:s.docs.map(d=>d.data())};
   },
+  /** Fichier conservé avec une semaine (feuille lue + durées de l'Extract), pour la relire sans le réimporter */
+  async source(id){
+    if(backend.mode!=='artifact') return backend.call('source?id='+encodeURIComponent(id));
+    const d=await ADB.doc(`detail/${id}__~source`).get(); return {source:d.exists?d.data().source||null:null};
+  },
   async saveSemaine(resume,details){
     if(backend.mode!=='artifact') return backend.call('semaine',{method:'PUT',body:JSON.stringify({resume,details})});
     for(const d of details) await ADB.doc(`detail/${resume.weekId}__${d.agenceSlug}`).set(d);
@@ -2140,8 +2184,9 @@ async function ensureLoaded(ids){
     if(S.loaded.has(id)) continue;
     const {docs}=await withLoad(api.semaine(id));
     if(!docs||!docs.length) continue;
-    const meta=docs[0].meta;
-    const agents=docs.flatMap(d=>d.agents);
+    const dd=docs.filter(d=>Array.isArray(d.agents)); if(!dd.length) continue;
+    const meta=dd[0].meta;
+    const agents=dd.flatMap(d=>d.agents);
     S.parsedCache.set(id,{meta,agents});
     const v=applyRules({meta,agents},effRules()); v.agents.forEach(a=>a.weekId=id);
     S.loaded.set(id,v);
@@ -3979,7 +4024,8 @@ function viewImport(){
       ${S.err?`<div class="note c"><b>Lecture impossible.</b> ${esc(S.err)}</div>`:''}
       ${S.queue.length?queueView():''}
     </div></section>
-    <section class="card"><div class="card-h"><div><h2>Semaines enregistrées</h2><p class="card-s">${S.weeks.length} au total — supprimer un fichier retire sa semaine des chiffres</p></div></div>
+    <section class="card"><div class="card-h"><div><h2>Semaines enregistrées</h2><p class="card-s">${S.weeks.length} au total — supprimer un fichier retire sa semaine des chiffres · « Relire » refait la lecture du fichier conservé (heures, pauses, nettoyage) et montre l’écart avant d’enregistrer</p></div>
+      ${S.weeks.length&&admin()?`<button class="btn btn-sm" id="relireAll"${S.busy?' disabled':''}>Tout relire</button>`:''}</div>
       <div class="card-b">${S.weeks.length?`<div class="rows">${S.weeks.map(w=>{const fn=w.fileName||(w.fichier&&w.fichier.nom), ft=w.taille??(w.fichier&&w.fichier.taille);
         return `<div class="row"><div class="rl"><div class="rt">${weekLabel(w)} <span class="mut nb">· ${weekRange(w)}</span></div>
           <div class="rs">${fn?`${esc(fn)}${ft?` · ${taille(ft)}`:''} · `:''}${nf(w.nbAgents)} lignes · ${(w.agences||[]).length} agences · extrait ARP du ${w.extractDate?dISO(w.extractDate):'?'} · importé le ${dISO(w.importedAt)}</div>
@@ -3987,7 +4033,7 @@ function viewImport(){
           ${w.controle&&w.controle.anomalies&&w.controle.anomalies.length?anomList(w.controle.anomalies):''}</div>
         <div class="ract">${S.delAsk===w.weekId
           ?`<span class="mut sm">Supprimer ${weekLabel(w)} ?</span><button class="btn btn-sm dgr" data-delok="${w.weekId}">Confirmer</button><button class="btn btn-sm" data-delno="1">Annuler</button>`
-          :`<button class="btn btn-sm" data-del="${w.weekId}">Supprimer</button>`}</div></div>`;}).join('')}</div>`
+          :`<button class="btn btn-sm" data-relire="${w.weekId}" title="Relire le fichier conservé avec les règles de lecture actuelles, sans le réimporter">Relire</button> <button class="btn btn-sm" data-del="${w.weekId}">Supprimer</button>`}</div></div>`;}).join('')}</div>`
         :'<p class="mut">Aucune semaine enregistrée pour l’instant.</p>'}</div></section>`;
 }
 /** Part des cases jour lues sans anomalie */
@@ -4018,6 +4064,7 @@ function queueView(){
         <div class="rs">${q.view
           ? `${esc(q.name)} · ${taille(q.size)} · ${dFull(q.view.meta.monday)} → ${dFull(q.view.meta.sunday)} · ${nf(q.view.agents.length)} agents${q.view.meta.fusions?` (${q.view.meta.fusions} en double, fusionnés)`:''} · ${nf(q.stats.nbRHR)} RHR · ${nf(q.stats.journeesBlanches)} journées blanches · ${fmtH(q.stats.heuresSup)} d'heures sup${q.anom?` · ${q.anom} cellule${q.anom>1?'s':''} illisible${q.anom>1?'s':''}`:''}`
           : esc(q.err||q.name)}</div>
+          ${q.relecture?`<div class="note" style="margin-top:8px"><b>Relecture du fichier conservé</b> — avant → après : ${[['TTE','heuresPlanifiees',fmtH],['heures sup','heuresSup',fmtH],['missions','nbMissions',nf],['RHR','nbRHR',nf],['paniers','nbPaniers',nf],['heures de nuit','heuresNuit',fmtH]].map(([l,k,f])=>{const a=q.relecture.avant[k]||0,b=q.stats[k]||0;return `${l} ${f(a)} → <b${a!==b?' style="color:var(--accent)"':''}>${f(b)}</b>`;}).join(' · ')}${q.relecture.pausesExtract?` · ${nf(q.relecture.pausesExtract)} pause${q.relecture.pausesExtract>1?'s':''} lue${q.relecture.pausesExtract>1?'s':''} dans l’onglet Extract`:''}. Rien n’est modifié tant que vous n’enregistrez pas.</div>`:''}
           ${q.retraits&&q.retraits.length?`<details class="qd note" style="margin-top:8px"><summary><b>Fichier nettoyé :</b> ${q.retraits.length} ligne${q.retraits.length>1?'s':''} ajoutée${q.retraits.length>1?'s':''} par erreur retirée${q.retraits.length>1?'s':''} avant lecture</summary><ul>${q.retraits.map(x=>`<li>ligne ${x.ligne} · <b>${esc(x.agent)}</b> — ${esc(x.raison)}</li>`).join('')}</ul></details>`:''}
           ${q.susp&&q.susp.length?`<div class="note w" style="margin-top:8px"><b>Fichier à vérifier</b> par rapport à la semaine précédente : ${q.susp.map(esc).join(' · ')}</div>`:''}
           ${q.rpd&&q.rpd.length?`<details class="qd note w" style="margin-top:8px"><summary><b>${q.rpd.length} numéro${q.rpd.length>1?'s':''} de RP déjà lu${q.rpd.length>1?'s':''}</b> ailleurs : compté${q.rpd.length>1?'s':''} une seule fois</summary><ul>${q.rpd.slice(0,200).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
@@ -4400,6 +4447,28 @@ async function rpDejaLus(view){
   for(const [k,v] of m) for(const a of v.agents) for(const j of a.jours) if(j.rpDouble&&(k===id||j.rpDouble.weekId===id)) out.push(`${a.nom} ${a.prenom} : ${j.code} le ${dFull(j.date)}, déjà lu le ${dFull(j.rpDouble.date)}`);
   return out;
 }
+/** « Relire » : refait la lecture du fichier conservé avec les règles de lecture actuelles (nettoyage, pauses « P: » et Extract),
+    et le place dans la file d'import avec l'écart avant / après ; rien n'est enregistré sans « Enregistrer ». */
+async function relireSemaines(ids){
+  S.err=null; S.msg=null; const sans=[];
+  await ensureLoaded(ids);
+  for(const id of ids){
+    const w=S.weeks.find(x=>x.weekId===id); if(!w) continue;
+    S.queue=S.queue.filter(q=>!(q.relecture&&q.parsed&&q.parsed.meta.weekId===id));
+    try{
+      const {source}=await withLoad(api.source(id));
+      if(!source||!source.rows){ sans.push(weekLabel(w)); continue; }
+      const net=nettoyerFeuille(source.rows), parsed=parseWeek(net.rows,source.extract||null);
+      const view=applyRules(parsed,effRules([...new Set(parsed.agents.map(a=>a.agence))])); view.agents.forEach(a=>a.weekId=id);
+      const avant=agg((S.loaded.get(id)?.agents||[]).filter(a=>!a.exclu));
+      const pe=parsed.agents.reduce((s,a)=>s+a.jours.reduce((t,j)=>t+(j.missions||[]).filter(m=>m.pauseExtract).length,0),0);
+      S.queue.push({name:w.fileName||weekLabel(w),size:w.taille??null,state:'pret',parsed,view,anom:parsed.anomalies.length,stats:agg(view.agents.filter(a=>!a.exclu)),
+        existe:true,retraits:net.retraits,source,relecture:{avant,pausesExtract:pe}});
+    }catch(e){ S.queue.push({name:weekLabel(w),state:'erreur',err:`${weekLabel(w)} — ${e.message||e}`}); }
+  }
+  if(sans.length) S.msg={m:`Fichier non conservé pour ${sans.join(', ')} (importée${sans.length>1?'s':''} avant cette version) : réimportez-${sans.length>1?'les':'la'} une fois, la relecture sera ensuite possible.`,t:'w'};
+  S.tab='import'; render();
+}
 async function handleFiles(list){
   S.err=null; S.msg=null;
   const files=[...list].filter(Boolean);
@@ -4408,9 +4477,10 @@ async function handleFiles(list){
     const q={name:f.name,size:f.size,state:'lecture'}; S.queue.push(q); render();
     if(!/\.xlsx$/i.test(f.name)){ q.state='erreur'; q.err=`${f.name} — seuls les .xlsx sont lus.`; render(); continue; }
     try{
-      const {rows:brutes}=await readRecapSheet(await f.arrayBuffer());
+      const {rows:brutes,extract,sheetName}=await readRecapSheet(await f.arrayBuffer());
       const net=nettoyerFeuille(brutes), rows=net.rows;
-      const parsed=parseWeek(rows); q.retraits=net.retraits;
+      const parsed=parseWeek(rows,extract); q.retraits=net.retraits;
+      q.source=sourceDe(brutes,extract,parsed,sheetName);
       const view=applyRules(parsed,effRules([...new Set(parsed.agents.map(a=>a.agence))]));
       view.agents.forEach(a=>a.weekId=parsed.meta.weekId);
       q.parsed=parsed; q.view=view; q.anom=parsed.anomalies.length;
@@ -4428,7 +4498,15 @@ async function handleFiles(list){
     render();
   }
 }
-function weekPayload(parsed,view,fileName,size){
+/** Fichier conservé avec la semaine (pour « Relire ») : lignes de la feuille lue (sans colonnes vides en fin de ligne)
+    et, pour les anciens fichiers, les durées T / U de l'Extract limitées aux jours de la semaine */
+function sourceDe(rows,extract,parsed,sheetName){
+  const trim=r=>{ const x=(r||[]).slice(0,60); let n=x.length; while(n&&x[n-1]==null) n--; return x.slice(0,n); };
+  const jours=new Set(parsed.meta.days), ex={};
+  if(extract) for(const [k,v] of Object.entries(extract)) if(jours.has(k.slice(k.lastIndexOf('|')+1))) ex[k]=v;
+  return {sheetName:sheetName||'',rows:rows.map(trim),extract:extract?ex:null,lu:new Date().toISOString()};
+}
+function weekPayload(parsed,view,fileName,size,source){
   const agences=[...new Set(parsed.agents.map(a=>a.agence))].sort();
   const byAgence={};
   for(const [k,list] of groupBy(view.agents,a=>a.agence+'||'+a.metier)){
@@ -4440,8 +4518,9 @@ function weekPayload(parsed,view,fileName,size){
   return {
     resume:{...parsed.meta,agences,byAgence,fileName:fileName||'',taille:size??null,importedAt:new Date().toISOString(),controle:controleOf(parsed),
       metiers:[...new Set(parsed.agents.map(a=>a.metier))].sort()},
-    details:agences.map(ag=>({weekId:parsed.meta.weekId,agence:ag,agenceSlug:slug(ag),meta:parsed.meta,
+    details:[...agences.map(ag=>({weekId:parsed.meta.weekId,agence:ag,agenceSlug:slug(ag),meta:parsed.meta,
       agents:parsed.agents.filter(a=>a.agence===ag)})),
+      ...(source?[{weekId:parsed.meta.weekId,agenceSlug:'~source',source}]:[])],
   };
 }
 async function saveAll(){
@@ -4452,7 +4531,7 @@ async function saveAll(){
     if(q.state!=='pret') continue;
     q.state='envoi'; render();
     try{
-      const p=weekPayload(q.parsed,q.view,q.name,q.size);
+      const p=weekPayload(q.parsed,q.view,q.name,q.size,q.source);
       await api.saveSemaine(p.resume,p.details);
       const id=q.parsed.meta.weekId;
       S.parsedCache.set(id,{meta:q.parsed.meta,agents:q.parsed.agents});
@@ -4481,7 +4560,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4545,6 +4624,8 @@ document.addEventListener('click',async e=>{
     return saveCorrection(`Résidence de l’agent : ${normLieu(l)} (${perLab(w)})`,nmPk(pk)); }
   if(t.dataset.dwreset){ S.dwPer=null; renderDrawer(); return; }
   if(t.dataset.dwcode){ S.dwCode=S.dwCode===t.dataset.dwcode?null:t.dataset.dwcode; renderDrawer(); return; }
+  if(t.dataset.relire&&admin()){ await relireSemaines([t.dataset.relire]); return; }
+  if(t.id==='relireAll'&&admin()){ await relireSemaines(S.weeks.map(w=>w.weekId).sort()); return; }
   if(t.id==='mnUndo'){ S.mnDraft=null; render(); return; }
   if(t.id==='mnSave'&&admin()&&S.mnDraft){
     try{ const r=await withLoad(api.saveMentions(Object.fromEntries(MENTIONS.map(([k])=>[k,String(S.mnDraft[k]||'').trim()]))));

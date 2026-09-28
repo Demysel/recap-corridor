@@ -115,7 +115,7 @@ function engine() {
 let vitrineCache = null;       // recalculée après chaque import, suppression ou changement de règles
 async function vitrine(p) {
   if (vitrineCache) return vitrineCache;
-  const d = await p.query(`select week_id, data from ${SCHEMA}.details order by week_id, agence_slug`);
+  const d = await p.query(`select week_id, data from ${SCHEMA}.details where agence_slug <> '~source' order by week_id, agence_slug`);
   const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'regles'`);
   const weeks = new Map();
   for (const r of d.rows) {
@@ -159,8 +159,15 @@ async function api(req, res, url) {
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
-    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 order by agence_slug`, [id]);
+    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug <> '~source' order by agence_slug`, [id]);
     return json(req, res, 200, { docs: d.rows.map((x) => x.data) });
+  }
+  if (route === 'source' && req.method === 'GET') {   // fichier conservé avec la semaine (feuille lue + Extract), pour « Relire »
+    if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
+    const id = url.searchParams.get('id') || '';
+    if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
+    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug = '~source'`, [id]);
+    return json(req, res, 200, { source: d.rows[0]?.data?.source || null });
   }
   if (route === 'semaine' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas d’importer.' });
