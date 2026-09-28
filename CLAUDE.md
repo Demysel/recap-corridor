@@ -44,14 +44,14 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 - **Vue Coco (copain covoit)**, demandée par l'utilisateur : troisième code d'accès `CODE_COVOIT` (variable Render, rôle
   `covoit`, valeur « covoit » sur les deux sites) qui ne voit que l'onglet « Coco ». Semaine au choix (par défaut celle
   d'aujourd'hui, ‹ › pour naviguer) ; chaque jour : graduation heure par heure (00 à 23), une ligne par agent choisi avec
-  ses missions (barres sur 0–24 h ; détail — trajet, horaire, amplitude, pauses — en infobulle comme la fiche agent) et ses
-  RHR (cadre pointillé, lieu en infobulle), mission ou RHR à cheval sur minuit affiché sur chaque jour touché (« … »).
+  ses missions (barres grises sur 0–24 h, pauses hachurées dans la barre ; détail — trajet, horaire, amplitude, pauses — en infobulle comme la fiche agent) et ses
+  RHR (cadre pointillé gris, lieu en infobulle), mission ou RHR à cheval sur minuit affiché sur chaque jour touché (« … »).
   Pastille « en service » (heure de l'appareil) et trait « maintenant » sur le jour en cours. **Covoiturage** : deux
-  missions d'agents différents dont la prise ET la fin de service sont à 30 min près sont entourées d'un cadre vert épais
-  et lumineux (`--cov`, couleur distincte des rouges et jaunes ; ligne teintée), marquées ⇄ (avec qui, en infobulle ;
-  `cocoCovoit`, liste `paires`) et rappelées en bandeau vert sous le titre du jour (« ⇄ A + B · 16:30–01:00 », demandé : liseré trop peu visible). **Couleurs** : nuances de rouge pour les AFR, de jaune pour les conducteurs
-  (`COCO_ROUGES` / `COCO_JAUNES`, `cocoCouleurs`), une nuance par agent attribuée à la sélection et gardée d'une semaine à
-  l'autre. Rien d'autre n'est montré (ni codes, ni heures sup, ni paniers). Agents choisis par l'admin dans l'onglet Coco
+  missions d'agents différents dont la prise ET la fin de service sont à 30 min près prennent une même couleur vive
+  par groupe (`COCO_PAIRES`, `cocoGroupes` : missions reliées entre elles), avec cadre épais lumineux de cette couleur et ligne
+  teintée, marquées ⇄ (avec qui, en infobulle ;
+  `cocoCovoit`, liste `paires`) et rappelées en bandeau vert sous le titre du jour (« ⇄ A + B · 16:30–01:00 », demandé : liseré trop peu visible). **Couleurs** (demandé par l'utilisateur) : toutes les missions en gris neutre, seules les
+  missions de covoiturage possible en couleur (les couleurs par agent `cocoCouleurs` restent mémorisées mais ne sont plus affichées). Rien d'autre n'est montré (ni codes, ni heures sup, ni paniers). Agents choisis par l'admin dans l'onglet Coco
   (recherche, ajout, retrait), mémorisés dans `recap.config` clé `coco` ({agents:[{pk,nom,metier,couleur}]}). Le serveur
   calcule la semaine avec les règles du site (`cocoCalcul` : applyRules + reconcile sur la semaine et ses voisines) et
   n'envoie que ces missions et RHR ; `/api/semaine`, `/api/source`, les règles restent refusés au code covoit.
@@ -154,7 +154,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (ATCMD 10h–20h = panier midi + panier soir) ; ses heures de nuit et du dimanche sont ramenées aux 5 h, au prorata
   de l'horaire réel (ATCMD dim. 20h–lun. 6h : 10 h d'amplitude, 5 h de TTE, 3h30 de nuit, 2 h de dimanche ; validé).
   Mission (hors ATCMD) de moins de 5 h d'amplitude : comptée 5 h d'amplitude et 5 h de TTE, mission par mission
-  (validé par l'utilisateur : deux missions de 4 h = 10 h ; réglable, 0 = désactivé). Nuit, dimanche et paniers restent lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
+  (validé par l'utilisateur : deux missions de 4 h = 10 h ; réglable, 0 = désactivé), quel que soit le jour : ses heures de
+  nuit et du dimanche sont ramenées aux 5 h au prorata de son temps travaillé réel (VOY dim. 10h–13h = 5 h de dimanche ;
+  23h–02h = 5 h de nuit ; précisé par l'utilisateur). Paniers lus sur l'horaire réel. Heures sup : TTE au-delà de 35 h par agent et par semaine.
   Calcul blindé : durées recalculées en minutes entières depuis les horaires (`missionMinutes`), pauses = réunion des
   pauses ramenées dans la mission (jamais déduites deux fois), totaux gardés en minutes exactes (`rM`, aucune dérive
   d'arrondi). **Anciens fichiers (S01 à S19, onglet « Corridor Atlantique ») : les pauses ne sont pas dans les cases** ; elles

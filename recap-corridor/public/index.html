@@ -27,7 +27,7 @@
    la « ligne » ferroviaire marque la section active ; ambre pour ce qui
    demande attention, chiffres en police à chasse fixe.
    ========================================================================== */
-:root{--cov:#00B86B;
+:root{--cov:#00B86B;--cc-gris:#8A8A93;--cc-gris-t:#fff;
   --ground:#F4F4F5; --surface:#FFFFFF; --surface-2:#F8F8F9; --surface-3:#EDEDEF;
   --line:#E4E4E7; --line-2:#D1D1D6;
   --ink:#131316; --ink-2:#4B4B53; --ink-3:#74747D;
@@ -242,11 +242,13 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .cc-r{margin-bottom:6px}.cc-nm{overflow:hidden;text-overflow:ellipsis}
 .cc-live{margin-left:6px;font-size:10px;padding:1px 6px}
 .cc-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--accent);z-index:3}
-.cc-rhr{position:absolute;top:3px;bottom:3px;border:2px dashed;border-radius:4px;font:600 10px/14px var(--mono);color:var(--ink-2);padding:0 4px;overflow:hidden;white-space:nowrap;background:var(--surface)}
-.cc-b{z-index:2;cursor:default}.cc-b.cov{z-index:3;outline:3px solid var(--cov);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cov) 35%,transparent),0 0 14px 2px color-mix(in srgb,var(--cov) 70%,transparent)}
-.cc-r.cov{margin:10px 0 12px}.cc-r.cov .cc-t{background:color-mix(in srgb,var(--cov) 10%,var(--surface-2))}
-.cc-cov-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--surface-2);outline:3px solid var(--cov);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cov) 35%,transparent);margin:0 10px 0 6px;vertical-align:middle}
-.cc-covj{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.cc-covj span{background:var(--cov);color:#fff;font:700 11.5px/1.2 var(--mono);border-radius:999px;padding:4px 10px}
+.cc-rhr{position:absolute;top:3px;bottom:3px;border:2px dashed var(--ink-3);border-radius:4px;font:600 10px/14px var(--mono);color:var(--ink-2);padding:0 4px;overflow:hidden;white-space:nowrap;background:var(--surface)}
+.cc-b{z-index:2;cursor:default;background:var(--cc-gris);color:var(--cc-gris-t)}.cc-b.cov{z-index:3;color:#fff;outline:3px solid var(--cg);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cg) 30%,transparent),0 0 14px 2px color-mix(in srgb,var(--cg) 65%,transparent)}
+.cc-b .cc-tx{position:relative;z-index:1}.cc-p{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.75) 0 2px,transparent 2px 5px);border-left:1px solid rgba(255,255,255,.8);border-right:1px solid rgba(255,255,255,.8)}
+.cc-pause-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--cc-gris) repeating-linear-gradient(135deg,rgba(255,255,255,.75) 0 2px,transparent 2px 5px);margin-right:6px;vertical-align:middle}
+.cc-r.cov{margin:10px 0 12px}.cc-r.cov .cc-t{background:color-mix(in srgb,var(--cov) 8%,var(--surface-2))}
+.cc-cov-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--surface-2);background:var(--cov);outline:3px solid var(--cov);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cov) 35%,transparent);margin:0 10px 0 6px;vertical-align:middle}
+.cc-covj{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.cc-covj span{background:var(--cg,var(--cov));color:#fff;font:700 11.5px/1.2 var(--mono);border-radius:999px;padding:4px 10px}
 .cc-b{position:absolute;top:2px;bottom:2px;border-radius:4px;color:#fff;font:600 10.5px/18px var(--mono);padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 @media (max-width:640px){.cc-ax,.cc-r{grid-template-columns:1fr}.cc-ax>span:first-child{display:none}.cc-axt .h1{display:none}}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
@@ -1338,7 +1340,8 @@ function setBands(a){
 }
 /** Heures comptées d'une mission. ATCMD : TTE fixe (5 h), amplitude = horaire réel de la case.
     Autre mission de moins de minMission h d'amplitude : amplitude et TTE comptés minMission h (règle de l'utilisateur).
-    Heures de nuit, du dimanche et paniers restent lus sur l'horaire réel. */
+    Heures de nuit et du dimanche d'une mission courte : ramenées aux minMission h, au prorata de son temps travaillé réel
+    (précisé par l'utilisateur : une mission de moins de 5 h compte 5 h quel que soit le jour) ; paniers lus sur l'horaire réel. */
 const isATCMD=m=>/ATCMD/i.test(m.label);
 const missionCourte=(m,rules)=>!isATCMD(m)&&rules.minMission>0&&missionMinutes(m).amp<Math.round(rules.minMission*60);
 const missionAmp=(m,rules)=>missionCourte(m,rules)?rules.minMission:missionMinutes(m).amp/60;
@@ -1412,8 +1415,10 @@ function computeAgent(a,days,rules,residence,weekId){
         const hPlan=missionTTE(m,rules);
         // ATCMD : heures de nuit et du dimanche ramenées à ses heures fixes, au prorata de l'horaire réel (validé par l'utilisateur)
         const hNuitR=hoursInDailyWindow(segs,nuitW[0],nuitW[1],Math.floor(Sm/DAY)*DAY-DAY,Math.floor(Em/DAY)*DAY);
-        const hNuit=atcmd?(Em>Sm?rules.heuresATCMD*hNuitR*H/(Em-Sm):0):hNuitR;
-        const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H;
+        // mission courte (moins de 5 h) : comptée 5 h partout, nuit et dimanche compris, au prorata du temps travaillé réel (demandé)
+        const mm=missionMinutes(m), kC=!atcmd&&missionCourte(m,rules)&&mm.amp-mm.pause>0?rules.minMission*60/(mm.amp-mm.pause):1;
+        const hNuit=atcmd?(Em>Sm?rules.heuresATCMD*hNuitR*H/(Em-Sm):0):hNuitR*kC;
+        const hDim=atcmd?(Em>Sm?rules.heuresATCMD*ovl(Sm,Em,sun0,sun1)/(Em-Sm):0):segOvl(segs,sun0,sun1)/H*kC;
         all.push({...m,S,E,segs,atcmd,d:j.d});
         const mAmp=missionAmp(m,rules);
         nbMissions++; amp+=mAmp; pauseMin+=missionMinutes(m).pause; plan+=hPlan; nuit+=hNuit; dim+=hDim; hj+=hPlan;
@@ -1862,7 +1867,7 @@ function cocoSemaine(meta,agents,sel,autres){
     o.nom=`${a.nom} ${a.prenom}`.trim()||o.nom; o.metier=a.metier||o.metier;
     for(const j of a.jours||[]) if(j.kind==='SERVICE') for(const m of j.missions||[]){
       if(o.missions.some(x=>x.start===m.start&&x.label===m.label)) continue;
-      o.missions.push({label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end,amplitude:m.amplitude??null,pauseMin:m.pauseMin||0});
+      o.missions.push({label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end,amplitude:m.amplitude??null,pauseMin:m.pauseMin||0,pauses:(m.pauses||[]).filter(Array.isArray).map(([a,b])=>[a,b])});
       place(o,o.missions,'m',m); } }
   // RHR de la semaine, et ceux d'une semaine voisine qui débordent sur celle-ci
   for(const a of [...(agents||[]),...(autres||[])]){ const i=idx.get(personKey(a)); if(i==null) continue; const o=out[i];
@@ -3181,7 +3186,7 @@ function explain(k){
       <td>${a.joursService}</td><td>${fmtH(a.amplitudeTotale)}</td><td>${nf(a.pauseTotaleMin)} min</td><td>${a.nbATCMD||'<span class="z">0</span>'}</td><td><b>${fmtH(a.heuresPlanifiees)}</b></td><td>${a.heuresSup?`<b>${fmtH(a.heuresSup)}</b>`:'<span class="z">—</span>'}</td></tr>`));
   } else if(k==='heuresNuit'){
     const l=sc.filter(a=>a.heuresNuit>0).sort((p,q)=>q.heuresNuit-p.heuresNuit);
-    title='Heures de nuit'; rule=`Temps travaillé hors pauses dans la plage de nuit : AFR ${r.nuitAFR[0]}h–${r.nuitAFR[1]}h, conducteurs ${r.nuitCDR[0]}h–${r.nuitCDR[1]}h. Une ATCMD est ramenée à ses ${nfa(r.heuresATCMD)} h, au prorata de son horaire.`;
+    title='Heures de nuit'; rule=`Temps travaillé hors pauses dans la plage de nuit : AFR ${r.nuitAFR[0]}h–${r.nuitAFR[1]}h, conducteurs ${r.nuitCDR[0]}h–${r.nuitCDR[1]}h. Une ATCMD est ramenée à ses ${nfa(r.heuresATCMD)} h, et une mission de moins de ${nfa(r.minMission??5)} h à ${nfa(r.minMission??5)} h, au prorata de son horaire (idem pour les heures du dimanche).`;
     html=tbl([['Agent','l'],['Sem.','l'],['Métier','l'],['Heures de nuit'],['TTE'],['Part']],l.slice(0,lim).map(a=>`<tr><td class="l">${nm(a)}</td><td class="l mono">${wk(a)}</td><td class="l">${esc(a.metier)}</td><td><b>${fmtH(a.heuresNuit)}</b></td><td>${fmtH(a.heuresPlanifiees)}</td><td>${nf(100*a.heuresNuit/(a.heuresPlanifiees||1),0)} %</td></tr>`));
   } else if(k==='nbMissions'){
     const t={}; sc.forEach(a=>Object.entries(a.typesMission||{}).forEach(([x,n])=>t[x]=(t[x]||0)+n));
@@ -4207,6 +4212,15 @@ function cocoCouleurs(sel){
   return out;
 }
 const cocoTexte=c=>COCO_JAUNES.includes(c)?'#1a1a1a':'#fff';
+/** Missions en gris neutre ; chaque groupe de covoiturage (missions reliées entre elles) prend une même couleur vive (demandé) */
+const COCO_PAIRES=['#00B86B','#1E88E5','#8E24AA','#FF6D00','#00ACC1','#D81B60','#43A047','#5E35B1','#F4511E','#3949AB'];
+function cocoGroupes(sel,cov){
+  const par=new Map(), f=k=>{ while(par.get(k)!==k) k=par.get(k); return k; };
+  for(const p of cov.paires){ const a=p.i+'|'+p.k, b=p.j+'|'+p.l; if(!par.has(a)) par.set(a,a); if(!par.has(b)) par.set(b,b); par.set(f(a),f(b)); }
+  const racines=[...new Set([...par.keys()].map(f))].sort((x,y)=>{ const d=k=>{ const [i,m]=k.split('|'); return Date.parse(sel[i].missions[m].start); }; return d(x)-d(y); });
+  const coul=new Map(racines.map((r,n)=>[r,COCO_PAIRES[n%COCO_PAIRES.length]]));
+  return new Map([...par.keys()].map(k=>[k,coul.get(f(k))]));
+}
 /** Semaine affichée : celle choisie, sinon celle d'aujourd'hui, sinon la dernière importée */
 function cocoSemaineParDefaut(){
   const W=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), t=isoD(new Date(nowW()));
@@ -4241,9 +4255,9 @@ function viewCoco(){
   const sel=C?cocoCouleurs(C.agents):[], now=nowW();
   const enService=a=>a.missions.some(m=>Date.parse(m.start)<=now&&now<Date.parse(m.end));
   const pill='<span class="pill pill-g cc-live">en service</span>';
-  const cov=C?cocoCovoit(sel):Object.assign(new Map(),{paires:[]});
-  const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li"><span class="cc-dot" style="background:${a.couleur}"></span>${esc(a.nom)} <span class="mut sm">${esc(a.metier||'')}</span>${enService(a)?pill:''}</span>`).join('')}
-    <span class="cc-li mut sm"><span class="cc-cov-ex"></span><b>⇄ covoiturage possible</b> : même prise et fin de service (± 30 min)</span></div>`:'';
+  const cov=C?cocoCovoit(sel):Object.assign(new Map(),{paires:[]}), grp=cocoGroupes(sel,cov);
+  const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li">${esc(a.nom)} <span class="mut sm">${esc(a.metier||'')}</span>${enService(a)?pill:''}</span>`).join('')}
+    <span class="cc-li mut sm"><span class="cc-pause-ex"></span>pause</span><span class="cc-li mut sm"><span class="cc-cov-ex"></span><b>⇄ covoiturage possible</b> : même prise et fin de service (± 30 min), une couleur par groupe</span></div>`:'';
   const axe=`<div class="cc-ax"><span></span><div class="cc-axt">${Array.from({length:24},(_,h)=>`<span class="${h%3?'h1':''}" style="left:${(h/24*100).toFixed(3)}%">${String(h).padStart(2,'0')}</span>`).join('')}</div></div>`;
   const grille=Array.from({length:23},(_,h)=>`<i class="${(h+1)%6?'':'f'}" style="left:${((h+1)/24*100).toFixed(3)}%"></i>`).join('');
   let corps;
@@ -4257,17 +4271,19 @@ function viewCoco(){
     // covoiturages possibles du jour (mission qui commence ce jour-là), rappelés en clair sous le titre du jour
     const debuts=new Set(sel.flatMap((a,ai)=>a.jours[d].m.filter(x=>!x.suite).map(x=>ai+'|'+x.i)));
     const pj=cov.paires.filter(p=>debuts.has(p.i+'|'+p.k)).map(p=>{ const m=sel[p.i].missions[p.k], n=sel[p.j].missions[p.l];
-      return `<span title="${esc(m.label)} · ${esc(n.label)}">⇄ ${esc(sel[p.i].nom)} + ${esc(sel[p.j].nom)} · ${hm(m.start)}–${hm(m.end)}</span>`; });
+      return `<span style="--cg:${grp.get(p.i+'|'+p.k)}" title="${esc(m.label)} · ${esc(n.label)}">⇄ ${esc(sel[p.i].nom)} + ${esc(sel[p.j].nom)} · ${hm(m.start)}–${hm(m.end)}</span>`; });
     return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span>${auj?' <span class="pill pill-a">aujourd’hui</span>':''}</div>${pj.length?`<div class="cc-covj">${pj.join('')}</div>`:''}${axe}${lignes.length?lignes.map(({a,ai,j})=>`<div class="cc-r${j.m.some(x=>cov.has(ai+'|'+x.i))?' cov':''}">
-      <div class="cc-n"><span class="cc-dot" style="background:${a.couleur}"></span><span class="cc-nm">${esc(a.nom)}</span>${auj&&enService(a)?pill:''}</div>
+      <div class="cc-n"><span class="cc-nm">${esc(a.nom)}</span>${auj&&enService(a)?pill:''}</div>
       <div class="cc-t">${grille}${auj?`<b class="cc-now" style="left:${((now-D0)/DAY*100).toFixed(3)}%"></b>`:''}${j.r.map(x=>{ const r=a.rhr[x.i];
         const tip=`<b>Repos hors résidence</b><span class="tr"><span>Lieu</span><b>${esc(r.lieu||'?')}</b></span><span class="tr"><span>Du</span><b>${dtISO(r.debut)}</b></span><span class="tr"><span>Au</span><b>${r.fin?dtISO(r.fin):'semaine suivante'}</b></span>${r.dureeH!=null?`<span class="tr"><span>Durée</span><b>${fmtH(r.dureeH)}</b></span>`:''}`;
-        return `<span class="cc-rhr" style="${pos(x.s,x.e)};border-color:${a.couleur}" data-tip="${esc(tip)}">RHR ${esc(r.lieu||'')}</span>`;}).join('')}${j.m.map(x=>{ const m=a.missions[x.i], avec=cov.get(ai+'|'+x.i);
+        return `<span class="cc-rhr" style="${pos(x.s,x.e)}" data-tip="${esc(tip)}">RHR ${esc(r.lieu||'')}</span>`;}).join('')}${j.m.map(x=>{ const m=a.missions[x.i], avec=cov.get(ai+'|'+x.i);
         const tip=`<b>${esc(m.label)}</b><span class="tr"><span>${esc(m.from||'?')} → ${esc(m.to||'?')}</span></span><span class="tr"><span>Horaire</span><b>${dtISO(m.start)} – ${hm(m.end)}</b></span>${m.amplitude!=null?`<span class="tr"><span>Amplitude</span><b>${fmtH(m.amplitude)}</b></span>`:''}${m.pauseMin?`<span class="tr"><span>Pauses</span><b>${m.pauseMin} min</b></span>`:''}${avec?`<span class="tr"><span>Covoiturage possible avec</span><b>${esc([...new Set(avec)].join(', '))}</b></span>`:''}`;
-        return `<span class="cc-b${avec?' cov':''}" style="${pos(x.s,x.e)};background:${a.couleur};color:${cocoTexte(a.couleur)}" data-tip="${esc(tip)}">${avec?'⇄ ':''}${x.suite?'… ':''}${esc(m.label)}</span>`;}).join('')}</div></div>`).join('')
+        const L0=x.e-x.s, pz=(m.pauses||[]).map(([p0,p1])=>[Math.max(Date.parse(p0),x.s),Math.min(Date.parse(p1),x.e)]).filter(([p0,p1])=>p1>p0)
+          .map(([p0,p1])=>`<i class="cc-p" style="left:${((p0-x.s)/L0*100).toFixed(2)}%;width:${((p1-p0)/L0*100).toFixed(2)}%"></i>`).join('');
+        return `<span class="cc-b${avec?' cov':''}" style="${pos(x.s,x.e)}${avec?`;--cg:${grp.get(ai+'|'+x.i)};background:${grp.get(ai+'|'+x.i)}`:''}" data-tip="${esc(tip)}">${pz}<span class="cc-tx">${avec?'⇄ ':''}${x.suite?'… ':''}${esc(m.label)}</span></span>`;}).join('')}</div></div>`).join('')
       :'<p class="mut sm" style="margin:4px 0 8px">Aucune mission pour ces agents.</p>'}</div>`; }).join('');
   const choix=S.role==='admin'?cocoChoix():'';
-  return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent · rouges : AFR, jaunes : conducteurs · touchez une mission pour son détail</p></div></div>
+  return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent · missions en gris, covoiturages possibles en couleur · touchez une mission pour son détail</p></div></div>
     <div class="card-b stack">${nav}${leg}${corps}</div></section>${choix}`;
 }
 /** Admin : agents affichés dans la vue Coco (code covoit), couleur fixée à la sélection */
@@ -4275,9 +4291,9 @@ function cocoChoix(){
   const sel=S.coco.agents||[], pris=new Set(sel.map(x=>x.pk)), q=deacc(S.cocoQ||'').toLowerCase().trim();
   const pers=new Map(); for(const v of S.loaded.values()) for(const a of v.agents){ const k=personKey(a); if(!pers.has(k)) pers.set(k,{pk:k,nom:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,metier:a.metier}); }
   const res=q?[...pers.values()].filter(x=>!pris.has(x.pk)&&deacc(`${x.nom} ${x.agence} ${x.pk}`).toLowerCase().includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).slice(0,20):[];
-  return `<section class="card"><div class="card-h"><div><h2>Agents affichés dans Coco</h2><p class="card-s">visibles avec le code covoit · la couleur reste la même d’une semaine à l’autre</p></div></div>
+  return `<section class="card"><div class="card-h"><div><h2>Agents affichés dans Coco</h2><p class="card-s">visibles avec le code covoit</p></div></div>
     <div class="card-b stack">
-      <div class="frow">${sel.length?cocoCouleurs(sel).map(x=>`<span class="chip" aria-pressed="true"><span class="cc-dot" style="background:${esc(x.couleur)}"></span>${esc(x.nom)} <button class="lnk" data-cocodel="${esc(x.pk)}" title="Retirer">×</button></span>`).join(''):'<span class="mut">Aucun agent choisi.</span>'}</div>
+      <div class="frow">${sel.length?cocoCouleurs(sel).map(x=>`<span class="chip" aria-pressed="true">${esc(x.nom)} <button class="lnk" data-cocodel="${esc(x.pk)}" title="Retirer">×</button></span>`).join(''):'<span class="mut">Aucun agent choisi.</span>'}</div>
       <label class="fld"><span class="flabel">Ajouter un agent</span><input type="search" id="cocoQ" value="${esc(S.cocoQ||'')}" placeholder="Nom, agence ou matricule…" autocomplete="off"></label>
       ${q?`<div class="frow">${res.length?res.map(x=>`<button class="chip" data-cocoadd="${esc(x.pk)}">+ ${esc(x.nom)} <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span></button>`).join(''):'<span class="mut">Aucun agent trouvé dans les semaines chargées.</span>'}</div>`:''}
     </div></section>`;

@@ -121,6 +121,16 @@ test('ATCMD : heures de nuit et du dimanche ramenées aux 5 h, au prorata de l�
   assert.equal(a.heuresDimanche, 2);
 });
 
+test('mission de moins de 5 h : nuit et dimanche ramenés aux 5 h, au prorata du temps travaillé réel', () => {
+  // dimanche 13/09 : VOY 10:00–13:00 (3 h) → 5 h de dimanche ; lundi 07/09 23:00 → mardi 02:00 (3 h de nuit) → 5 h de nuit
+  const a = one([svc(['N', 'HENDAYE', 'HENDAYE', 7, '23:00', 8, '02:00']), 'RP', 'RP', 'RP', 'RP', 'RP', svc(['VOY-1', 'HENDAYE', 'BAYONNE', 13, '10:00', 13, '13:00'])], {}, RES);
+  assert.equal(a.heuresDimanche, 5);
+  assert.equal(a.heuresNuit, 5);
+  const b = one([svc(['N', 'HENDAYE', 'HENDAYE', 7, '23:00', 8, '02:00']), 'RP', 'RP', 'RP', 'RP', 'RP', svc(['VOY-1', 'HENDAYE', 'BAYONNE', 13, '10:00', 13, '13:00'])], {}, { ...RES, minMission: 0 });
+  assert.equal(b.heuresDimanche, 3);
+  assert.equal(b.heuresNuit, 3);
+});
+
 test('deux missions de 4 h dans la semaine : 10 h au décompte', () => {
   const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '10:00']), 'RP', svc(['T2', 'HENDAYE', 'HENDAYE', 9, '06:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
   assert.equal(a.heuresPlanifiees, 10);
