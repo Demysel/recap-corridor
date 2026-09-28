@@ -115,6 +115,8 @@ function engine() {
   return moteur;
 }
 let vitrineCache = null;       // recalculée après chaque import, suppression ou changement de règles
+const cocoCache = new Map();   // vue Coco par semaine (la page du code covoit la redemande toutes les 2 minutes)
+function invalider() { vitrineCache = null; cocoCache.clear(); }
 async function vitrine(p) {
   if (vitrineCache) return vitrineCache;
   const d = await p.query(`select week_id, data from ${SCHEMA}.details where agence_slug <> '~source' order by week_id, agence_slug`);
@@ -174,13 +176,16 @@ async function api(req, res, url) {
     const ids = (await p.query(`select week_id from ${SCHEMA}.semaines order by week_id`)).rows.map((x) => x.week_id), k = ids.indexOf(id);
     if (k < 0) return json(req, res, 200, { agents: sel, semaine: null });
     const voisins = [ids[k - 1], id, ids[k + 1]].filter(Boolean);
+    if (cocoCache.has(id)) return json(req, res, 200, { agents: sel, semaine: cocoCache.get(id) });
     const d = await p.query(`select week_id, data from ${SCHEMA}.details where week_id = any($1) and agence_slug <> '~source' order by week_id, agence_slug`, [voisins]);
     const weeks = new Map();
     for (const x of d.rows) { if (!weeks.has(x.week_id)) weeks.set(x.week_id, { meta: x.data.meta, agents: [] }); weeks.get(x.week_id).agents.push(...(x.data.agents || [])); }
     const c2 = await p.query(`select valeur from ${SCHEMA}.config where cle = 'regles'`);
     const E = engine();
     const sem = E.cocoCalcul([...weeks.values()], E.loadRules(c2.rows[0]?.valeur || null), id, sel);
-    return json(req, res, 200, { agents: sel, semaine: sem ? JSON.parse(JSON.stringify(sem)) : null });
+    const semaine = sem ? JSON.parse(JSON.stringify(sem)) : null;
+    cocoCache.set(id, semaine);
+    return json(req, res, 200, { agents: sel, semaine });
   }
   if (route === 'coco' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Seul le code administrateur choisit les agents de la vue Coco.' });
@@ -189,6 +194,7 @@ async function api(req, res, url) {
       .map((x) => ({ pk: String(x.pk || '').slice(0, 200), nom: String(x.nom || '').slice(0, 120), metier: String(x.metier || '').slice(0, 60), couleur: /^#[0-9a-f]{6}$/i.test(x.couleur || '') ? x.couleur : '#1F77B4' }))
       .filter((x) => x.pk);
     await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('coco', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify({ agents })]);
+    cocoCache.clear();
     return json(req, res, 200, { ok: true });
   }
   if (route === 'source' && req.method === 'GET') {   // fichier conservé avec la semaine (feuille lue + Extract), pour « Relire »
@@ -215,7 +221,7 @@ async function api(req, res, url) {
       }
       await c.query('commit');
     } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }
-    vitrineCache = null;
+    invalider();
     return json(req, res, 200, { ok: true, weekId: resume.weekId });
   }
   if (route === 'semaine' && req.method === 'DELETE') {
@@ -223,7 +229,7 @@ async function api(req, res, url) {
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     await p.query(`delete from ${SCHEMA}.semaines where week_id = $1`, [id]);   // les détails suivent (cascade)
-    vitrineCache = null;
+    invalider();
     return json(req, res, 200, { ok: true });
   }
   if (route === 'regles' && req.method === 'PUT') {
@@ -236,7 +242,7 @@ async function api(req, res, url) {
       const list = [...(j.rows[0]?.valeur || []), { ..._journal, le }].slice(-500);
       await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('journal', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify(list)]);
     }
-    vitrineCache = null;
+    invalider();
     return json(req, res, 200, { ok: true });
   }
   if (route === 'mentions' && req.method === 'GET') {   // mentions légales : lisibles par les deux codes (page du visiteur)
@@ -277,14 +283,26 @@ async function icone(req, res, path) {
 
 /* ------------------------------------------------------------ page */
 const PAGE = join(ROOT, 'index.html');
-async function statique(req, res, url) {
-  if (url.pathname !== '/' && url.pathname !== '/index.html') return send(req, res, 404, 'Page introuvable', 'text/plain; charset=utf-8');
+let page = null;   // la page ne change qu'au redéploiement : lue, empreinte et version compressée calculées une seule fois
+async function lirePage() {
+  if (page) return page;
   let buf = await readFile(PAGE);
   // site de test : la page est marquée data-env="dev" (autres couleurs, bandeau) et son titre commence par « [TEST] »
   if (DEV) buf = Buffer.from(buf.toString('utf8').replace('<html lang="fr">', '<html lang="fr" data-env="dev">').replace('<title>Récap Corridor</title>', '<title>[TEST] Récap Corridor</title>'));
   const etag = '"' + crypto.createHash('sha1').update(buf).digest('base64url').slice(0, 20) + '"';
+  page = { buf, gz: zlib.gzipSync(buf, { level: 9 }), etag };
+  return page;
+}
+async function statique(req, res, url) {
+  if (url.pathname !== '/' && url.pathname !== '/index.html') return send(req, res, 404, 'Page introuvable', 'text/plain; charset=utf-8');
+  const { buf, gz, etag } = await lirePage();
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag }); return res.end(); }
-  return send(req, res, 200, buf, 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache', ETag: etag });
+  const headers = { ...SEC, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: etag };
+  const zip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+  if (zip) { headers['Content-Encoding'] = 'gzip'; headers.Vary = 'Accept-Encoding'; }
+  const out = zip ? gz : buf;
+  headers['Content-Length'] = out.length;
+  res.writeHead(200, headers); res.end(out);
 }
 
 http.createServer(async (req, res) => {
@@ -300,5 +318,7 @@ http.createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log('Récap Corridor à l’écoute sur le port', PORT, '· schéma', SCHEMA, DEV ? '· SITE DE TEST' : '');
-  connectDb().catch((e) => console.error('Base indisponible au démarrage :', e.message));
+  lirePage().catch(() => {});
+  // au réveil : base connectée, moteur chargé et vitrine préparée tout de suite, pour que le premier visiteur n'attende pas
+  connectDb().then(() => { engine(); return vitrine(pool); }).catch((e) => console.error('Base indisponible au démarrage :', e.message));
 });

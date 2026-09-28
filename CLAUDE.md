@@ -228,6 +228,13 @@ l'onglet) ; si les semaines, les règles ou la sélection Coco ont changé (`sig
 Jamais pendant une saisie, un import, dans Réglages / Import (saisies non enregistrées) ni onglet caché (`rafraichir`).
 Chaque minute, Coco et la Synthèse sont redessinées (pastille « en service », trait « maintenant »).
 
+## Performances
+
+Serveur : page lue, empreinte (ETag) et version compressée calculées une fois par démarrage (`lirePage`) ; au réveil,
+base connectée, moteur chargé et vitrine préparée d'avance ; vue Coco gardée en mémoire par semaine (`cocoCache`),
+vidée comme la vitrine à chaque import, suppression, changement de règles ou de sélection Coco (`invalider`).
+Page : semaines demandées au serveur en parallèle, 6 à la fois (`ensureLoaded`).
+
 ## Interface
 
 Couleurs DB Cargo : rouge (#EC0016) sur blanc en mode clair, rouge sur noir en mode sombre, sans dégradé ;

@@ -2250,9 +2250,12 @@ const nbWeeksLoaded=()=>activeWeeks().filter(id=>S.loaded.has(id)).length;
 
 async function ensureLoaded(ids){
   if(backend.mode!=='artifact'&&S.role!=='admin') return;   // visiteur : statistiques anonymes uniquement, jamais le détail
-  for(const id of ids){
+  // semaines demandées au serveur en parallèle (6 à la fois), puis traitées dans l'ordre
+  const manq=[...new Set(ids)].filter(id=>!S.loaded.has(id)), recus=new Map();
+  for(let k=0;k<manq.length;k+=6) await withLoad(Promise.all(manq.slice(k,k+6).map(id=>api.semaine(id).then(r=>recus.set(id,r)))));
+  for(const id of manq){
     if(S.loaded.has(id)) continue;
-    const {docs}=await withLoad(api.semaine(id));
+    const {docs}=recus.get(id)||{};
     if(!docs||!docs.length) continue;
     const dd=docs.filter(d=>Array.isArray(d.agents)); if(!dd.length) continue;
     const meta=dd[0].meta;
