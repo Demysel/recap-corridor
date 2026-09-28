@@ -47,8 +47,9 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   ses missions (barres sur 0–24 h ; détail — trajet, horaire, amplitude, pauses — en infobulle comme la fiche agent) et ses
   RHR (cadre pointillé, lieu en infobulle), mission ou RHR à cheval sur minuit affiché sur chaque jour touché (« … »).
   Pastille « en service » (heure de l'appareil) et trait « maintenant » sur le jour en cours. **Covoiturage** : deux
-  missions d'agents différents dont la prise ET la fin de service sont à 30 min près sont entourées et marquées ⇄ (avec
-  qui, en infobulle ; `cocoCovoit`). **Couleurs** : nuances de rouge pour les AFR, de jaune pour les conducteurs
+  missions d'agents différents dont la prise ET la fin de service sont à 30 min près sont entourées d'un cadre vert épais
+  et lumineux (`--cov`, couleur distincte des rouges et jaunes ; ligne teintée), marquées ⇄ (avec qui, en infobulle ;
+  `cocoCovoit`, liste `paires`) et rappelées en bandeau vert sous le titre du jour (« ⇄ A + B · 16:30–01:00 », demandé : liseré trop peu visible). **Couleurs** : nuances de rouge pour les AFR, de jaune pour les conducteurs
   (`COCO_ROUGES` / `COCO_JAUNES`, `cocoCouleurs`), une nuance par agent attribuée à la sélection et gardée d'une semaine à
   l'autre. Rien d'autre n'est montré (ni codes, ni heures sup, ni paniers). Agents choisis par l'admin dans l'onglet Coco
   (recherche, ajout, retrait), mémorisés dans `recap.config` clé `coco` ({agents:[{pk,nom,metier,couleur}]}). Le serveur
@@ -216,6 +217,14 @@ s'affichent côte à côte (valeur la plus haute en ambre, la plus basse en rose
 options que le filtre principal ; pour une seule semaine, le planning de chaque agent suit. Colonne « Heures HR » retirée du détail par agent (demandé).
 Fiche agent : elle suit la période du filtre principal ; un sélecteur « Période de la fiche » (mêmes choix) la
 remplace tant que la fiche est ouverte ; à la fermeture, le filtre principal reprend la main (demandé par l'utilisateur).
+
+## Actualisation automatique (demandée par l'utilisateur)
+
+Pas de tâche planifiée sur le serveur : la page ouverte interroge `/api/etat` toutes les 2 minutes (et au retour sur
+l'onglet) ; si les semaines, les règles ou la sélection Coco ont changé (`sigEtat`), elle recharge les chiffres
+(admin : semaines rechargées ; visiteur : vitrine ; covoit : `/api/coco` à chaque passage) et l'indique brièvement.
+Jamais pendant une saisie, un import, dans Réglages / Import (saisies non enregistrées) ni onglet caché (`rafraichir`).
+Chaque minute, Coco et la Synthèse sont redessinées (pastille « en service », trait « maintenant »).
 
 ## Interface
 

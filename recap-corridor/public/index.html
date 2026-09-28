@@ -27,7 +27,7 @@
    la « ligne » ferroviaire marque la section active ; ambre pour ce qui
    demande attention, chiffres en police à chasse fixe.
    ========================================================================== */
-:root{
+:root{--cov:#00B86B;
   --ground:#F4F4F5; --surface:#FFFFFF; --surface-2:#F8F8F9; --surface-3:#EDEDEF;
   --line:#E4E4E7; --line-2:#D1D1D6;
   --ink:#131316; --ink-2:#4B4B53; --ink-3:#74747D;
@@ -237,14 +237,16 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .cc-axt{position:relative;height:14px;margin-top:2px;font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}.cc-axt span{position:absolute;transform:translateX(-50%)}.cc-axt span:first-child{transform:none}
 .cc-j{border-top:1px solid var(--line);padding-top:8px}.cc-jh{font-weight:700;font-size:13.5px;margin-bottom:6px}
 .cc-n{font-size:13px;font-weight:600;display:flex;align-items:center;min-height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cc-t{position:relative;height:22px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cc-t{position:relative;height:22px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
 .cc-t i{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.55}.cc-t i.f{opacity:1;background:var(--line-2)}
 .cc-r{margin-bottom:6px}.cc-nm{overflow:hidden;text-overflow:ellipsis}
 .cc-live{margin-left:6px;font-size:10px;padding:1px 6px}
 .cc-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--accent);z-index:3}
 .cc-rhr{position:absolute;top:3px;bottom:3px;border:2px dashed;border-radius:4px;font:600 10px/14px var(--mono);color:var(--ink-2);padding:0 4px;overflow:hidden;white-space:nowrap;background:var(--surface)}
-.cc-b{z-index:2;cursor:default}.cc-b.cov{outline:2px solid var(--ink);outline-offset:1px;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 35%,transparent)}
-.cc-cov-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--surface-2);outline:2px solid var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 35%,transparent);margin-right:8px;vertical-align:middle}
+.cc-b{z-index:2;cursor:default}.cc-b.cov{z-index:3;outline:3px solid var(--cov);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cov) 35%,transparent),0 0 14px 2px color-mix(in srgb,var(--cov) 70%,transparent)}
+.cc-r.cov{margin:10px 0 12px}.cc-r.cov .cc-t{background:color-mix(in srgb,var(--cov) 10%,var(--surface-2))}
+.cc-cov-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--surface-2);outline:3px solid var(--cov);outline-offset:2px;box-shadow:0 0 0 6px color-mix(in srgb,var(--cov) 35%,transparent);margin:0 10px 0 6px;vertical-align:middle}
+.cc-covj{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.cc-covj span{background:var(--cov);color:#fff;font:700 11.5px/1.2 var(--mono);border-radius:999px;padding:4px 10px}
 .cc-b{position:absolute;top:2px;bottom:2px;border-radius:4px;color:#fff;font:600 10.5px/18px var(--mono);padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 @media (max-width:640px){.cc-ax,.cc-r{grid-template-columns:1fr}.cc-ax>span:first-child{display:none}.cc-axt .h1{display:none}}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
@@ -4223,10 +4225,11 @@ async function loadCoco(){
 /** Missions compatibles pour covoiturer : deux agents dont la prise ET la fin de service sont à 30 min près (demandé) */
 const COCO_TOL=30*6e4;
 function cocoCovoit(agents){
-  const res=new Map();
+  const res=new Map(); res.paires=[];
   agents.forEach((a,i)=>a.missions.forEach((m,k)=>agents.forEach((b,j)=>{ if(j<=i) return;
     b.missions.forEach((n,l)=>{ if(Math.abs(Date.parse(m.start)-Date.parse(n.start))<=COCO_TOL&&Math.abs(Date.parse(m.end)-Date.parse(n.end))<=COCO_TOL){
-      (res.get(i+'|'+k)||res.set(i+'|'+k,[]).get(i+'|'+k)).push(b.nom); (res.get(j+'|'+l)||res.set(j+'|'+l,[]).get(j+'|'+l)).push(a.nom); } }); })));
+      (res.get(i+'|'+k)||res.set(i+'|'+k,[]).get(i+'|'+k)).push(b.nom); (res.get(j+'|'+l)||res.set(j+'|'+l,[]).get(j+'|'+l)).push(a.nom);
+      res.paires.push({i,k,j,l}); } }); })));
   return res;
 }
 function viewCoco(){
@@ -4238,9 +4241,9 @@ function viewCoco(){
   const sel=C?cocoCouleurs(C.agents):[], now=nowW();
   const enService=a=>a.missions.some(m=>Date.parse(m.start)<=now&&now<Date.parse(m.end));
   const pill='<span class="pill pill-g cc-live">en service</span>';
-  const cov=C?cocoCovoit(sel):new Map();
+  const cov=C?cocoCovoit(sel):Object.assign(new Map(),{paires:[]});
   const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li"><span class="cc-dot" style="background:${a.couleur}"></span>${esc(a.nom)} <span class="mut sm">${esc(a.metier||'')}</span>${enService(a)?pill:''}</span>`).join('')}
-    <span class="cc-li mut sm"><span class="cc-cov-ex"></span>même prise et fin de service (± 30 min) : covoiturage possible</span></div>`:'';
+    <span class="cc-li mut sm"><span class="cc-cov-ex"></span><b>⇄ covoiturage possible</b> : même prise et fin de service (± 30 min)</span></div>`:'';
   const axe=`<div class="cc-ax"><span></span><div class="cc-axt">${Array.from({length:24},(_,h)=>`<span class="${h%3?'h1':''}" style="left:${(h/24*100).toFixed(3)}%">${String(h).padStart(2,'0')}</span>`).join('')}</div></div>`;
   const grille=Array.from({length:23},(_,h)=>`<i class="${(h+1)%6?'':'f'}" style="left:${((h+1)/24*100).toFixed(3)}%"></i>`).join('');
   let corps;
@@ -4251,7 +4254,11 @@ function viewCoco(){
     const D0=Date.parse(day+'T00:00:00Z'), pos=(s0,e0)=>`left:${((s0-D0)/DAY*100).toFixed(3)}%;width:${Math.max(0.6,(e0-s0)/DAY*100).toFixed(3)}%`;
     const lignes=sel.map((a,ai)=>({a,ai,j:a.jours[d]})).filter(x=>x.j.m.length||x.j.r.length);
     const auj=now>=D0&&now<D0+DAY;
-    return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span>${auj?' <span class="pill pill-a">aujourd’hui</span>':''}</div>${axe}${lignes.length?lignes.map(({a,ai,j})=>`<div class="cc-r">
+    // covoiturages possibles du jour (mission qui commence ce jour-là), rappelés en clair sous le titre du jour
+    const debuts=new Set(sel.flatMap((a,ai)=>a.jours[d].m.filter(x=>!x.suite).map(x=>ai+'|'+x.i)));
+    const pj=cov.paires.filter(p=>debuts.has(p.i+'|'+p.k)).map(p=>{ const m=sel[p.i].missions[p.k], n=sel[p.j].missions[p.l];
+      return `<span title="${esc(m.label)} · ${esc(n.label)}">⇄ ${esc(sel[p.i].nom)} + ${esc(sel[p.j].nom)} · ${hm(m.start)}–${hm(m.end)}</span>`; });
+    return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span>${auj?' <span class="pill pill-a">aujourd’hui</span>':''}</div>${pj.length?`<div class="cc-covj">${pj.join('')}</div>`:''}${axe}${lignes.length?lignes.map(({a,ai,j})=>`<div class="cc-r${j.m.some(x=>cov.has(ai+'|'+x.i))?' cov':''}">
       <div class="cc-n"><span class="cc-dot" style="background:${a.couleur}"></span><span class="cc-nm">${esc(a.nom)}</span>${auj&&enService(a)?pill:''}</div>
       <div class="cc-t">${grille}${auj?`<b class="cc-now" style="left:${((now-D0)/DAY*100).toFixed(3)}%"></b>`:''}${j.r.map(x=>{ const r=a.rhr[x.i];
         const tip=`<b>Repos hors résidence</b><span class="tr"><span>Lieu</span><b>${esc(r.lieu||'?')}</b></span><span class="tr"><span>Du</span><b>${dtISO(r.debut)}</b></span><span class="tr"><span>Au</span><b>${r.fin?dtISO(r.fin):'semaine suivante'}</b></span>${r.dureeH!=null?`<span class="tr"><span>Durée</span><b>${fmtH(r.dureeH)}</b></span>`:''}`;
@@ -5021,7 +5028,7 @@ async function login(code){
 }
 async function boot(){
   try{
-    const {weeks,regles,suivi,journal,coco}=await withLoad(api.etat());
+    const et=await withLoad(api.etat()), {weeks,regles,suivi,journal,coco}=et; S.sig=sigEtat(et);
     S.coco=coco&&Array.isArray(coco.agents)?coco:{agents:[]};
     S.weeks=weeks||[]; S.suivi=suivi||{alertes:{}}; S.journal=journal||[];
     S.rules=loadRules(regles);
@@ -5044,6 +5051,34 @@ async function boot(){
   }catch(e){ S.msg={m:'Chargement impossible : '+e.message,t:'c'}; }
   render();
 }
+/* Actualisation automatique (demandée par l'utilisateur) : pas de tâche sur le serveur, la page ouverte vérifie
+   toutes les 2 minutes si une semaine a été importée / supprimée ou si un réglage a changé, et recharge alors les chiffres.
+   Rien n'est fait si l'onglet est caché, pendant une saisie, un import ou dans Réglages / Import (saisies non enregistrées).
+   Chaque minute, la vue Coco et la Synthèse sont redessinées (pastille « en service », trait « maintenant »). */
+const sigEtat=d=>JSON.stringify([d.weeks||[],d.regles||null,d.coco||null]);
+const saisieEnCours=()=>{ const a=document.activeElement; return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))||!!S.mnDraft; };
+let rafEnCours=false;
+async function rafraichir(){
+  if(rafEnCours||document.hidden||!S.role||S.busy||S.queue.length||saisieEnCours()) return;
+  if(S.role==='admin'&&['reglages','import'].includes(S.tab)) return;
+  rafEnCours=true;
+  try{
+    if(S.role==='covoit'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }
+    const et=await api.etat(), sig=sigEtat(et);
+    if(sig===S.sig||saisieEnCours()||S.busy||S.queue.length) return;
+    S.sig=sig; S.weeks=et.weeks||[];
+    if(S.role!=='admin'){ S.vit=null; await loadVitrine(true); render(); return; }
+    S.rules=loadRules(et.regles); S.suivi=et.suivi||{alertes:{}}; S.journal=et.journal||[]; S.coco=et.coco&&Array.isArray(et.coco.agents)?et.coco:{agents:[]};
+    S.loaded=new Map(); S.parsedCache=new Map(); S.vit=null;
+    if(S.tab==='coco') await loadCoco(); else if(S.tab==='vitrine') await loadVitrine(true); else await ensureLoaded(toLoad());
+    S.msg={m:'Données mises à jour automatiquement (nouvelle semaine ou réglage modifié).'}; render();
+    setTimeout(()=>{ if(S.msg&&/automatiquement/.test(S.msg.m)){ S.msg=null; render(); } },6000);
+  }catch(e){ /* réseau coupé ou serveur en veille : on réessaiera au prochain passage */ }
+  finally{ rafEnCours=false; }
+}
+setInterval(rafraichir,120000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) rafraichir(); });
+setInterval(()=>{ if(!document.hidden&&S.role&&['coco','synthese'].includes(S.tab)&&!saisieEnCours()&&!S.busy&&!document.querySelector('[data-tip]:hover')) render(); },60000);
 (async function start(){
   const p=prefs();
   const qs=new URLSearchParams(location.search).get('semaine');
