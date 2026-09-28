@@ -1,0 +1,17 @@
+# Garde le site principal éveillé (offre gratuite Render : mise en veille après 15 min sans visite).
+# Appelle /api/ping toutes les 10 minutes. Uniquement le site principal : le site de test peut dormir
+# (l'offre gratuite donne 750 h par mois pour tout le compte, le principal en consomme environ 744).
+# GitHub peut retarder un passage de quelques minutes, et désactive la tâche après 60 jours sans commit :
+# la réactiver dans l'onglet Actions du dépôt si besoin.
+name: Garder le site éveillé
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 https://recap-corridor.onrender.com/api/ping
