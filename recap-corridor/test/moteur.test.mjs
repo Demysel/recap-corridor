@@ -632,21 +632,27 @@ test('anciens fichiers : pause = WorkDuration (T) − WorkDurationEffective (U) 
   const h = (x) => x / 24, d = (j) => serial(2026, 9, j);
   const HX = ['CodeID', 'Code', 'FullName', 'ID', 'Date', 'Nbr', null, 'JS1', 'D1', 'F1', 'From', 'To', 'JS2', 'D2', 'F2', 'From', 'To', 'DayType', 'Shift', 'WorkDuration', 'WorkDurationEffective'];
   const ligne = (id, j, T, U) => { const r = Array(21).fill(null); r[3] = id; r[4] = d(j); r[19] = h(T); r[20] = h(U); return r; };
-  const ex = E.readExtract([HX, ligne('1', 7, 8, 7), ligne('1', 8, 11, 10.5), ligne('1', 9, 7, 2.5), ligne('1', 10, 5, 3), ligne('1', 13, 8, 7.5)]);
+  const ex = E.readExtract([HX, ligne('1', 7, 8, 7), ligne('1', 8, 11, 10.5), ligne('1', 9, 7, 2.5), ligne('1', 10, 5, 3), ligne('1', 11, 11 + 50 / 60, 10), ligne('1', 12, 10, 9 + 40 / 60), ligne('1', 13, 8, 7.5)]);
   assert.equal(ex['1|2026-09-07'].join(), '480,420');
   const j = [svc(['MHIS', 'HENDAYE', 'HENDAYE', 7, '08:00', 7, '16:00']),
     svc(['A', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '07:00'], ['B', 'HENDAYE', 'HENDAYE', 8, '14:00', 8, '23:00']),
-    svc(['ATCMD-1', 'HENDAYE', 'HENDAYE', 9, '10:00', 9, '17:00']), svc(['VOY-7', 'HENDAYE', 'BORDEAUX', 10, '10:00', 10, '15:00']), 'RP', 'RP',
+    svc(['ATCMD-1', 'HENDAYE', 'HENDAYE', 9, '10:00', 9, '17:00']), svc(['VOY-7', 'HENDAYE', 'BORDEAUX', 10, '10:00', 10, '15:00']),
+    svc(['VOY+CSE-353-HE', 'HENDAYE', 'PERIGUEUX', 11, '06:35', 11, '18:25']), svc(['CSE+VOY-553-HE', 'PERIGUEUX', 'HENDAYE', 12, '08:30', 12, '18:30']),
     svc(['N', 'HENDAYE', 'HENDAYE', 13, '06:00', 13, '14:00'])];
   const p = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }]), ex);
-  const js = p.agents[0].jours;
+  assert.equal(p.agents[0].jours[0].tu.join(), '480,420');               // la lecture note T / U du jour…
+  assert.equal(p.agents[0].jours[0].missions[0].pauseMin, 0);            // …la pause est appliquée au calcul (règles)
+  const a = E.applyRules(p, RES).agents[0], js = a.jours;
   assert.equal(js[0].missions[0].pauseMin, 60);                          // 8 h − 7 h
   assert.equal(js[0].missions[0].pauses[0][0], new Date(Date.UTC(2026, 8, 7, 11, 30)).toISOString());   // au milieu de la mission
   assert.equal(js[1].missions[0].pauseMin + js[1].missions[1].pauseMin, 30);   // 30 min pour la journée…
   assert.equal(js[1].missions[1].pauseMin, 25);                          // …au prorata des JS (2 h et 9 h)
   assert.equal(js[2].missions[0].pauseMin, 0);                           // ATCMD : jamais de pause
-  assert.equal(js[3].missions[0].pauseMin, 0);                           // trajet VOY : horaire complet
-  const a = E.applyRules(p, RES).agents[0];
+  assert.equal(js[3].missions[0].pauseMin, 0);                           // trajet seul VOY : horaire complet
+  assert.equal(js[4].missions[0].pauseMin, 110);                         // mission mixte VOY+CSE : 11h50 − 10h00
+  assert.equal(js[5].missions[0].pauseMin, 20);                          // mission mixte CSE+VOY : 10h00 − 9h40
   assert.equal(a.heuresDimanche, 7.5);                                   // pause retirée du dimanche
-  assert.equal(E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }])).agents[0].jours[0].missions[0].pauseMin, 0);   // sans Extract : rien
+  const applis = () => E.applyRules(p, RES).agents[0].heuresPlanifiees;
+  assert.equal(applis(), applis());                                      // rejoué à chaque affichage sans cumuler
+  assert.equal(E.applyRules(E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }])), RES).agents[0].jours[0].missions[0].pauseMin, 0);   // sans Extract : rien
 });

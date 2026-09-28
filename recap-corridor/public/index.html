@@ -1052,21 +1052,6 @@ function nettoyerFeuille(rows){
     for(const x of gardees.slice(1)) if(!x.datees) retirer.set(x.i,{ligne:x.i+1,agent:x.agent,raison:`ligne en double sans horaire (ligne ${gardees[0].i+1} gardée)`}); }
   return {rows:rows.filter((_,i)=>!retirer.has(i)),retraits:[...retirer.values()].sort((a,b)=>a.ligne-b.ligne)};
 }
-/** Pause de la journée lue dans l'Extract (T − U) : répartie entre les JS du jour au prorata de leur durée, placée au milieu
-    de chaque mission (retirée des heures de nuit et du dimanche là où elle tombe). Jamais de pause pendant une ATCMD, ni
-    sur un trajet VOY (horaire complet ; un jour VOY + autre JS : la pause va à l'autre JS). Choix de l'utilisateur. Rien n'est ajouté si la case a déjà ses pauses « P: ». */
-function pausesExtract(c,e){
-  if(!e||!(e[0]>e[1])) return;
-  // ATCMD : 5 h fixes, jamais de pause ; trajets VOY : l'écart T − U est un coefficient, pas une pause → horaire complet gardé
-  const ms=c.missions.filter(m=>!/ATCMD|VOY/i.test(m.label)); if(!ms.length||c.missions.some(m=>m.pauses&&m.pauses.length)) return;
-  const t0=m=>Date.parse(m.start), len=m=>Math.max(0,Date.parse(m.end)-t0(m)), tot=ms.reduce((s,m)=>s+len(m),0); if(!tot) return;
-  const P=(e[0]-e[1])*6e4; let reste=P;
-  ms.forEach((m,i)=>{ const p=i===ms.length-1?reste:Math.round(P*len(m)/tot/6e4)*6e4; reste-=p;
-    const q=Math.min(p,len(m)); if(q<=0) return;
-    const mid=t0(m)+len(m)/2;
-    m.pauses=[[new Date(mid-q/2).toISOString(),new Date(mid+q/2).toISOString()]];
-    const mm=missionMinutes(m); m.pauseMin=mm.pause; m.travail=(mm.amp-mm.pause)/60; m.nbPauses=1; m.pauseExtract=Math.round(q/6e4); });
-}
 function parseWeek(rows,extract){
   if(!rows.length) throw new Error('Feuille vide.');
   const L=findLayout(rows);
@@ -1093,7 +1078,7 @@ function parseWeek(rows,extract){
       const pkA=personKey({matricule:mat==null?'':String(mat).trim(),nom:String(nom??'').trim(),prenom:String(r[cPre]??'').trim()});
       (c.anom||[]).forEach(a=>anomalies.push({agent:`${nom??''} ${r[cPre]??''}`.trim(),jour:JN[d],message:a,pk:pkA,date:isoD(days[d]),brut:normTxt(String(r[cLun+d]??'')).slice(0,600)}));
       delete c.anom;
-      if(extract&&c.kind==='SERVICE') pausesExtract(c,extract[String(mat??'').trim()+'|'+isoD(days[d])]);
+      if(extract&&c.kind==='SERVICE'){ const e=extract[String(mat??'').trim()+'|'+isoD(days[d])]; if(e) c.tu=e; }   // Extract : [T, U] du jour
       jours.push(c);
     }
     agents.push({
@@ -1164,7 +1149,7 @@ function splitHorsColonne(agents,days,rules){
       touched=true;
       const hc=hors.map(m=>({label:m.label,start:m.start,end:m.end}));
       hc.forEach(m=>liste.push({agent:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,jour:JN[d],pk:personKey(a),...m}));
-      return ok.length?{kind:'SERVICE',missions:ok,horsColonne:hc}:{kind:'CODE',code:'Hors colonne',family:'HORS',horsColonne:hc};
+      return ok.length?{kind:'SERVICE',missions:ok,horsColonne:hc,...(j.tu?{tu:j.tu}:{})}:{kind:'CODE',code:'Hors colonne',family:'HORS',horsColonne:hc};
     });
     return touched?{...a,jours}:a;
   });
@@ -1195,7 +1180,8 @@ function mergeDuplicates(agents){
         const seen=new Set(), ms=[];
         for(const c of svcs) for(const m of c.missions){const key=m.label+'|'+m.start+'|'+m.end; if(!seen.has(key)){seen.add(key);ms.push(m);}}
         ms.sort((a,b)=>new Date(a.start)-new Date(b.start));
-        jours.push(withHC({kind:'SERVICE',missions:ms},cells));
+        const tu=(svcs.find(c=>c.tu)||{}).tu;
+        jours.push(withHC({kind:'SERVICE',missions:ms,...(tu?{tu}:{})},cells));
       }else if(codes.length){
         const mc=main.jours[d];
         jours.push(withHC(mc.kind==='CODE'&&mc.family!=='HORS'?mc:(codes.find(c=>c.family!=='HORS')||codes[0]),cells));
@@ -1226,6 +1212,23 @@ function agenceExclue(ag,rules){
   const n=normLieu(ag), m=n.replace(/^AGENCE /,'');
   return L.includes(n)||L.includes(m);
 }
+/** Anciens fichiers (S01 à S19) : pause de la journée = WorkDuration (T) − WorkDurationEffective (U) de l'onglet Extract
+    (précisé par l'utilisateur), répartie entre les missions du jour au prorata de leur durée et placée au milieu de chacune
+    (retirée des heures de nuit et du dimanche là où elle tombe). Jamais de pause sur une ATCMD (5 h fixes) ni sur un trajet
+    seul (isTrajetSeul : l'écart T − U y est souvent un coefficient, pas une pause → horaire complet) ; une mission mixte
+    (VOY+CSE, CSE+VOY…) reçoit sa pause. Rien n'est ajouté si la case a déjà ses pauses « P: ». Choix de l'utilisateur. */
+function pausesExtractJour(j,rules){
+  const e=j.tu; if(j.kind!=='SERVICE'||!e||!(e[0]>e[1])) return j;
+  if(j.missions.some(m=>m.pauses&&m.pauses.length)) return j;
+  const ms=j.missions.filter(m=>!isATCMD(m)&&!isTrajetSeul(m.label,rules.trajetTypes||[])); if(!ms.length) return j;
+  const t0=m=>Date.parse(m.start), len=m=>Math.max(0,Date.parse(m.end)-t0(m)), tot=ms.reduce((s,m)=>s+len(m),0); if(!tot) return j;
+  const P=(e[0]-e[1])*6e4, iso=t=>new Date(t).toISOString(), neuf=new Map(); let reste=P;
+  ms.forEach((m,i)=>{ const p=i===ms.length-1?reste:Math.round(P*len(m)/tot/6e4)*6e4; reste-=p;
+    const q=Math.min(p,len(m)); if(q<=0) return;
+    const mid=t0(m)+len(m)/2, pauses=[[iso(mid-q/2),iso(mid+q/2)]], mm=missionMinutes({...m,pauses});
+    neuf.set(m,{...m,pauses,pauseMin:mm.pause,travail:(mm.amp-mm.pause)/60,nbPauses:1,pauseExtract:Math.round(q/6e4)}); });
+  return neuf.size?{...j,missions:j.missions.map(m=>neuf.get(m)||m)}:j;
+}
 function applyRules(parsed, rulesIn){
   const rules={...DEFAULT_RULES,...rulesIn};
   const days=parsed.meta.days.map(d=>new Date(d+'T00:00:00Z'));
@@ -1246,7 +1249,9 @@ function applyRules(parsed, rulesIn){
     return chg?{...a,jours}:a; }):src1;
   const src2=applyHoraires(src15,days,rules);
   const hc=rules.horsColonne==='garder'?{agents:src2,liste:[]}:splitHorsColonne(src2,days.map(d=>d.getTime()),rules);
-  const merged=mergeDuplicates(hc.agents);
+  const merged=mergeDuplicates(hc.agents).map(a=>{ let chg=false;
+    const jours=a.jours.map(j=>{ const n=pausesExtractJour(j,rules); if(n!==j) chg=true; return n; });
+    return chg?{...a,jours}:a; });
   const {residences,residenceSource,locCounts}=deduceResidences(merged,rules);
   const agents=merged.map(a=>computeAgent(a,days,rules,residences[a.agence],parsed.meta.weekId));
   return {meta:{...parsed.meta,residences,residenceSource,locCounts,rules,horsColonne:hc.liste,
@@ -4461,7 +4466,7 @@ async function relireSemaines(ids){
       const net=nettoyerFeuille(source.rows), parsed=parseWeek(net.rows,source.extract||null);
       const view=applyRules(parsed,effRules([...new Set(parsed.agents.map(a=>a.agence))])); view.agents.forEach(a=>a.weekId=id);
       const avant=agg((S.loaded.get(id)?.agents||[]).filter(a=>!a.exclu));
-      const pe=parsed.agents.reduce((s,a)=>s+a.jours.reduce((t,j)=>t+(j.missions||[]).filter(m=>m.pauseExtract).length,0),0);
+      const pe=view.agents.reduce((s,a)=>s+a.jours.reduce((t,j)=>t+(j.missions||[]).filter(m=>m.pauseExtract).length,0),0);
       S.queue.push({name:w.fileName||weekLabel(w),size:w.taille??null,state:'pret',parsed,view,anom:parsed.anomalies.length,stats:agg(view.agents.filter(a=>!a.exclu)),
         existe:true,retraits:net.retraits,source,relecture:{avant,pausesExtract:pe}});
     }catch(e){ S.queue.push({name:weekLabel(w),state:'erreur',err:`${weekLabel(w)} — ${e.message||e}`}); }

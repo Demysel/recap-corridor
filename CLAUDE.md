@@ -137,12 +137,14 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Calcul blindé : durées recalculées en minutes entières depuis les horaires (`missionMinutes`), pauses = réunion des
   pauses ramenées dans la mission (jamais déduites deux fois), totaux gardés en minutes exactes (`rM`, aucune dérive
   d'arrondi). **Anciens fichiers (S01 à S19, onglet « Corridor Atlantique ») : les pauses ne sont pas dans les cases** ; elles
-  viennent de l'onglet « Extract » (une ligne par agent et par jour, clé matricule|date, `readExtract`) : pause de la journée =
-  WorkDuration (T) − WorkDurationEffective (U) (précisé par l'utilisateur), répartie entre les JS du jour au prorata de leur
-  durée, placée au milieu de chaque mission (donc retirée des heures de nuit et du dimanche là où elle tombe) — `pausesExtract`.
-  Jamais de pause sur une ATCMD (5 h fixes) ni sur un trajet VOY (l'écart T − U y est un coefficient ≈ 58,7 %, pas une pause :
-  horaire complet gardé ; jour VOY + autre JS : la pause va à l'autre JS) — choix de l'utilisateur. Rien n'est ajouté si la case
-  a déjà ses pauses « P: ». Ligne de pause vide « P: - » = aucune pause, sans alerte (`RE_PV`). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
+  viennent de l'onglet « Extract » (une ligne par agent et par jour, clé matricule|date, `readExtract`) : la lecture note
+  [T, U] sur la journée (`tu`), le calcul (`pausesExtractJour`, dans applyRules, donc rejoué sans réimport) retire la pause
+  de la journée = WorkDuration (T) − WorkDurationEffective (U) (précisé par l'utilisateur), répartie entre les missions du
+  jour au prorata de leur durée, placée au milieu de chaque mission (donc retirée des heures de nuit et du dimanche là où
+  elle tombe). Jamais de pause sur une ATCMD (5 h fixes) ni sur un **trajet seul** (`isTrajetSeul` : l'écart T − U y est
+  souvent un coefficient, pas une pause → horaire complet) ; une **mission mixte** (VOY+CSE, CSE+VOY, VS+VOY…) reçoit sa
+  pause (précisé par l'utilisateur, cas Bonzi S13) ; jour trajet seul + autre JS : la pause va à l'autre JS. Rien n'est
+  ajouté si la case a déjà ses pauses « P: ». Ligne de pause vide « P: - » = aucune pause, sans alerte (`RE_PV`). Signalés : pause illisible, pause hors mission, mission de 24 h ou plus, missions qui se chevauchent.
   Test aléatoire de 400 semaines contre un calcul de référence indépendant.
 - Résidences : une résidence déduite automatiquement reste automatique à l'enregistrement des Réglages
   (elle peut s'écrire BX une semaine et BORDEAUX une autre) ; seule une valeur modifiée à la main devient manuelle.
