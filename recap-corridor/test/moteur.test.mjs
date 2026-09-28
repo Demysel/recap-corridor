@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -655,4 +655,18 @@ test('anciens fichiers : pause = WorkDuration (T) − WorkDurationEffective (U) 
   const applis = () => E.applyRules(p, RES).agents[0].heuresPlanifiees;
   assert.equal(applis(), applis());                                      // rejoué à chaque affichage sans cumuler
   assert.equal(E.applyRules(E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'TEST', j }])), RES).agents[0].jours[0].missions[0].pauseMin, 0);   // sans Extract : rien
+});
+
+test('vue Coco : missions et RHR des agents choisis, mission de nuit sur deux jours, rien d’autre', () => {
+  const j1 = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), svc(['N', 'HENDAYE', 'HENDAYE', 9, '22:00', 10, '05:00']), 'RP', 'RP', 'RP', 'RP'];
+  const w = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'CHOISI', j: j1 }, { mat: '2', nom: 'AUTRE', j: j1 }]));
+  const sem = E.cocoCalcul([w], E.loadRules({ residences: { Hendaye: 'HENDAYE' } }), '2026-S37', [{ pk: 'm:1', nom: 'x', metier: 'CONDUCTEUR', couleur: '#FFD600' }]);
+  assert.equal(sem.agents.length, 1);                           // seul l'agent choisi
+  const a = sem.agents[0];
+  assert.equal(a.missions.length, 3);
+  assert.equal(a.rhr.length, 1);                                // RHR à Bordeaux du lundi au mardi
+  assert.equal(a.rhr[0].lieu, 'BORDEAUX');
+  assert.equal(a.jours[2].m.length + a.jours[3].m.length, 2);   // mission de nuit : mercredi et suite jeudi
+  assert.equal(a.jours[3].m[0].suite, true);
+  assert.ok(!('heuresSup' in a) && !('codes' in a) && !/RP/.test(JSON.stringify(sem)));   // ni heures ni codes
 });

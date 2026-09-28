@@ -42,12 +42,18 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   légales » (aperçu de la page visiteur), jamais écrits dans le code ; un champ vide n'est pas affiché. Textes fixes : vitrine
   anonyme (groupes d'au moins 5 agents), pas de cookie, stockage local du code et des préférences, polices Google Fonts.
 - **Vue Coco (copain covoit)**, demandée par l'utilisateur : troisième code d'accès `CODE_COVOIT` (variable Render, rôle
-  `covoit`) qui ne voit que l'onglet « Coco ». Semaine au choix (par défaut celle d'aujourd'hui, ‹ › pour naviguer) ;
-  chaque jour, une ligne par agent choisi avec ses missions (barres sur 0–24 h + texte intitulé · horaire · départ → arrivée),
-  rien d'autre (ni codes, ni heures, ni RHR). Agents choisis par l'admin dans l'onglet Coco (recherche, ajout, retrait),
-  mémorisés dans `recap.config` clé `coco` ({agents:[{pk,nom,couleur}]}) ; **couleur attribuée à la sélection et gardée
-  pour toutes les semaines** (`COCO_COUL`). Le serveur calcule la semaine (`cocoSemaine` du moteur) et n'envoie que ces
-  missions ; `/api/semaine`, `/api/source`, les règles restent refusés au code covoit.
+  `covoit`, valeur « covoit » sur les deux sites) qui ne voit que l'onglet « Coco ». Semaine au choix (par défaut celle
+  d'aujourd'hui, ‹ › pour naviguer) ; chaque jour : graduation heure par heure (00 à 23), une ligne par agent choisi avec
+  ses missions (barres sur 0–24 h ; détail — trajet, horaire, amplitude, pauses — en infobulle comme la fiche agent) et ses
+  RHR (cadre pointillé, lieu en infobulle), mission ou RHR à cheval sur minuit affiché sur chaque jour touché (« … »).
+  Pastille « en service » (heure de l'appareil) et trait « maintenant » sur le jour en cours. **Covoiturage** : deux
+  missions d'agents différents dont la prise ET la fin de service sont à 30 min près sont entourées et marquées ⇄ (avec
+  qui, en infobulle ; `cocoCovoit`). **Couleurs** : nuances de rouge pour les AFR, de jaune pour les conducteurs
+  (`COCO_ROUGES` / `COCO_JAUNES`, `cocoCouleurs`), une nuance par agent attribuée à la sélection et gardée d'une semaine à
+  l'autre. Rien d'autre n'est montré (ni codes, ni heures sup, ni paniers). Agents choisis par l'admin dans l'onglet Coco
+  (recherche, ajout, retrait), mémorisés dans `recap.config` clé `coco` ({agents:[{pk,nom,metier,couleur}]}). Le serveur
+  calcule la semaine avec les règles du site (`cocoCalcul` : applyRules + reconcile sur la semaine et ses voisines) et
+  n'envoie que ces missions et RHR ; `/api/semaine`, `/api/source`, les règles restent refusés au code covoit.
 - `recap-corridor/public/icons/` — icône de l'application (carré rouge, rail blanc, deux stations, comme la marque) :
   favicon SVG et PNG, `apple-touch-icon.png` (écran d'accueil iPhone), icônes 192/512 et `manifest.webmanifest`
   (installation en app). Servies par `server.js` (liste fermée `ICONES`, plus `/favicon.ico` et `/apple-touch-icon.png`).

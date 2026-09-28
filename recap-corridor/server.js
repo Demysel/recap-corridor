@@ -110,7 +110,7 @@ function engine() {
   const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
   const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
   const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules,cocoSemaine};', ctx);
+  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules,cocoCalcul};', ctx);
   moteur = ctx.__E;
   return moteur;
 }
@@ -170,17 +170,23 @@ async function api(req, res, url) {
     const sel = (c.rows[0]?.valeur?.agents || []).filter((x) => x && x.pk);
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id) || !sel.length) return json(req, res, 200, { agents: sel.map(({ pk, nom, couleur }) => ({ pk, nom, couleur })), semaine: null });
-    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug <> '~source'`, [id]);
-    if (!d.rows.length) return json(req, res, 200, { agents: sel, semaine: null });
+    // la semaine et ses voisines (RHR commencé la semaine précédente), calculées avec les règles du site
+    const ids = (await p.query(`select week_id from ${SCHEMA}.semaines order by week_id`)).rows.map((x) => x.week_id), k = ids.indexOf(id);
+    if (k < 0) return json(req, res, 200, { agents: sel, semaine: null });
+    const voisins = [ids[k - 1], id, ids[k + 1]].filter(Boolean);
+    const d = await p.query(`select week_id, data from ${SCHEMA}.details where week_id = any($1) and agence_slug <> '~source' order by week_id, agence_slug`, [voisins]);
+    const weeks = new Map();
+    for (const x of d.rows) { if (!weeks.has(x.week_id)) weeks.set(x.week_id, { meta: x.data.meta, agents: [] }); weeks.get(x.week_id).agents.push(...(x.data.agents || [])); }
+    const c2 = await p.query(`select valeur from ${SCHEMA}.config where cle = 'regles'`);
     const E = engine();
-    const sem = JSON.parse(JSON.stringify(E.cocoSemaine(d.rows[0].data.meta, d.rows.flatMap((x) => x.data.agents || []), sel)));
-    return json(req, res, 200, { agents: sel, semaine: sem });
+    const sem = E.cocoCalcul([...weeks.values()], E.loadRules(c2.rows[0]?.valeur || null), id, sel);
+    return json(req, res, 200, { agents: sel, semaine: sem ? JSON.parse(JSON.stringify(sem)) : null });
   }
   if (route === 'coco' && req.method === 'PUT') {
     if (!admin) return json(req, res, 403, { error: 'Seul le code administrateur choisit les agents de la vue Coco.' });
     const body = await readBody(req);
     const agents = (Array.isArray(body.agents) ? body.agents : []).slice(0, 60)
-      .map((x) => ({ pk: String(x.pk || '').slice(0, 200), nom: String(x.nom || '').slice(0, 120), couleur: /^#[0-9a-f]{6}$/i.test(x.couleur || '') ? x.couleur : '#1F77B4' }))
+      .map((x) => ({ pk: String(x.pk || '').slice(0, 200), nom: String(x.nom || '').slice(0, 120), metier: String(x.metier || '').slice(0, 60), couleur: /^#[0-9a-f]{6}$/i.test(x.couleur || '') ? x.couleur : '#1F77B4' }))
       .filter((x) => x.pk);
     await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('coco', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify({ agents })]);
     return json(req, res, 200, { ok: true });

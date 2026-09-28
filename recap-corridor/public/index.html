@@ -234,14 +234,19 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .cc-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}.cc-li{display:inline-flex;align-items:center;gap:6px}
 .cc-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;margin-right:4px}
 .cc-ax,.cc-r{display:grid;grid-template-columns:minmax(110px,190px) 1fr;gap:10px;align-items:start}
-.cc-axt{position:relative;height:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}.cc-axt span{position:absolute;transform:translateX(-50%)}.cc-axt span:first-child{transform:none}
+.cc-axt{position:relative;height:14px;margin-top:2px;font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}.cc-axt span{position:absolute;transform:translateX(-50%)}.cc-axt span:first-child{transform:none}
 .cc-j{border-top:1px solid var(--line);padding-top:8px}.cc-jh{font-weight:700;font-size:13.5px;margin-bottom:6px}
 .cc-n{font-size:13px;font-weight:600;display:flex;align-items:center;min-height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cc-t{position:relative;height:22px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.cc-t i{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.cc-t i{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.55}.cc-t i.f{opacity:1;background:var(--line-2)}
+.cc-r{margin-bottom:6px}.cc-nm{overflow:hidden;text-overflow:ellipsis}
+.cc-live{margin-left:6px;font-size:10px;padding:1px 6px}
+.cc-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--accent);z-index:3}
+.cc-rhr{position:absolute;top:3px;bottom:3px;border:2px dashed;border-radius:4px;font:600 10px/14px var(--mono);color:var(--ink-2);padding:0 4px;overflow:hidden;white-space:nowrap;background:var(--surface)}
+.cc-b{z-index:2;cursor:default}.cc-b.cov{outline:2px solid var(--ink);outline-offset:1px;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 35%,transparent)}
+.cc-cov-ex{display:inline-block;width:18px;height:10px;border-radius:3px;background:var(--surface-2);outline:2px solid var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 35%,transparent);margin-right:8px;vertical-align:middle}
 .cc-b{position:absolute;top:2px;bottom:2px;border-radius:4px;color:#fff;font:600 10.5px/18px var(--mono);padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.cc-tx{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11.5px;color:var(--ink-2);margin:3px 0 8px}
-@media (max-width:640px){.cc-ax,.cc-r{grid-template-columns:1fr}.cc-ax>span:first-child{display:none}}
+@media (max-width:640px){.cc-ax,.cc-r{grid-template-columns:1fr}.cc-ax>span:first-child{display:none}.cc-axt .h1{display:none}}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
 @media (max-width:900px){.cols2{grid-template-columns:1fr}}
 /* entrée d'onglet : les blocs arrivent en cascade, une seule fois par changement d'onglet */
@@ -1842,19 +1847,36 @@ function mergeAcrossWeeks(rows){
   return out;
 }
 
-/** Vue Coco (copain covoit) : missions de la semaine des agents choisis par l'admin, jour par jour, rien d'autre
-    (ni codes, ni heures, ni RHR). Couleur fixe par agent, choisie à la sélection (config « coco »). */
-function cocoSemaine(meta,agents,sel){
-  const days=meta.days, idx=new Map((sel||[]).map((x,i)=>[x.pk,i]));
-  const out=(sel||[]).map(x=>({pk:x.pk,nom:x.nom||'',couleur:x.couleur,jours:days.map(()=>[])}));
+/** Vue Coco (copain covoit) : missions et RHR de la semaine des agents choisis par l'admin, jour par jour, rien d'autre
+    (ni codes, ni heures sup, ni paniers). Calculés avec les règles du site (cocoCalcul : applyRules + reconcile sur la
+    semaine et ses voisines, pour les RHR commencés la semaine précédente). Une mission ou un RHR à cheval sur minuit
+    apparaît sur chaque jour touché (morceau du jour, `suite` le lendemain). */
+function cocoSemaine(meta,agents,sel,autres){
+  const days=meta.days, idx=new Map((sel||[]).map((x,i)=>[x.pk,i])), D=days.map(d=>Date.parse(d+'T00:00:00Z'));
+  const out=(sel||[]).map(x=>({pk:x.pk,nom:x.nom||'',metier:x.metier||'',couleur:x.couleur,missions:[],rhr:[],jours:days.map(()=>({m:[],r:[]}))}));
+  const place=(o,list,kind,x)=>{ const S0=Date.parse(x.start||x.debut), E0=x.fin===null?D[6]+DAY:Date.parse(x.end||x.fin);
+    D.forEach((d,k)=>{ if(S0<d+DAY&&E0>d) o.jours[k][kind].push({i:list.length-1,s:Math.max(S0,d),e:Math.min(E0,d+DAY),suite:S0<d}); }); };
   for(const a of agents||[]){ const i=idx.get(personKey(a)); if(i==null) continue; const o=out[i];
-    o.nom=`${a.nom} ${a.prenom}`.trim()||o.nom;
-    (a.jours||[]).forEach((j,d)=>{ if(j.kind!=='SERVICE') return; const D=Date.parse(days[d]+'T00:00:00Z');
-      for(const m of j.missions||[]){ const S0=Date.parse(m.start), E0=Date.parse(m.end); if(!(S0<D+DAY&&E0>D)) continue;
-        if(o.jours[d].some(x=>x.start===m.start&&x.label===m.label)) continue;
-        o.jours[d].push({label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end}); }
-      o.jours[d].sort((x,y)=>x.start.localeCompare(y.start)); }); }
+    o.nom=`${a.nom} ${a.prenom}`.trim()||o.nom; o.metier=a.metier||o.metier;
+    for(const j of a.jours||[]) if(j.kind==='SERVICE') for(const m of j.missions||[]){
+      if(o.missions.some(x=>x.start===m.start&&x.label===m.label)) continue;
+      o.missions.push({label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end,amplitude:m.amplitude??null,pauseMin:m.pauseMin||0});
+      place(o,o.missions,'m',m); } }
+  // RHR de la semaine, et ceux d'une semaine voisine qui débordent sur celle-ci
+  for(const a of [...(agents||[]),...(autres||[])]){ const i=idx.get(personKey(a)); if(i==null) continue; const o=out[i];
+    for(const r of a.rhr||[]){ if(o.rhr.some(x=>x.debut===r.debut)) continue;
+      const S0=Date.parse(r.debut), E0=r.fin?Date.parse(r.fin):D[6]+DAY; if(!(S0<D[6]+DAY&&E0>D[0])) continue;
+      o.rhr.push({lieu:r.lieu||'',debut:r.debut,fin:r.fin||null,dureeH:r.dureeH??null}); place(o,o.rhr,'r',{start:r.debut,end:r.fin||new Date(D[6]+DAY).toISOString()}); } }
+  for(const o of out) for(const j of o.jours){ j.m.sort((x,y)=>x.s-y.s); j.r.sort((x,y)=>x.s-y.s); }
   return {weekId:meta.weekId,monday:meta.monday,sunday:meta.sunday,days,agents:out};
+}
+function cocoCalcul(weeks,rulesIn,id,sel){
+  const R=rulesIn||{}, rules={...R,agencesAlias:{...autoAliasFrom(weeks.flatMap(w=>w.agents.map(a=>a.agence))),...(R.agencesAlias||{})}};
+  const map=new Map();
+  for(const w of [...weeks].sort((a,b)=>a.meta.weekId.localeCompare(b.meta.weekId))){ const v=applyRules(w,rules); v.agents.forEach(a=>a.weekId=w.meta.weekId); map.set(w.meta.weekId,v); }
+  reconcile(map,rules);
+  const v=map.get(id); if(!v) return null;
+  return cocoSemaine(v.meta,v.agents.filter(a=>!a.exclu),sel,[...map.entries()].filter(([k])=>k!==id).flatMap(([,x])=>x.agents));
 }
 
 /* ==========================================================================
@@ -2095,8 +2117,9 @@ const backend={
   },
   async coco(id){
     if(backend.mode!=='artifact') return backend.call('coco?id='+encodeURIComponent(id||''));
-    await ensureLoaded([id]); const p=S.parsedCache.get(id);
-    return {agents:S.coco.agents,semaine:p?cocoSemaine(p.meta,p.agents,S.coco.agents):null};
+    const ids=S.weeks.map(w=>w.weekId).sort(), k=ids.indexOf(id), voisins=[ids[k-1],id,ids[k+1]].filter(Boolean);
+    await ensureLoaded(voisins); const ws=voisins.map(x=>S.parsedCache.get(x)).filter(Boolean);
+    return {agents:S.coco.agents,semaine:S.parsedCache.get(id)?cocoCalcul(ws,S.rules,id,S.coco.agents):null};
   },
   async saveCoco(c){
     if(backend.mode!=='artifact') return backend.call('coco',{method:'PUT',body:JSON.stringify(c)});
@@ -4169,7 +4192,19 @@ function mentionsHTML(m){
     ${m.majLe?`<p class="hint">Dernière mise à jour : ${dFull(m.majLe)}</p>`:''}</div>`.replace(/<b><\/b> : /g,'');
 }
 /* ---------- Coco (copain covoit) : missions de la semaine des agents choisis, une ligne par agent et par jour ---------- */
-const COCO_COUL=['#1F77B4','#E4572E','#2CA02C','#9467BD','#FF8C00','#0097A7','#C2185B','#6D4C41','#7CB342','#3949AB','#F4B400','#00897B','#8E24AA','#546E7A'];
+/** Couleurs Coco (demandé par l'utilisateur) : nuances de rouge pour les AFR, nuances de jaune pour les conducteurs ;
+    une nuance par agent, attribuée à la sélection et gardée d'une semaine à l'autre */
+const COCO_ROUGES=['#D50000','#FF6F61','#8E0000','#FF1744','#C2185B','#E57373','#B71C1C','#FF8A80','#AD1457','#F4511E'];
+const COCO_JAUNES=['#FFD600','#F9A825','#FFEE58','#FFB300','#E6B800','#FFF176','#FF8F00','#FBC02D','#C6A700','#FFCA28'];
+const cocoFam=m=>isAFR(m)?COCO_ROUGES:COCO_JAUNES;
+/** Couleur de chaque agent choisi : la sienne si elle est de la bonne famille et libre, sinon la première libre de sa famille */
+function cocoCouleurs(sel){
+  const pris=new Set(), out=[];
+  for(const x of sel||[]){ const fam=cocoFam(x.metier), c=fam.includes(x.couleur)&&!pris.has(x.couleur)?x.couleur:(fam.find(k=>!pris.has(k))||fam[out.length%fam.length]);
+    pris.add(c); out.push({...x,couleur:c}); }
+  return out;
+}
+const cocoTexte=c=>COCO_JAUNES.includes(c)?'#1a1a1a':'#fff';
 /** Semaine affichée : celle choisie, sinon celle d'aujourd'hui, sinon la dernière importée */
 function cocoSemaineParDefaut(){
   const W=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), t=isoD(new Date(nowW()));
@@ -4178,9 +4213,21 @@ function cocoSemaineParDefaut(){
 async function loadCoco(){
   if(!S.cocoW||!S.weeks.some(w=>w.weekId===S.cocoW)) S.cocoW=cocoSemaineParDefaut();
   if(!S.cocoW){ S.cocoData={semaine:null}; render(); return; }
-  try{ const r=await withLoad(api.coco(S.cocoW)); S.cocoData=r; if(r&&Array.isArray(r.agents)&&S.role!=='admin') S.coco={agents:r.agents}; }
+  try{ const r=await withLoad(api.coco(S.cocoW)); S.cocoData=r; if(r&&Array.isArray(r.agents)&&S.role!=='admin') S.coco={agents:r.agents};
+    if(S.role==='admin'&&r&&r.semaine){ const met=new Map(r.semaine.agents.map(a=>[a.pk,a.metier])), cur=S.coco.agents||[];
+      const neuf=cocoCouleurs(cur.map(x=>({...x,metier:x.metier||met.get(x.pk)||''})));
+      if(neuf.some((x,k)=>x.couleur!==cur[k].couleur||x.metier!==cur[k].metier)){ S.coco={agents:neuf}; api.saveCoco(S.coco).catch(()=>{}); } } }
   catch(e){ S.cocoData=null; S.msg={m:'Vue Coco indisponible : '+e.message,t:'c'}; }
   render();
+}
+/** Missions compatibles pour covoiturer : deux agents dont la prise ET la fin de service sont à 30 min près (demandé) */
+const COCO_TOL=30*6e4;
+function cocoCovoit(agents){
+  const res=new Map();
+  agents.forEach((a,i)=>a.missions.forEach((m,k)=>agents.forEach((b,j)=>{ if(j<=i) return;
+    b.missions.forEach((n,l)=>{ if(Math.abs(Date.parse(m.start)-Date.parse(n.start))<=COCO_TOL&&Math.abs(Date.parse(m.end)-Date.parse(n.end))<=COCO_TOL){
+      (res.get(i+'|'+k)||res.set(i+'|'+k,[]).get(i+'|'+k)).push(b.nom); (res.get(j+'|'+l)||res.set(j+'|'+l,[]).get(j+'|'+l)).push(a.nom); } }); })));
+  return res;
 }
 function viewCoco(){
   const W=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), i=W.findIndex(w=>w.weekId===S.cocoW), C=S.cocoData&&S.cocoData.semaine;
@@ -4188,24 +4235,32 @@ function viewCoco(){
       <button class="btn btn-sm" data-cocow="${i>0?W[i-1].weekId:''}"${i>0?'':' disabled'} aria-label="Semaine précédente">‹</button>
       <select id="cocoW" style="flex:1;min-width:0;max-width:340px">${W.slice().reverse().map(w=>`<option value="${w.weekId}"${w.weekId===S.cocoW?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</select>
       <button class="btn btn-sm" data-cocow="${i>=0&&i<W.length-1?W[i+1].weekId:''}"${i>=0&&i<W.length-1?'':' disabled'} aria-label="Semaine suivante">›</button></div></div></div>`;
-  const sel=(C&&C.agents)||[];
-  const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li"><span class="cc-dot" style="background:${esc(a.couleur)}"></span>${esc(a.nom)}</span>`).join('')}</div>`:'';
-  const hx=`<div class="cc-ax"><span></span><div class="cc-axt">${[0,3,6,9,12,15,18,21].map(h=>`<span style="left:${h/24*100}%">${String(h).padStart(2,'0')}h</span>`).join('')}</div></div>`;
+  const sel=C?cocoCouleurs(C.agents):[], now=nowW();
+  const enService=a=>a.missions.some(m=>Date.parse(m.start)<=now&&now<Date.parse(m.end));
+  const pill='<span class="pill pill-g cc-live">en service</span>';
+  const cov=C?cocoCovoit(sel):new Map();
+  const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li"><span class="cc-dot" style="background:${a.couleur}"></span>${esc(a.nom)} <span class="mut sm">${esc(a.metier||'')}</span>${enService(a)?pill:''}</span>`).join('')}
+    <span class="cc-li mut sm"><span class="cc-cov-ex"></span>même prise et fin de service (± 30 min) : covoiturage possible</span></div>`:'';
+  const axe=`<div class="cc-ax"><span></span><div class="cc-axt">${Array.from({length:24},(_,h)=>`<span class="${h%3?'h1':''}" style="left:${(h/24*100).toFixed(3)}%">${String(h).padStart(2,'0')}</span>`).join('')}</div></div>`;
+  const grille=Array.from({length:23},(_,h)=>`<i class="${(h+1)%6?'':'f'}" style="left:${((h+1)/24*100).toFixed(3)}%"></i>`).join('');
   let corps;
   if(!W.length) corps='<p class="mut">Aucune semaine enregistrée.</p>';
   else if(!S.cocoData) corps='<p class="mut">Chargement…</p>';
   else if(!sel.length) corps=`<p class="mut">${S.role==='admin'?'Choisissez ci-dessous les agents à afficher.':'Aucun agent n’a encore été choisi : demandez à l’administrateur.'}</p>`;
-  else corps=hx+C.days.map((day,d)=>{
-    const D=Date.parse(day+'T00:00:00Z'), lignes=sel.filter(a=>a.jours[d]&&a.jours[d].length);
-    return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span></div>${lignes.length?lignes.map(a=>`<div class="cc-r">
-      <div class="cc-n"><span class="cc-dot" style="background:${esc(a.couleur)}"></span>${esc(a.nom)}</div>
-      <div><div class="cc-t">${[6,12,18].map(h=>`<i style="left:${h/24*100}%"></i>`).join('')}${a.jours[d].map(m=>{
-        const s0=Math.max(Date.parse(m.start),D), e0=Math.min(Date.parse(m.end),D+DAY), txt=`${m.label} · ${hm(m.start)}–${hm(m.end)}${m.from||m.to?` · ${m.from} → ${m.to}`:''}`;
-        return `<span class="cc-b" style="left:${((s0-D)/DAY*100).toFixed(2)}%;width:${Math.max(0.8,(e0-s0)/DAY*100).toFixed(2)}%;background:${esc(a.couleur)}" title="${esc(txt)}">${esc(m.label)}</span>`;}).join('')}</div>
-        <div class="cc-tx">${a.jours[d].map(m=>`<span>${esc(m.label)} · <b>${hm(m.start)}–${hm(m.end)}</b>${m.from||m.to?` · ${esc(m.from)} → ${esc(m.to)}`:''}</span>`).join('')}</div></div></div>`).join('')
+  else corps=C.days.map((day,d)=>{
+    const D0=Date.parse(day+'T00:00:00Z'), pos=(s0,e0)=>`left:${((s0-D0)/DAY*100).toFixed(3)}%;width:${Math.max(0.6,(e0-s0)/DAY*100).toFixed(3)}%`;
+    const lignes=sel.map((a,ai)=>({a,ai,j:a.jours[d]})).filter(x=>x.j.m.length||x.j.r.length);
+    const auj=now>=D0&&now<D0+DAY;
+    return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span>${auj?' <span class="pill pill-a">aujourd’hui</span>':''}</div>${axe}${lignes.length?lignes.map(({a,ai,j})=>`<div class="cc-r">
+      <div class="cc-n"><span class="cc-dot" style="background:${a.couleur}"></span><span class="cc-nm">${esc(a.nom)}</span>${auj&&enService(a)?pill:''}</div>
+      <div class="cc-t">${grille}${auj?`<b class="cc-now" style="left:${((now-D0)/DAY*100).toFixed(3)}%"></b>`:''}${j.r.map(x=>{ const r=a.rhr[x.i];
+        const tip=`<b>Repos hors résidence</b><span class="tr"><span>Lieu</span><b>${esc(r.lieu||'?')}</b></span><span class="tr"><span>Du</span><b>${dtISO(r.debut)}</b></span><span class="tr"><span>Au</span><b>${r.fin?dtISO(r.fin):'semaine suivante'}</b></span>${r.dureeH!=null?`<span class="tr"><span>Durée</span><b>${fmtH(r.dureeH)}</b></span>`:''}`;
+        return `<span class="cc-rhr" style="${pos(x.s,x.e)};border-color:${a.couleur}" data-tip="${esc(tip)}">RHR ${esc(r.lieu||'')}</span>`;}).join('')}${j.m.map(x=>{ const m=a.missions[x.i], avec=cov.get(ai+'|'+x.i);
+        const tip=`<b>${esc(m.label)}</b><span class="tr"><span>${esc(m.from||'?')} → ${esc(m.to||'?')}</span></span><span class="tr"><span>Horaire</span><b>${dtISO(m.start)} – ${hm(m.end)}</b></span>${m.amplitude!=null?`<span class="tr"><span>Amplitude</span><b>${fmtH(m.amplitude)}</b></span>`:''}${m.pauseMin?`<span class="tr"><span>Pauses</span><b>${m.pauseMin} min</b></span>`:''}${avec?`<span class="tr"><span>Covoiturage possible avec</span><b>${esc([...new Set(avec)].join(', '))}</b></span>`:''}`;
+        return `<span class="cc-b${avec?' cov':''}" style="${pos(x.s,x.e)};background:${a.couleur};color:${cocoTexte(a.couleur)}" data-tip="${esc(tip)}">${avec?'⇄ ':''}${x.suite?'… ':''}${esc(m.label)}</span>`;}).join('')}</div></div>`).join('')
       :'<p class="mut sm" style="margin:4px 0 8px">Aucune mission pour ces agents.</p>'}</div>`; }).join('');
   const choix=S.role==='admin'?cocoChoix():'';
-  return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent, une couleur par agent (toujours la même)</p></div></div>
+  return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent · rouges : AFR, jaunes : conducteurs · touchez une mission pour son détail</p></div></div>
     <div class="card-b stack">${nav}${leg}${corps}</div></section>${choix}`;
 }
 /** Admin : agents affichés dans la vue Coco (code covoit), couleur fixée à la sélection */
@@ -4215,7 +4270,7 @@ function cocoChoix(){
   const res=q?[...pers.values()].filter(x=>!pris.has(x.pk)&&deacc(`${x.nom} ${x.agence} ${x.pk}`).toLowerCase().includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).slice(0,20):[];
   return `<section class="card"><div class="card-h"><div><h2>Agents affichés dans Coco</h2><p class="card-s">visibles avec le code covoit · la couleur reste la même d’une semaine à l’autre</p></div></div>
     <div class="card-b stack">
-      <div class="frow">${sel.length?sel.map(x=>`<span class="chip" aria-pressed="true"><span class="cc-dot" style="background:${esc(x.couleur)}"></span>${esc(x.nom)} <button class="lnk" data-cocodel="${esc(x.pk)}" title="Retirer">×</button></span>`).join(''):'<span class="mut">Aucun agent choisi.</span>'}</div>
+      <div class="frow">${sel.length?cocoCouleurs(sel).map(x=>`<span class="chip" aria-pressed="true"><span class="cc-dot" style="background:${esc(x.couleur)}"></span>${esc(x.nom)} <button class="lnk" data-cocodel="${esc(x.pk)}" title="Retirer">×</button></span>`).join(''):'<span class="mut">Aucun agent choisi.</span>'}</div>
       <label class="fld"><span class="flabel">Ajouter un agent</span><input type="search" id="cocoQ" value="${esc(S.cocoQ||'')}" placeholder="Nom, agence ou matricule…" autocomplete="off"></label>
       ${q?`<div class="frow">${res.length?res.map(x=>`<button class="chip" data-cocoadd="${esc(x.pk)}">+ ${esc(x.nom)} <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span></button>`).join(''):'<span class="mut">Aucun agent trouvé dans les semaines chargées.</span>'}</div>`:''}
     </div></section>`;
@@ -4745,9 +4800,8 @@ document.addEventListener('click',async e=>{
   if(t.id==='relireAll'&&admin()){ await relireSemaines(S.weeks.map(w=>w.weekId).sort()); return; }
   if(t.dataset.cocow){ S.cocoW=t.dataset.cocow; await loadCoco(); return; }
   if(t.dataset.cocoadd&&admin()){ const pk=t.dataset.cocoadd, pris=new Set((S.coco.agents||[]).map(x=>x.couleur));
-    let nom=pk; for(const v of S.loaded.values()){ const a=v.agents.find(x=>personKey(x)===pk); if(a){ nom=`${a.nom} ${a.prenom}`.trim(); break; } }
-    const couleur=COCO_COUL.find(c=>!pris.has(c))||COCO_COUL[(S.coco.agents||[]).length%COCO_COUL.length];
-    S.coco={agents:[...(S.coco.agents||[]),{pk,nom,couleur}]}; S.cocoQ=''; await saveCoco(); return; }
+    let nom=pk, metier=''; for(const v of S.loaded.values()){ const a=v.agents.find(x=>personKey(x)===pk); if(a){ nom=`${a.nom} ${a.prenom}`.trim(); metier=a.metier||''; break; } }
+    S.coco={agents:cocoCouleurs([...(S.coco.agents||[]),{pk,nom,metier,couleur:''}])}; S.cocoQ=''; await saveCoco(); return; }
   if(t.dataset.cocodel!=null&&admin()){ S.coco={agents:(S.coco.agents||[]).filter(x=>x.pk!==t.dataset.cocodel)}; await saveCoco(); return; }
   if(t.id==='mnUndo'){ S.mnDraft=null; render(); return; }
   if(t.id==='mnSave'&&admin()&&S.mnDraft){
