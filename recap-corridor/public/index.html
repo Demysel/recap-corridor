@@ -231,6 +231,17 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .mnf{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 14px}.mnf .mnw{grid-column:1/-1}
 .mnf input,.mnf textarea{width:100%}.mnf textarea{font:inherit;font-size:13.5px;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:10px;padding:7px 11px;resize:vertical}.mnprev{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:8px}
 .mnfoot{text-align:center;margin:18px 0 6px;font-size:13px}
+.cc-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}.cc-li{display:inline-flex;align-items:center;gap:6px}
+.cc-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;margin-right:4px}
+.cc-ax,.cc-r{display:grid;grid-template-columns:minmax(110px,190px) 1fr;gap:10px;align-items:start}
+.cc-axt{position:relative;height:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}.cc-axt span{position:absolute;transform:translateX(-50%)}.cc-axt span:first-child{transform:none}
+.cc-j{border-top:1px solid var(--line);padding-top:8px}.cc-jh{font-weight:700;font-size:13.5px;margin-bottom:6px}
+.cc-n{font-size:13px;font-weight:600;display:flex;align-items:center;min-height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-t{position:relative;height:22px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cc-t i{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.cc-b{position:absolute;top:2px;bottom:2px;border-radius:4px;color:#fff;font:600 10.5px/18px var(--mono);padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cc-tx{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11.5px;color:var(--ink-2);margin:3px 0 8px}
+@media (max-width:640px){.cc-ax,.cc-r{grid-template-columns:1fr}.cc-ax>span:first-child{display:none}}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
 @media (max-width:900px){.cols2{grid-template-columns:1fr}}
 /* entrée d'onglet : les blocs arrivent en cascade, une seule fois par changement d'onglet */
@@ -1831,6 +1842,21 @@ function mergeAcrossWeeks(rows){
   return out;
 }
 
+/** Vue Coco (copain covoit) : missions de la semaine des agents choisis par l'admin, jour par jour, rien d'autre
+    (ni codes, ni heures, ni RHR). Couleur fixe par agent, choisie à la sélection (config « coco »). */
+function cocoSemaine(meta,agents,sel){
+  const days=meta.days, idx=new Map((sel||[]).map((x,i)=>[x.pk,i]));
+  const out=(sel||[]).map(x=>({pk:x.pk,nom:x.nom||'',couleur:x.couleur,jours:days.map(()=>[])}));
+  for(const a of agents||[]){ const i=idx.get(personKey(a)); if(i==null) continue; const o=out[i];
+    o.nom=`${a.nom} ${a.prenom}`.trim()||o.nom;
+    (a.jours||[]).forEach((j,d)=>{ if(j.kind!=='SERVICE') return; const D=Date.parse(days[d]+'T00:00:00Z');
+      for(const m of j.missions||[]){ const S0=Date.parse(m.start), E0=Date.parse(m.end); if(!(S0<D+DAY&&E0>D)) continue;
+        if(o.jours[d].some(x=>x.start===m.start&&x.label===m.label)) continue;
+        o.jours[d].push({label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end}); }
+      o.jours[d].sort((x,y)=>x.start.localeCompare(y.start)); }); }
+  return {weekId:meta.weekId,monday:meta.monday,sunday:meta.sunday,days,agents:out};
+}
+
 /* ==========================================================================
    5. VITRINE — statistiques anonymes du code visiteur (calculées sur le serveur)
    Aucun nom, matricule ni ligne individuelle ne sort : chaque cellule publiée réunit au moins
@@ -2029,8 +2055,8 @@ const backend={
     if(backend.mode!=='artifact') return backend.call('etat');
     const s=await ADB.collection('semaines').get();
     const weeks=s.docs.map(d=>d.data()).sort((a,b)=>String(b.weekId).localeCompare(String(a.weekId)));
-    const rg=await ADB.doc('config/regles').get(), su=await ADB.doc('config/suivi').get(), jo=await ADB.doc('config/journal').get();
-    return {role:'admin',weeks,regles:rg.exists?rg.data():null,suivi:su.exists?su.data():{alertes:{}},journal:jo.exists?(jo.data().list||[]):[]};
+    const rg=await ADB.doc('config/regles').get(), su=await ADB.doc('config/suivi').get(), jo=await ADB.doc('config/journal').get(), co=await ADB.doc('config/coco').get();
+    return {role:'admin',weeks,regles:rg.exists?rg.data():null,suivi:su.exists?su.data():{alertes:{}},journal:jo.exists?(jo.data().list||[]):[],coco:co.exists?co.data():null};
   },
   async semaine(id){
     if(backend.mode!=='artifact') return backend.call('semaine?id='+encodeURIComponent(id));
@@ -2067,6 +2093,15 @@ const backend={
     if(_journal){ const jo=await ADB.doc('config/journal').get(); await ADB.doc('config/journal').set({list:[...(jo.exists?jo.data().list||[]:[]),{..._journal,le}].slice(-500)}); }
     return {ok:true};
   },
+  async coco(id){
+    if(backend.mode!=='artifact') return backend.call('coco?id='+encodeURIComponent(id||''));
+    await ensureLoaded([id]); const p=S.parsedCache.get(id);
+    return {agents:S.coco.agents,semaine:p?cocoSemaine(p.meta,p.agents,S.coco.agents):null};
+  },
+  async saveCoco(c){
+    if(backend.mode!=='artifact') return backend.call('coco',{method:'PUT',body:JSON.stringify(c)});
+    await ADB.doc('config/coco').set(c); return {ok:true};
+  },
   async mentions(){
     if(backend.mode!=='artifact') return backend.call('mentions');
     const m=await ADB.doc('config/mentions').get(); return m.exists?m.data():{};
@@ -2086,7 +2121,7 @@ const api=backend;
    ========================================================================== */
 const S={
   role:null, tab:'synthese', weeks:[], rules:structuredClone(DEFAULT_RULES), jbFiltre:'comptees',
-  suivi:{alertes:{}}, journal:[], auteur:'', mentions:{}, mnDraft:null,
+  suivi:{alertes:{}}, journal:[], auteur:'', mentions:{}, mnDraft:null, coco:{agents:[]}, cocoW:null, cocoData:null, cocoQ:'',
   selWeek:'__all__', selAgences:null, selMetiers:null, search:'',
   loaded:new Map(), parsedCache:new Map(),
   queue:[], busy:false, err:null, msg:null, delAsk:null,
@@ -2100,7 +2135,7 @@ const S={
 const menuClose=()=>{ el('side').classList.remove('open'); document.querySelector('[data-act=menu]')?.setAttribute('aria-expanded','false'); };
 function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
 function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
-  code:api.code, selAgences:S.selAgences, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
+  code:api.code, selAgences:S.selAgences, agDefHE:S.agDefHE||prefs().agDefHE||false, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
   theme:document.documentElement.dataset.theme||'', mini:el('shell').classList.contains('mini'), cols:S.cols, chart:S.chart, st:S.st, auteur:S.auteur}));}catch(e){} }
 
 /** Anciens fichiers : « Agence Bordeaux » est rattachée automatiquement à « Bordeaux-St-Jean » quand un seul nom
@@ -2283,24 +2318,25 @@ const TI={synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.
   rhr:'M13 9.5A5.5 5.5 0 1 1 6.5 3a4.3 4.3 0 0 0 6.5 6.5z',blanches:'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3',
   graphiques:'M3 13.5V8M6.5 13.5V3.5M10 13.5V6.5M13.5 13.5V10',stats:'M2 12l3.5-4 3 2.5L14 4M10.5 4H14v3.5',
   comparer:'M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13',vitrine:'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  coco:'M2 10.5l1.4-4a1.5 1.5 0 0 1 1.4-1h6.4a1.5 1.5 0 0 1 1.4 1l1.4 4v2.5h-12zM4.5 13v1M11.5 13v1M4.5 10.5h.1M11.5 10.5h.1',
   mentions:'M4 1.5h5.5L12.5 4.5v10H4zM9.5 1.5v3h3M6 7.5h4.5M6 10h4.5M6 12.5h3',
   lecture:'M2.5 3.5c2-.8 3.8-.8 5.5.5v9.5c-1.7-1.3-3.5-1.3-5.5-.5zM13.5 3.5c-2-.8-3.8-.8-5.5.5v9.5c1.7-1.3 3.5-1.3 5.5-.5z',
   exports:'M8 10V2.5M5 5.5l3-3 3 3M2.5 10v3.5h11V10',import:'M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10',
   reglages:'M2.5 4.5h7M12 4.5h1.5M2.5 11.5h2M7 11.5h6.5M10.5 3v3M5.5 10v3'};
 /** Mentions légales : uniquement dans la vue visiteur (l'admin les rédige et les prévisualise dans Réglages) */
-const tabVisible=t=>S.role==='admin'?t.k!=='mentions':['vitrine','lecture','mentions'].includes(t.k);
+const tabVisible=t=>S.role==='admin'?t.k!=='mentions':S.role==='covoit'?t.k==='coco':['vitrine','lecture','mentions'].includes(t.k);
 const TABS=[
   {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
   {k:'agents',l:'Agents',g:'Détail'},{k:'rhr',l:'RHR',g:'Détail'},{k:'blanches',l:'Journées blanches',g:'Détail'},
   {k:'graphiques',l:'Graphiques',g:'Analyse'},{k:'stats',l:'Statistiques',g:'Analyse'},{k:'comparer',l:'Comparer',g:'Analyse'},
-  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},
+  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},{k:'coco',l:'Coco',g:'Diffusion'},
   {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
 const TAB_CTX={synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
-  comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
+  comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',coco:'copain covoit — missions de la semaine des agents choisis',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
 /** Valeur à afficher : entier en total, deux décimales en moyenne */
 const nfa=v=>nf(v,Number.isInteger(v)?0:2);
 /** Mesures des statistiques (graphiques) */
@@ -2341,7 +2377,8 @@ function renderTabs(){
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt${t.k==='verifier'&&cnt[t.k]?' hot':''}">${nf(cnt[t.k])}</span>`:''}</button>`).join('')}</div>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
   el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture','mentions'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
-  el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}" title="${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}"><span class="bl-t">${S.role==='admin'?'Accès complet':'Visiteur · anonyme'}</span></span>`:'';
+  { const rl=S.role==='admin'?'Accès complet':S.role==='covoit'?'Coco · covoiturage':'Visiteur · anonyme';
+    el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}" title="${rl}"><span class="bl-t">${rl}</span></span>`:''; }
 }
 function renderFilters(){
   if(!S.weeks.length||S.role!=='admin'||S.tab==='vitrine'){ el('filters').innerHTML=''; return; }
@@ -2521,7 +2558,6 @@ const COLS=[
   {g:'identite',k:'agence',l:'Agence',cls:'l',f:a=>`<span class="dot" style="background:${agenceColor(a.agence)}"></span>${esc(a.agence)}${a.agences.length>1?` <span class="mut" title="${esc(a.agences.join(' → '))}">+${a.agences.length-1}</span>`:''}`,t:a=>a.agence},
   {g:'identite',k:'metier',l:'Métier',cls:'l',f:a=>esc(a.metier)},
   {g:'identite',k:'nbSemaines',l:'Semaines',f:a=>nf(a.nbSemaines),t:a=>a.nbSemaines},
-  {g:'identite',k:'residence',l:'Résidence',cls:'l mono',f:a=>a.residence?esc(a.residence):'<span class="z">—</span>'},
   {g:'activite',k:'joursService',l:'J. service'},
   {g:'activite',k:'nbMissions',l:'Missions'},
   {g:'activite',k:'nbTrajetsSeuls',l:'Trajets seuls'},
@@ -2530,7 +2566,6 @@ const COLS=[
   {g:'activite',k:'nbATCMD',l:'ATCMD'},
   {g:'activite',k:'weekendTravaille',l:'J. week-end'},
   {g:'rhr',k:'nbRHR',l:'RHR',f:a=>a.rhrApplicable?(a.nbRHR?`<b>${nfa(pv(a,'nbRHR'))}</b>`+(a.rhrEnCours?' <span class="pill pill-w" title="RHR commencé en fin de semaine : sa fin est dans la semaine suivante, pas encore importée">suite S+1</span>':''):'<span class="z">0</span>'):'<span class="z">n/a</span>',t:a=>a.rhrApplicable?pv(a,'nbRHR'):-1},
-  {g:'rhr',k:'rhrNuits',l:'Nuits HR'},
   {g:'rhr',k:'rhrLieux',l:'Lieux',cls:'l mono',f:a=>a.rhrLieux.length?esc(a.rhrLieux.join(' ')):'<span class="z">—</span>',t:a=>a.rhrLieux.join(' ')},
   {g:'temps',k:'amplitudeTotale',l:'Amplitude',f:numF('amplitudeTotale',fmtH)},
   {g:'temps',k:'amplitudeMoyenne',l:'Ampl. moy.',f:a=>a.amplitudeMoyenne?fmtH(a.amplitudeMoyenne):'<span class="z">—</span>',t:a=>a.amplitudeMoyenne},
@@ -2552,8 +2587,9 @@ const COLS=[
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
+  {g:'absences',k:'autresVides',l:'Autres cases vides',f:a=>a.autresVides?`<span title="Cases vides qui ne sont pas des journées blanches : avant le premier ou après le dernier service de la semaine, pendant un RHR…">${nf(a.autresVides)}</span>`:'<span class="z">0</span>',t:a=>a.autresVides},
   {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<span title="Jours de la période où l’agent n’est dans aucun fichier importé (arrivée, départ, autre agence, agence hors production, semaine exclue)">${nf(a.horsFichier)}</span>`:'<span class="z">0</span>',t:a=>a.horsFichier},
-  {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<span title="Jours présents dans les fichiers mais rangés dans aucune colonne : cases vides qui ne sont pas des journées blanches (avant le premier / après le dernier service, pendant un RHR…), RP dont le numéro a déjà été lu, cases « hors colonne »">${nf(a.nonClasses)}</span>`:'<span class="z">0</span>',t:a=>a.nonClasses},
+  {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<span title="Jours présents dans les fichiers mais rangés dans aucune colonne : RP dont le numéro a déjà été lu, cases « hors colonne »">${nf(a.nonClasses)}</span>`:'<span class="z">0</span>',t:a=>a.nonClasses},
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
@@ -2563,6 +2599,9 @@ const joursDePeriode=()=>{ const r=periodRange(S.selWeek); let n=0;
   for(const id of activeWeeks()){ const w=S.weeks.find(x=>x.weekId===id); if(!w) continue;
     for(let i=0;i<7;i++){ const d=isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+i*DAY)); if(!r||(d>=r[0]&&d<=r[1])) n++; } }
   return n; };
+/** Dernier jour de la période choisie : fin du mois / de l'année, sinon dimanche de la dernière semaine */
+const finPeriode=()=>{ const r=periodRange(S.selWeek); if(r) return r[1];
+  const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?w.sunday:isoD(new Date()); };
 const anneeCP=()=>{ const r=periodRange(S.selWeek); if(r) return r[1].slice(0,4);
   const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?w.sunday.slice(0,4):String(new Date().getUTCFullYear()); };
 function sortAgents(list){
@@ -2575,13 +2614,17 @@ function sortAgents(list){
 function viewAgents(){
   const sc=scopeAgents(); if(!sc.length) return emptyScope();
   // détail des codes (RP, RF, JF, RCL, RCC, CP) et CP pris sur toute l'année de la période
-  const yr=anneeCP(), cpY=new Map();
-  for(const x of rowsOfPeriod([...S.loaded.entries()].flatMap(([id,v])=>v.agents.map(a=>a.weekId?a:Object.assign(a,{weekId:id}))),'y:'+yr)) if(!x.exclu){ const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); }
+  // CP de l'année en cours : du 1er janvier au dernier jour de la période choisie (demandé par l'utilisateur)
+  const yr=anneeCP(), finCP=finPeriode(), debCP=yr+'-01-01', cpY=new Map();
+  for(const [id,v] of S.loaded){ const w=S.weeks.find(x=>x.weekId===id); if(!w||w.sunday<debCP||w.monday>finCP) continue;
+    for(const a of v.agents){ if(a.exclu) continue; const x=sliceAgent(a,debCP,finCP); if(!x) continue;
+      const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); } }
   const jp=joursDePeriode();
   const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
     const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
     o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
-    o.horsFichier=Math.max(0,jp-presents); o.nonClasses=Math.max(0,presents-o.totalJours); return o; });
+    o.autresVides=Math.max(0,(a.joursVides||0)-(a.journeesBlanches||0));
+    o.horsFichier=Math.max(0,jp-presents); o.nonClasses=Math.max(0,presents-o.totalJours-o.autresVides); return o; });
   const list=sortAgents(merged), cols=visCols().map(c=>c.k==='cpAnnee'?{...c,l:'CP '+yr}:c), nW=nbWeeksLoaded();
   S.rows_agents=list;
   const spans=[]; let cur=null;
@@ -4125,6 +4168,62 @@ function mentionsHTML(m){
     ${bloc('Autres mentions',L('autres',''))}
     ${m.majLe?`<p class="hint">Dernière mise à jour : ${dFull(m.majLe)}</p>`:''}</div>`.replace(/<b><\/b> : /g,'');
 }
+/* ---------- Coco (copain covoit) : missions de la semaine des agents choisis, une ligne par agent et par jour ---------- */
+const COCO_COUL=['#1F77B4','#E4572E','#2CA02C','#9467BD','#FF8C00','#0097A7','#C2185B','#6D4C41','#7CB342','#3949AB','#F4B400','#00897B','#8E24AA','#546E7A'];
+/** Semaine affichée : celle choisie, sinon celle d'aujourd'hui, sinon la dernière importée */
+function cocoSemaineParDefaut(){
+  const W=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), t=isoD(new Date(nowW()));
+  return (W.find(w=>w.monday<=t&&t<=w.sunday)||W[W.length-1]||{}).weekId||null;
+}
+async function loadCoco(){
+  if(!S.cocoW||!S.weeks.some(w=>w.weekId===S.cocoW)) S.cocoW=cocoSemaineParDefaut();
+  if(!S.cocoW){ S.cocoData={semaine:null}; render(); return; }
+  try{ const r=await withLoad(api.coco(S.cocoW)); S.cocoData=r; if(r&&Array.isArray(r.agents)&&S.role!=='admin') S.coco={agents:r.agents}; }
+  catch(e){ S.cocoData=null; S.msg={m:'Vue Coco indisponible : '+e.message,t:'c'}; }
+  render();
+}
+function viewCoco(){
+  const W=S.weeks.slice().sort((a,b)=>a.weekId.localeCompare(b.weekId)), i=W.findIndex(w=>w.weekId===S.cocoW), C=S.cocoData&&S.cocoData.semaine;
+  const nav=`<div><div class="fld"><span class="flabel">Semaine</span><div class="frow" style="gap:6px;flex-wrap:nowrap;width:100%;max-width:420px">
+      <button class="btn btn-sm" data-cocow="${i>0?W[i-1].weekId:''}"${i>0?'':' disabled'} aria-label="Semaine précédente">‹</button>
+      <select id="cocoW" style="flex:1;min-width:0;max-width:340px">${W.slice().reverse().map(w=>`<option value="${w.weekId}"${w.weekId===S.cocoW?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</select>
+      <button class="btn btn-sm" data-cocow="${i>=0&&i<W.length-1?W[i+1].weekId:''}"${i>=0&&i<W.length-1?'':' disabled'} aria-label="Semaine suivante">›</button></div></div></div>`;
+  const sel=(C&&C.agents)||[];
+  const leg=sel.length?`<div class="cc-leg">${sel.map(a=>`<span class="cc-li"><span class="cc-dot" style="background:${esc(a.couleur)}"></span>${esc(a.nom)}</span>`).join('')}</div>`:'';
+  const hx=`<div class="cc-ax"><span></span><div class="cc-axt">${[0,3,6,9,12,15,18,21].map(h=>`<span style="left:${h/24*100}%">${String(h).padStart(2,'0')}h</span>`).join('')}</div></div>`;
+  let corps;
+  if(!W.length) corps='<p class="mut">Aucune semaine enregistrée.</p>';
+  else if(!S.cocoData) corps='<p class="mut">Chargement…</p>';
+  else if(!sel.length) corps=`<p class="mut">${S.role==='admin'?'Choisissez ci-dessous les agents à afficher.':'Aucun agent n’a encore été choisi : demandez à l’administrateur.'}</p>`;
+  else corps=hx+C.days.map((day,d)=>{
+    const D=Date.parse(day+'T00:00:00Z'), lignes=sel.filter(a=>a.jours[d]&&a.jours[d].length);
+    return `<div class="cc-j"><div class="cc-jh">${JN[d]} <span class="mut">${dFull(day)}</span></div>${lignes.length?lignes.map(a=>`<div class="cc-r">
+      <div class="cc-n"><span class="cc-dot" style="background:${esc(a.couleur)}"></span>${esc(a.nom)}</div>
+      <div><div class="cc-t">${[6,12,18].map(h=>`<i style="left:${h/24*100}%"></i>`).join('')}${a.jours[d].map(m=>{
+        const s0=Math.max(Date.parse(m.start),D), e0=Math.min(Date.parse(m.end),D+DAY), txt=`${m.label} · ${hm(m.start)}–${hm(m.end)}${m.from||m.to?` · ${m.from} → ${m.to}`:''}`;
+        return `<span class="cc-b" style="left:${((s0-D)/DAY*100).toFixed(2)}%;width:${Math.max(0.8,(e0-s0)/DAY*100).toFixed(2)}%;background:${esc(a.couleur)}" title="${esc(txt)}">${esc(m.label)}</span>`;}).join('')}</div>
+        <div class="cc-tx">${a.jours[d].map(m=>`<span>${esc(m.label)} · <b>${hm(m.start)}–${hm(m.end)}</b>${m.from||m.to?` · ${esc(m.from)} → ${esc(m.to)}`:''}</span>`).join('')}</div></div></div>`).join('')
+      :'<p class="mut sm" style="margin:4px 0 8px">Aucune mission pour ces agents.</p>'}</div>`; }).join('');
+  const choix=S.role==='admin'?cocoChoix():'';
+  return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent, une couleur par agent (toujours la même)</p></div></div>
+    <div class="card-b stack">${nav}${leg}${corps}</div></section>${choix}`;
+}
+/** Admin : agents affichés dans la vue Coco (code covoit), couleur fixée à la sélection */
+function cocoChoix(){
+  const sel=S.coco.agents||[], pris=new Set(sel.map(x=>x.pk)), q=deacc(S.cocoQ||'').toLowerCase().trim();
+  const pers=new Map(); for(const v of S.loaded.values()) for(const a of v.agents){ const k=personKey(a); if(!pers.has(k)) pers.set(k,{pk:k,nom:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,metier:a.metier}); }
+  const res=q?[...pers.values()].filter(x=>!pris.has(x.pk)&&deacc(`${x.nom} ${x.agence} ${x.pk}`).toLowerCase().includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).slice(0,20):[];
+  return `<section class="card"><div class="card-h"><div><h2>Agents affichés dans Coco</h2><p class="card-s">visibles avec le code covoit · la couleur reste la même d’une semaine à l’autre</p></div></div>
+    <div class="card-b stack">
+      <div class="frow">${sel.length?sel.map(x=>`<span class="chip" aria-pressed="true"><span class="cc-dot" style="background:${esc(x.couleur)}"></span>${esc(x.nom)} <button class="lnk" data-cocodel="${esc(x.pk)}" title="Retirer">×</button></span>`).join(''):'<span class="mut">Aucun agent choisi.</span>'}</div>
+      <label class="fld"><span class="flabel">Ajouter un agent</span><input type="search" id="cocoQ" value="${esc(S.cocoQ||'')}" placeholder="Nom, agence ou matricule…" autocomplete="off"></label>
+      ${q?`<div class="frow">${res.length?res.map(x=>`<button class="chip" data-cocoadd="${esc(x.pk)}">+ ${esc(x.nom)} <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span></button>`).join(''):'<span class="mut">Aucun agent trouvé dans les semaines chargées.</span>'}</div>`:''}
+    </div></section>`;
+}
+async function saveCoco(){
+  try{ await withLoad(api.saveCoco(S.coco)); }catch(e){ S.msg={m:'Enregistrement impossible : '+e.message,t:'c'}; }
+  await loadCoco();
+}
 function viewMentions(){
   return `<section class="card"><div class="card-b">${mentionsHTML(S.mentions||{})}</div></section>`;
 }
@@ -4300,17 +4399,17 @@ function render(){
   const v=el('view');
   const body = S.tab==='synthese'?viewSynthese(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
-    S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
+    S.role==='covoit'||S.tab==='coco'?viewCoco(): S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
-  v.innerHTML=body+(S.role!=='admin'&&S.tab!=='mentions'?`<p class="mnfoot"><button class="lnk" data-tab="mentions">Mentions légales</button></p>`:'');
+  v.innerHTML=body+(S.role==='lecture'&&S.tab!=='mentions'?`<p class="mnfoot"><button class="lnk" data-tab="mentions">Mentions légales</button></p>`:'');
   v.classList.toggle('enter',entering);
   addPngButtons(v);
   if(entering){ countUp(v); }
   else v.querySelectorAll('.tw').forEach((t,i)=>{ if(sc[i]){ t.scrollTop=sc[i][0]; t.scrollLeft=sc[i][1]; } });
   el('brandsub').textContent=S.weeks.length
-    ? `${S.weeks.length} semaine${S.weeks.length>1?'s':''}${S.role==='admin'?` · ${allAgences().length} agences`:' · statistiques anonymes'}`
+    ? `${S.weeks.length} semaine${S.weeks.length>1?'s':''}${S.role==='admin'?` · ${allAgences().length} agences`:S.role==='covoit'?' · copain covoit':' · statistiques anonymes'}`
     : 'Extraction hebdomadaire ARP';
   if(S.drawer) renderDrawer();
 }
@@ -4562,7 +4661,7 @@ async function saveAll(){
   S.busy=false;
   const {weeks}=await api.etat(); S.weeks=weeks;
   recomputeLoaded();   // les noms d'agence des anciens fichiers se rattachent aux semaines désormais connues
-  if(!S.selAgences){ const p=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(p.length) S.selAgences=p; }
+  if(!S.selAgences){ const p=['Hendaye'].filter(a=>allAgences().includes(a)); if(p.length) S.selAgences=p; }
   await ensureLoaded(toLoad());
   S.queue=S.queue.filter(q=>q.state!=='enregistre'); S.vit=null;
   S.msg={m:`${n} semaine${n>1?'s':''} enregistrée${n>1?'s':''}. Le rapport à diffuser est prêt dans l’onglet Exports.`};
@@ -4578,7 +4677,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-cocow],[data-cocoadd],[data-cocodel],[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!t) return;
   if(t.id==='codeGo'){ return login(); }
   if(t.id==='btnPal'){ openPalette(); return; }
@@ -4644,6 +4743,12 @@ document.addEventListener('click',async e=>{
   if(t.dataset.dwcode){ S.dwCode=S.dwCode===t.dataset.dwcode?null:t.dataset.dwcode; renderDrawer(); return; }
   if(t.dataset.relire&&admin()){ await relireSemaines([t.dataset.relire]); return; }
   if(t.id==='relireAll'&&admin()){ await relireSemaines(S.weeks.map(w=>w.weekId).sort()); return; }
+  if(t.dataset.cocow){ S.cocoW=t.dataset.cocow; await loadCoco(); return; }
+  if(t.dataset.cocoadd&&admin()){ const pk=t.dataset.cocoadd, pris=new Set((S.coco.agents||[]).map(x=>x.couleur));
+    let nom=pk; for(const v of S.loaded.values()){ const a=v.agents.find(x=>personKey(x)===pk); if(a){ nom=`${a.nom} ${a.prenom}`.trim(); break; } }
+    const couleur=COCO_COUL.find(c=>!pris.has(c))||COCO_COUL[(S.coco.agents||[]).length%COCO_COUL.length];
+    S.coco={agents:[...(S.coco.agents||[]),{pk,nom,couleur}]}; S.cocoQ=''; await saveCoco(); return; }
+  if(t.dataset.cocodel!=null&&admin()){ S.coco={agents:(S.coco.agents||[]).filter(x=>x.pk!==t.dataset.cocodel)}; await saveCoco(); return; }
   if(t.id==='mnUndo'){ S.mnDraft=null; render(); return; }
   if(t.id==='mnSave'&&admin()&&S.mnDraft){
     try{ const r=await withLoad(api.saveMentions(Object.fromEntries(MENTIONS.map(([k])=>[k,String(S.mnDraft[k]||'').trim()]))));
@@ -4703,7 +4808,7 @@ document.addEventListener('click',async e=>{
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs(); menuClose();
-    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.role==='admin') await ensureLoaded(toLoad());
+    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.role==='admin') await ensureLoaded(toLoad());
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; S.agtOpen=false; render(); return; }
   if(t.id==='agtBtn'){ S.agtOpen=!S.agtOpen; S.scopeOpen=false; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
@@ -4797,12 +4902,14 @@ document.addEventListener('change',async e=>{
       S.msg={m:'Sauvegarde restaurée.'}; }
     catch(err){ S.msg={m:'Restauration impossible : '+err.message,t:'c'}; }
     render(); return; }
+  if(e.target.id==='cocoW'){ S.cocoW=e.target.value; await loadCoco(); return; }
   if(e.target.id==='vWeek'){ S.vf.w=e.target.value; render(); return; }
   if(e.target.id==='stMetric'){ S.st.metric=e.target.value; savePrefs(); render(); return; }
   if(e.target.id==='cTop'){ S.chart.top=+e.target.value; savePrefs(); render(); return; }
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
+  if(e.target.id==='cocoQ'){ S.cocoQ=e.target.value; const p=e.target.selectionStart; render(); const n=el('cocoQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } return; }
   if(e.target.dataset&&e.target.dataset.mn){ const first=!S.mnDraft; S.mnDraft=S.mnDraft||{...(S.mentions||{})}; S.mnDraft[e.target.dataset.mn]=e.target.value;
     if(first){ const b=el('mnSave'); if(b) b.disabled=false; } return; }
   if(e.target.id==='fSearch'){ S.search=e.target.value; const p=e.target.selectionStart; render();
@@ -4860,7 +4967,8 @@ async function login(code){
 }
 async function boot(){
   try{
-    const {weeks,regles,suivi,journal}=await withLoad(api.etat());
+    const {weeks,regles,suivi,journal,coco}=await withLoad(api.etat());
+    S.coco=coco&&Array.isArray(coco.agents)?coco:{agents:[]};
     S.weeks=weeks||[]; S.suivi=suivi||{alertes:{}}; S.journal=journal||[];
     S.rules=loadRules(regles);
     const p=prefs();
@@ -4868,10 +4976,14 @@ async function boot(){
     if(S.selAgences&&!S.selAgences.length) S.selAgences=null;
     if(p.selMetiers) S.selMetiers=p.selMetiers.filter(m=>allMetiers().includes(m));
     if(S.selMetiers&&!S.selMetiers.length) S.selMetiers=null;
-    if(!S.selAgences){ const pr=['Hendaye','Bordeaux-St-Jean'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
+    // filtre d'agence de base : Hendaye seule (demandé par l'utilisateur) ; l'ancien choix par défaut enregistré (Hendaye + Bordeaux) est remplacé
+    if(S.selAgences&&S.selAgences.length===2&&S.selAgences.includes('Hendaye')&&S.selAgences.includes('Bordeaux-St-Jean')&&!p.agDefHE){ S.selAgences=['Hendaye']; S.agDefHE=true; savePrefs(); }
+    if(!S.selAgences){ const pr=['Hendaye'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
     if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
     S.mentions=await api.mentions().catch(()=>({}))||{}; S.mnDraft=null;
-    if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
+    if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
+    else if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
+    else if(S.tab==='coco'){ render(); await loadCoco(); }
     else if(S.tab==='mentions'){ S.tab='reglages'; await ensureLoaded(toLoad()); }
     else if(S.tab==='vitrine'){ render(); await loadVitrine(true); }
     else await ensureLoaded(toLoad());

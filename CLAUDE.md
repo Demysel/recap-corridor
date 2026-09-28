@@ -9,7 +9,7 @@ Produis en continu sans demander de validation ; ne t'interromps que pour poser 
 Extraction hebdomadaire des fichiers ARP « Récap National Corridor » (.xlsx, feuille « Récap ») :
 repos hors résidence (RHR), journées blanches, heures planifiées, heures sup, heures de nuit et
 du dimanche, paniers repas, MHIS / DISPO / ATCMD, trajets seuls — par agent, agence et métier.
-Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean**. Métiers : AFR et CONDUCTEUR.
+Agences suivies en priorité : **Hendaye** et **Bordeaux-St-Jean** ; filtre d'agence par défaut : **Hendaye seule** (demandé par l'utilisateur ; l'ancien défaut enregistré Hendaye + Bordeaux est remplacé une fois). Métiers : AFR et CONDUCTEUR.
 
 ## Structure (à conserver)
 
@@ -21,7 +21,7 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 - `recap-corridor/server.js` — serveur Node (dépendance unique : `pg`). Sert `index.html` et l'API,
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
   `GET|PUT|DELETE /api/semaine`, `PUT /api/regles` (avec `_journal` : ligne ajoutée au journal, clé `journal`),
-  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET /api/source` (admin : fichier conservé d'une semaine), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
+  `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET|PUT /api/coco` (vue Coco, clé `coco`), `GET /api/source` (admin : fichier conservé d'une semaine), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
   lecture pour les deux codes, écriture admin, champs limités à la liste `MENTIONS`), `GET /api/ping`, `GET /api/vitrine`.
 - **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
   nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
@@ -41,6 +41,13 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   données personnelles, finalité, base légale, durée de conservation, autres mentions : saisis dans Réglages → « Mentions
   légales » (aperçu de la page visiteur), jamais écrits dans le code ; un champ vide n'est pas affiché. Textes fixes : vitrine
   anonyme (groupes d'au moins 5 agents), pas de cookie, stockage local du code et des préférences, polices Google Fonts.
+- **Vue Coco (copain covoit)**, demandée par l'utilisateur : troisième code d'accès `CODE_COVOIT` (variable Render, rôle
+  `covoit`) qui ne voit que l'onglet « Coco ». Semaine au choix (par défaut celle d'aujourd'hui, ‹ › pour naviguer) ;
+  chaque jour, une ligne par agent choisi avec ses missions (barres sur 0–24 h + texte intitulé · horaire · départ → arrivée),
+  rien d'autre (ni codes, ni heures, ni RHR). Agents choisis par l'admin dans l'onglet Coco (recherche, ajout, retrait),
+  mémorisés dans `recap.config` clé `coco` ({agents:[{pk,nom,couleur}]}) ; **couleur attribuée à la sélection et gardée
+  pour toutes les semaines** (`COCO_COUL`). Le serveur calcule la semaine (`cocoSemaine` du moteur) et n'envoie que ces
+  missions ; `/api/semaine`, `/api/source`, les règles restent refusés au code covoit.
 - `recap-corridor/public/icons/` — icône de l'application (carré rouge, rail blanc, deux stations, comme la marque) :
   favicon SVG et PNG, `apple-touch-icon.png` (écran d'accueil iPhone), icônes 192/512 et `manifest.webmanifest`
   (installation en app). Servies par `server.js` (liste fermée `ICONES`, plus `/favicon.ico` et `/apple-touch-icon.png`).
@@ -109,13 +116,15 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Onglet Agents (groupe Repos & absences) : détail RP, RF, JF, RCL, RCC, puis CP sur la période et « CP <année> »
   (CP de toute l'année civile du dernier jour de la période sélectionnée, compté au jour près ; année civile validée par l'utilisateur,
   pas la période de référence mai–mai). Fiche agent : tuile « Codes » (acronyme + nombre).
-  Tableau des agents : une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
+  Tableau des agents : colonnes « Résidence » et « Nuits HR » retirées (demandé). « CP <année> » = CP du 1er janvier au dernier
+  jour de la période choisie (`finPeriode`, demandé par l'utilisateur). Une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
   « Cases vides » est supprimée (demandé par l'utilisateur). Contrôle (demandé par l'utilisateur) après « Absences » : « Total jours »
   (service + repos + journées blanches + congés + absences, / jours de la période couverts par les semaines importées,
-  `joursDePeriode` ; pastille ≠ si différent), « Hors fichier » (jours où l'agent n'est dans aucun fichier : arrivée, départ,
+  `joursDePeriode` ; pastille ≠ si différent), « Autres cases vides » (cases vides qui ne sont pas des journées blanches,
+  colonne à part demandée), « Hors fichier » (jours où l'agent n'est dans aucun fichier : arrivée, départ,
   autre agence, agence hors production, semaine exclue) et « Non classés » (cases vides qui ne sont pas des journées
-  blanches, RP dont le numéro est déjà lu — non comptés, choix de l'utilisateur —, cases hors colonne) ; Total + Hors
-  fichier + Non classés = jours de la période. Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
+  RP dont le numéro est déjà lu — non comptés, choix de l'utilisateur —, cases hors colonne) ; Total + Autres cases vides +
+  Hors fichier + Non classés = jours de la période. Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
   clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,

@@ -8,6 +8,7 @@
      DATABASE_URL   chaîne de connexion Postgres
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
      CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
+     CODE_COVOIT    code « Coco » (copain covoit) : missions de la semaine des seuls agents choisis par l'admin
      PORT           fourni par Render
      DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
      APP_ENV        « dev » : site de test, couleurs différentes et bandeau « SITE DE TEST »
@@ -65,6 +66,7 @@ function role(req) {
   const given = req.headers['x-acces'] || '';
   if (process.env.CODE_ADMIN && same(given, process.env.CODE_ADMIN)) return 'admin';
   if (process.env.CODE_LECTURE && same(given, process.env.CODE_LECTURE)) return 'lecture';
+  if (process.env.CODE_COVOIT && same(given, process.env.CODE_COVOIT)) return 'covoit';
   return null;
 }
 const echecs = new Map();   // ralentit les essais de code répétés
@@ -108,7 +110,7 @@ function engine() {
   const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
   const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
   const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules};', ctx);
+  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules,cocoSemaine};', ctx);
   moteur = ctx.__E;
   return moteur;
 }
@@ -149,10 +151,10 @@ async function api(req, res, url) {
   if (route === 'etat' && req.method === 'GET') {
     const w = await p.query(`select resume from ${SCHEMA}.semaines order by week_id desc`);
     if (!admin) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
-    const c = await p.query(`select cle, valeur from ${SCHEMA}.config where cle in ('regles', 'suivi', 'journal')`);
+    const c = await p.query(`select cle, valeur from ${SCHEMA}.config where cle in ('regles', 'suivi', 'journal', 'coco')`);
     const cfg = Object.fromEntries(c.rows.map((x) => [x.cle, x.valeur]));
     return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: cfg.regles || null,
-      suivi: cfg.suivi || { alertes: {} }, journal: (cfg.journal || []).slice(-300) });
+      suivi: cfg.suivi || { alertes: {} }, journal: (cfg.journal || []).slice(-300), coco: cfg.coco || null });
   }
   if (route === 'vitrine' && req.method === 'GET') return json(req, res, 200, await vitrine(p));
   if (route === 'semaine' && req.method === 'GET') {
@@ -161,6 +163,27 @@ async function api(req, res, url) {
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug <> '~source' order by agence_slug`, [id]);
     return json(req, res, 200, { docs: d.rows.map((x) => x.data) });
+  }
+  if (route === 'coco' && req.method === 'GET') {   // vue Coco : missions de la semaine des agents choisis, rien d'autre
+    if (!admin && r !== 'covoit') return json(req, res, 403, { error: 'Ce code ne donne pas accès à la vue Coco.' });
+    const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'coco'`);
+    const sel = (c.rows[0]?.valeur?.agents || []).filter((x) => x && x.pk);
+    const id = url.searchParams.get('id') || '';
+    if (!ID.test(id) || !sel.length) return json(req, res, 200, { agents: sel.map(({ pk, nom, couleur }) => ({ pk, nom, couleur })), semaine: null });
+    const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug <> '~source'`, [id]);
+    if (!d.rows.length) return json(req, res, 200, { agents: sel, semaine: null });
+    const E = engine();
+    const sem = JSON.parse(JSON.stringify(E.cocoSemaine(d.rows[0].data.meta, d.rows.flatMap((x) => x.data.agents || []), sel)));
+    return json(req, res, 200, { agents: sel, semaine: sem });
+  }
+  if (route === 'coco' && req.method === 'PUT') {
+    if (!admin) return json(req, res, 403, { error: 'Seul le code administrateur choisit les agents de la vue Coco.' });
+    const body = await readBody(req);
+    const agents = (Array.isArray(body.agents) ? body.agents : []).slice(0, 60)
+      .map((x) => ({ pk: String(x.pk || '').slice(0, 200), nom: String(x.nom || '').slice(0, 120), couleur: /^#[0-9a-f]{6}$/i.test(x.couleur || '') ? x.couleur : '#1F77B4' }))
+      .filter((x) => x.pk);
+    await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('coco', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify({ agents })]);
+    return json(req, res, 200, { ok: true });
   }
   if (route === 'source' && req.method === 'GET') {   // fichier conservé avec la semaine (feuille lue + Extract), pour « Relire »
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
