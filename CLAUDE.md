@@ -247,6 +247,10 @@ quatre indicateurs principaux puis un bandeau compact pour les autres.
 - **Render**, service `recap-corridor` (gratuit, Francfort), déployé automatiquement à chaque
   commit sur `main`. Build : `cd recap-corridor && npm install --omit=dev`.
   Démarrage : `cd recap-corridor && npm start`.
+- Site principal gardé éveillé (demandé par l'utilisateur, offre gratuite conservée) : tâche GitHub Actions
+  `.github/workflows/garder-eveille.yml` qui appelle `https://recap-corridor.onrender.com/api/ping` toutes les 10 min.
+  Jamais pour le site de test (750 h gratuites par mois pour tout le compte). GitHub la désactive après 60 jours sans
+  commit : la réactiver dans l'onglet Actions.
 - **Supabase**, projet `recap-corridor`, schéma `recap` (tables `semaines`, `details`, `config`),
   accessible uniquement par le rôle `recap_app`.
 - Codes d'accès et chaîne de connexion : variables d'environnement Render (`CODE_ADMIN`,
