@@ -2550,10 +2550,19 @@ const COLS=[
   {g:'absences',k:'c_CP',l:'CP',cls:'sub'},
   {g:'absences',k:'cpAnnee',l:'CP année',f:a=>a.cpAnnee?`<b>${nf(a.cpAnnee)}</b>`:'<span class="z">0</span>',t:a=>a.cpAnnee},
   {g:'absences',k:'joursAbsence',l:'Absences'},
+  // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
+  {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
+  {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<span title="Jours de la période où l’agent n’est dans aucun fichier importé (arrivée, départ, autre agence, agence hors production, semaine exclue)">${nf(a.horsFichier)}</span>`:'<span class="z">0</span>',t:a=>a.horsFichier},
+  {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<span title="Jours présents dans les fichiers mais rangés dans aucune colonne : cases vides qui ne sont pas des journées blanches (avant le premier / après le dernier service, pendant un RHR…), RP dont le numéro a déjà été lu, cases « hors colonne »">${nf(a.nonClasses)}</span>`:'<span class="z">0</span>',t:a=>a.nonClasses},
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
 /** Année du compte « CP de l'année » : celle du dernier jour de la période sélectionnée (dimanche de la dernière semaine) */
+/** Nombre de jours de la période sélectionnée couverts par les semaines importées (mois et années au jour près) */
+const joursDePeriode=()=>{ const r=periodRange(S.selWeek); let n=0;
+  for(const id of activeWeeks()){ const w=S.weeks.find(x=>x.weekId===id); if(!w) continue;
+    for(let i=0;i<7;i++){ const d=isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+i*DAY)); if(!r||(d>=r[0]&&d<=r[1])) n++; } }
+  return n; };
 const anneeCP=()=>{ const r=periodRange(S.selWeek); if(r) return r[1].slice(0,4);
   const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?w.sunday.slice(0,4):String(new Date().getUTCFullYear()); };
 function sortAgents(list){
@@ -2568,7 +2577,11 @@ function viewAgents(){
   // détail des codes (RP, RF, JF, RCL, RCC, CP) et CP pris sur toute l'année de la période
   const yr=anneeCP(), cpY=new Map();
   for(const x of rowsOfPeriod([...S.loaded.entries()].flatMap(([id,v])=>v.agents.map(a=>a.weekId?a:Object.assign(a,{weekId:id}))),'y:'+yr)) if(!x.exclu){ const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); }
-  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0; return o; });
+  const jp=joursDePeriode();
+  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
+    const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
+    o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
+    o.horsFichier=Math.max(0,jp-presents); o.nonClasses=Math.max(0,presents-o.totalJours); return o; });
   const list=sortAgents(merged), cols=visCols().map(c=>c.k==='cpAnnee'?{...c,l:'CP '+yr}:c), nW=nbWeeksLoaded();
   S.rows_agents=list;
   const spans=[]; let cur=null;

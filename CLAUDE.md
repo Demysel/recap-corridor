@@ -110,7 +110,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (CP de toute l'année civile du dernier jour de la période sélectionnée, compté au jour près ; année civile validée par l'utilisateur,
   pas la période de référence mai–mai). Fiche agent : tuile « Codes » (acronyme + nombre).
   Tableau des agents : une seule colonne « Journées blanches » (le nombre de journées blanches, rien d'autre) ; la colonne
-  « Cases vides » est supprimée (demandé par l'utilisateur). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
+  « Cases vides » est supprimée (demandé par l'utilisateur). Contrôle (demandé par l'utilisateur) après « Absences » : « Total jours »
+  (service + repos + journées blanches + congés + absences, / jours de la période couverts par les semaines importées,
+  `joursDePeriode` ; pastille ≠ si différent), « Hors fichier » (jours où l'agent n'est dans aucun fichier : arrivée, départ,
+  autre agence, agence hors production, semaine exclue) et « Non classés » (cases vides qui ne sont pas des journées
+  blanches, RP dont le numéro est déjà lu — non comptés, choix de l'utilisateur —, cases hors colonne) ; Total + Hors
+  fichier + Non classés = jours de la période. Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
   clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
