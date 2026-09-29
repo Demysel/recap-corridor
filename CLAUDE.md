@@ -86,6 +86,29 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   l'agent à X et le départ prévu + fenêtre réglable (défaut 2 h) ; « journée économisable » si l'agent de ce train était
   venu à X en trajet seul et n'a rien fait d'autre. Présenté comme piste à vérifier (habilitations, ligne, repos).
 - Réglages → « Production » (`rules.production` : reposDus, reposPar, reposCodes, reposResMin, optiFenetre).
+- **Accord d'entreprise ECR 2018** (PDF fourni par l'utilisateur, scanné, non versé au dépôt) — valeurs pré-remplies et
+  réglables (`ACCORD_DEF`, `rules.accord`, Réglages → « Accord d'entreprise ») ; correspondance validée : CONDUCTEUR (dont
+  « CDR + AFR ») = personnel roulant, chapitre 3 ; AFR et COORDO AFR = continuité de service, chapitre 4 titre 2.
+  Conducteurs : TTE ≤ 10 h (9 h si > 2h30 entre 22h et 5h), amplitude ≤ 11 h (9h30), repos journalier à résidence 13 h
+  (réductible une fois par GPT, jamais < 11 h, ni < 12 h après une journée de nuit), RHR ≥ 9 h (< 11 h : repos compensateur,
+  2 RHR successifs une fois par GPT, > 24 h : repos à résidence de 15 h dans la GPT suivante), 117 RP / an (art. 12, 17–19).
+  AFR / coordo : TTE ≤ 10 h (8h30 si > 2h30 entre 22h et 7h), amplitude ≤ 12 h, repos journalier 12 h (réduit une fois par
+  GPT, ≥ 10 h), 113 RP / an (art. 28–30). Communs : 39 repos doubles / an dont 12 samedi-dimanche au minimum et un par mois,
+  8 RP / mois, 3 RP consécutifs au plus, 2 repos simples successifs au plus, veille d'un repos simple fin ≤ 22 h et reprise
+  ≥ 5 h (double : 23 h / 3 h), repos périodique = 24 h × jours + repos journalier, GPT ≤ 6 jours, GPT de 6 jours suivie d'un
+  repos double, 2 GPT de 6 jours au plus sur 4 semaines, 48 h / semaine, 44 h en moyenne sur 4 semaines, pause ≥ 20 min
+  au-delà de 6 h (art. 3, 19–20, 22, 30–32). **Choix de l'utilisateur** : repos périodique = RP seulement (RF / JF à part) ;
+  GPT = jours consécutifs sans repos (RP, RF, JF, RCL, RCC ; CP et absences ne la coupent pas). Attente de la commande /
+  disposition à l'agence (2 + 1 par semaine) : contrôle désactivé tant que « ATCMD = attente de la commande, DISPO =
+  disposition à l'agence » n'est pas confirmé (case dans Réglages). Non contrôlables (absents des fichiers) : temps de
+  conduite, réalisé. `conformiteData` (moteur, testé) → carte « Conformité à l'accord d'entreprise » (écarts par règle, détail
+  par agent et par jour ; « à surveiller » : repos compensateur dû).
+- Repos dus par défaut = accord (117 / 113 RP par an au prorata des jours présents) sauf nombre saisi dans Réglages ;
+  repos doubles = RP d'affilée (dus 39 / an), doubles samedi-dimanche (12 / an).
+- **Équité de répartition** (`equiteData`) : jours de service, heures de nuit, RHR, DISPO, journées blanches, ATCMD, heures
+  sup, jours de week-end travaillés, par semaine de présence ; par agence × métier : moyenne, min–max, « inégal » si
+  écart-type > moitié de la moyenne ; par agent : ambre au-dessus de moyenne + écart-type, rose en dessous.
+- Périmètre choisi par l'utilisateur : contrôle + équité + pistes sur les plannings importés (pas de génération automatique).
 
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 

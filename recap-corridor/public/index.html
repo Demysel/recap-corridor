@@ -262,6 +262,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 /* KPI : quatre indicateurs principaux + bandeau compact */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .kpis.lead{grid-template-columns:repeat(4,minmax(0,1fr))}
+.eqv{padding:1px 6px;border-radius:5px}.eqv.hi{background:color-mix(in srgb,var(--signal) 30%,transparent);font-weight:700}.eqv.lo{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .prod-pts{margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45}.warn{color:var(--amber,#B45309)}
 .kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 17px 16px;min-width:0;
   box-shadow:var(--shadow);overflow:hidden;transition:transform .2s var(--ease),box-shadow .2s,border-color .2s}
@@ -1857,6 +1858,147 @@ function mergeAcrossWeeks(rows){
   return out;
 }
 
+/** Règles de l'accord d'entreprise ECR 2018 (PDF fourni par l'utilisateur), pré-remplies et réglables.
+    roulant = conducteurs (chapitre 3) ; continuite = AFR et COORDO AFR (chapitre 4, titre 2) — correspondance validée. */
+const ACCORD_DEF={
+  roulant:{tteMax:10,tteMaxNuit:9,nuit:[22,5],nuitSeuil:2.5,ampMax:11,ampMaxNuit:9.5,rj:13,rjReduit:11,rjApresNuit:12,rpAn:117},      // art. 12, 17, 19
+  continuite:{tteMax:10,tteMaxNuit:8.5,nuit:[22,7],nuitSeuil:2.5,ampMax:12,ampMaxNuit:12,rj:12,rjReduit:10,rjApresNuit:10,rpAn:113}, // art. 28, 29, 30
+  rdAn:39,rdWeAn:12,rpMois:8,rpConsecMax:3,simplesSuccMax:2,veilleSimple:22,lendemainSimple:5,veilleDouble:23,lendemainDouble:3,    // art. 19–20, 30–31
+  gptMax:6,gpt6Par4sem:2,hebdoMax:48,moy4sem:44,                                                                                  // art. 3, 19
+  rhrMin:9,rhrComp:11,rhrLongRj:15,rhrSuccParGpt:1,                                                                               // art. 18
+  pauseSeuil:6,pauseMin:20,                                                                                                       // art. 22, 32
+  commandes:false,atcmdSem:2,dispoSem:2,cmdTotalSem:3   // art. 15–16, 36–37 : ATCMD = attente de la commande, DISPO = disposition à l'agence (à confirmer)
+};
+const accordOf=rules=>{ const A=(rules&&rules.accord)||{}; return {...ACCORD_DEF,...A,roulant:{...ACCORD_DEF.roulant,...(A.roulant||{})},continuite:{...ACCORD_DEF.continuite,...(A.continuite||{})}}; };
+const CONF_TYPES={
+  tte:['TTE de la journée au-delà du maximum','art. 12 / 28'],amp:['Amplitude au-delà du maximum','art. 12 / 28'],
+  pause:['Pas de pause de 20 min pour plus de 6 h de travail','art. 22 / 32'],
+  rj:['Repos journalier à résidence trop court','art. 17 / 29'],rjRed:['Repos journalier réduit plus d’une fois dans la GPT','art. 17 / 29'],
+  rhr:['RHR de moins de 9 h','art. 18'],rhrComp:['RHR de moins de 11 h : repos compensateur dû','art. 18'],
+  rhrSucc:['Deux RHR successifs plus d’une fois dans la GPT','art. 18'],rhrLong:['Après un RHR de plus de 24 h, pas de repos à résidence de 15 h dans la GPT suivante','art. 18'],
+  rp:['Repos périodique trop court (24 h × jours + repos journalier)','art. 19 / 30'],rpVeille:['Fin de service trop tardive la veille d’un repos périodique','art. 19 / 30'],
+  rpLendemain:['Reprise trop tôt le lendemain d’un repos périodique','art. 19 / 30'],rpConsec:['Plus de 3 repos périodiques consécutifs','art. 19 / 30'],
+  simples:['Plus de 2 repos simples successifs','art. 19 / 30'],rpMois:['Moins de 8 repos périodiques dans le mois','art. 19 / 30'],
+  weMois:['Aucun repos double samedi-dimanche dans le mois','art. 20 / 31'],
+  gpt:['Grande période de travail de plus de 6 jours','art. 3'],gptDouble:['GPT de 6 jours non suivie d’un repos double','art. 19 / 30'],
+  gpt6:['Plus de 2 GPT de 6 jours sur 4 semaines glissantes','art. 19 / 30'],
+  hebdo:['Plus de 48 h dans la semaine','art. 3'],moy4:['Plus de 44 h en moyenne sur 4 semaines','art. 3'],
+  cmd:['Attente de la commande / disposition à l’agence au-delà du maximum hebdomadaire','art. 15–16 / 36–37'],
+};
+/** Contrôle de conformité à l'accord, agent par agent, sur les lignes agent-semaine du périmètre (planning seulement).
+    GPT = jours consécutifs sans repos (RP, RF, JF, RCL, RCC) ; repos périodique = RP seulement (choix de l'utilisateur). */
+function conformiteData(rows,rulesIn){
+  const R={...DEFAULT_RULES,...(rulesIn||{})}, A=accordOf(R), out=[], tts=m=>isTrajetSeul(m.label,R.trajetTypes||[]);
+  const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  const jDiff=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/DAY), D0=d=>Date.parse(d+'T00:00:00Z');
+  const isRP=j=>j.kind==='CODE'&&j.family==='RP', isRepos=j=>j.kind==='CODE'&&FAM_REPOS.includes(j.family);
+  for(const [pk,list] of groupBy(rows,personKey)){
+    list.sort((x,y)=>String(x.weekId).localeCompare(String(y.weekId)));
+    const last=list[list.length-1], afr=isAFR(last.metier), C=afr?A.continuite:A.roulant;
+    const who={pk,nom:`${last.nom} ${last.prenom}`.trim(),agence:last.agence,metier:last.metier};
+    const add=(type,date,detail,niveau='nc')=>out.push({...who,type,date,detail,niveau});
+    const resSet=a=>new Set([a.residence,...(a.rattachement||a.residencePerso?[]:((R.lieuxResidence||{})[a.agence]||[]))].filter(Boolean).map(normLieu));
+    const J=list.flatMap(a=>a.jours.filter(j=>!j.horsPeriode).map(j=>({j,a}))).sort((x,y)=>x.j.date.localeCompare(y.j.date));
+    // journées de service : prise, fin, TTE réel, heures de nuit (plage de l'accord), dernier lieu
+    const svc=[];
+    for(const {j,a} of J){
+      if(j.kind!=='SERVICE'||!j.missions||!j.missions.length) continue;
+      const ms=[...j.missions].sort((x,y)=>Date.parse(x.start)-Date.parse(y.start));
+      let tte=0,nuit=0,pauseOk=false;
+      for(const m of ms){ const x=missionMinutes(m); tte+=isATCMD(m)?R.heuresATCMD*60:x.amp-x.pause;
+        const S=Date.parse(m.start),E=Date.parse(m.end); nuit+=hoursInDailyWindow(workSegments(m),C.nuit[0],C.nuit[1],Math.floor(S/DAY)*DAY-DAY,Math.floor(E/DAY)*DAY);
+        if((m.pauses||[]).some(p=>Array.isArray(p)&&(Date.parse(p[1])-Date.parse(p[0]))/6e4>=A.pauseMin)) pauseOk=true; }
+      const s=Date.parse(ms[0].start), e=Math.max(...ms.map(m=>Date.parse(m.end))), o={date:j.date,s,e,tte:tte/60,amp:(e-s)/H,nuit,to:ms[ms.length-1].to,a,ms,
+        atcmd:ms.some(isATCMD),dispo:ms.some(m=>/DISPO/i.test(m.label||'')),res:resSet(a).has(normLieu(ms[ms.length-1].to))};
+      const nuitJ=nuit>C.nuitSeuil;
+      if(o.tte>(nuitJ?C.tteMaxNuit:C.tteMax)+1e-9) add('tte',j.date,`${fmtH(o.tte)} de TTE (max ${fmtH(nuitJ?C.tteMaxNuit:C.tteMax)}${nuitJ?', journée de nuit':''})`);
+      if(o.amp>(nuitJ?C.ampMaxNuit:C.ampMax)+1e-9) add('amp',j.date,`${fmtH(o.amp)} d’amplitude (max ${fmtH(nuitJ?C.ampMaxNuit:C.ampMax)}${nuitJ?', journée de nuit':''})`);
+      if(o.tte>A.pauseSeuil&&!pauseOk&&!ms.every(m=>isATCMD(m)||tts(m))) add('pause',j.date,`${fmtH(o.tte)} de travail sans pause d’au moins ${A.pauseMin} min dans le planning`);
+      o.nuitJ=nuitJ; svc.push(o);
+    }
+    // GPT : jours consécutifs connus sans repos ; un jour hors fichier coupe la suite
+    const gpts=[]; let g=null, prev=null;
+    for(const {j} of J){ const suite=prev&&jDiff(prev,j.date)===1; prev=j.date;
+      if(isRepos(j)){ if(g) gpts.push(g); g=null; continue; }
+      if(g&&suite) g.fin=j.date,g.n++; else { if(g) gpts.push(g); g={debut:j.date,fin:j.date,n:1}; } }
+    if(g) gpts.push(g);
+    const gptDe=date=>gpts.find(x=>x.debut<=date&&date<=x.fin);
+    // périodes de repos RP (RP seulement) : longueur, jours
+    const runs=[]; let r=null; prev=null;
+    for(const {j} of J){ const suite=prev&&jDiff(prev,j.date)===1; prev=j.date;
+      if(isRP(j)){ if(r&&suite) r.fin=j.date,r.n++; else { if(r) runs.push(r); r={debut:j.date,fin:j.date,n:1}; } } else { if(r) runs.push(r); r=null; } }
+    if(r) runs.push(r);
+    for(const x of gpts){
+      if(x.n>A.gptMax) add('gpt',x.debut,`${x.n} jours de suite sans repos, du ${dFull(x.debut)} au ${dFull(x.fin)}`);
+      if(x.n===A.gptMax){ const nx=J.find(({j})=>j.date>x.fin); if(nx&&jDiff(x.fin,nx.j.date)===1){ const rr=runs.find(y=>y.debut===nx.j.date);
+        if(!rr||rr.n<2) add('gptDouble',x.fin,`GPT du ${dFull(x.debut)} au ${dFull(x.fin)}, suivie d’un repos ${rr?'simple':'autre qu’un RP'}`); } }
+    }
+    const g6=gpts.filter(x=>x.n>=A.gptMax); let g6fait=false;
+    for(const x of g6){ const n=g6.filter(y=>y.debut>=x.debut&&jDiff(x.debut,y.debut)<28).length; if(n>A.gpt6Par4sem&&!g6fait){ g6fait=true; add('gpt6',x.debut,`${n} GPT de ${A.gptMax} jours en 4 semaines à partir du ${dFull(x.debut)}`); } }
+    for(const x of runs) if(x.n>A.rpConsecMax) add('rpConsec',x.debut,`${x.n} RP de suite`);
+    let simples=0; for(const x of runs){ simples=x.n===1?simples+1:0; if(simples===A.simplesSuccMax+1) add('simples',x.debut,`${simples} repos simples de suite`); }
+    // repos entre deux journées de service
+    const redParGpt={}, succParGpt={}, rjParGpt={}, longs=[];
+    for(let i=1;i<svc.length;i++){
+      const a=svc[i-1], b=svc[i], gap=(b.s-a.e)/H; if(gap<0) continue;
+      const entre=J.filter(({j})=>j.date>a.date&&j.date<b.date).map(({j})=>j), rp=entre.filter(isRP).length;
+      const gp=gptDe(b.date), kg=gp?gp.debut:b.date;
+      if(!entre.length&&jDiff(a.date,b.date)===1){
+        if(!afr&&!a.res){   // repos journalier hors résidence (conducteurs)
+          if(gap<A.rhrMin) add('rhr',a.date,`${fmtH(gap)} à ${a.to||'?'} entre ${dtISO(new Date(a.e).toISOString())} et ${dtISO(new Date(b.s).toISOString())}`);
+          else if(gap<A.rhrComp) add('rhrComp',a.date,`${fmtH(gap)} à ${a.to||'?'}`,'info');
+          const p2=svc[i-2]; if(p2&&!p2.res&&jDiff(p2.date,a.date)===1){ succParGpt[kg]=(succParGpt[kg]||0)+1; if(succParGpt[kg]===A.rhrSuccParGpt+1) add('rhrSucc',a.date,`RHR successifs à ${p2.to||'?'} puis ${a.to||'?'}`); }
+        }else{
+          const plancher=a.nuitJ&&!afr?C.rjApresNuit:C.rjReduit;
+          if(gap<plancher) add('rj',a.date,`${fmtH(gap)} de repos (minimum ${fmtH(plancher)}${a.nuitJ&&!afr?' après une journée de nuit':''})`);
+          else if(gap<C.rj){ redParGpt[kg]=(redParGpt[kg]||0)+1; if(redParGpt[kg]===2) add('rjRed',a.date,`repos réduit à ${fmtH(gap)}, deuxième réduction dans la GPT du ${dFull(kg)}`); }
+          (rjParGpt[kg]=rjParGpt[kg]||[]).push(gap);
+        }
+      }else if(rp&&a.res&&entre.every(j=>isRP(j))){
+        const need=24*rp+C.rj; if(gap<need-1e-9) add('rp',a.date,`${fmtH(gap)} pour ${rp} RP (minimum ${fmtH(need)})`);
+        const r0=D0(entre[0].date), r1=D0(entre[entre.length-1].date)+DAY, dbl=rp>=2;
+        if(a.e>r0-(24-(dbl?A.veilleDouble:A.veilleSimple))*H) add('rpVeille',a.date,`fin à ${hm(new Date(a.e).toISOString())} avant un repos ${dbl?'double':'simple'} (au plus tard ${dbl?A.veilleDouble:A.veilleSimple} h)`);
+        if(b.s<r1+(dbl?A.lendemainDouble:A.lendemainSimple)*H) add('rpLendemain',b.date,`reprise à ${hm(new Date(b.s).toISOString())} après un repos ${dbl?'double':'simple'} (au plus tôt ${dbl?A.lendemainDouble:A.lendemainSimple} h)`);
+      }
+    }
+    // RHR de plus de 24 h : un repos journalier à résidence d'au moins 15 h dans la GPT suivante (art. 18)
+    for(const a of list) for(const r of a.rhr||[]) if(!afr&&r.fin&&r.dureeH>24){ const g=gptDe(r.fin.slice(0,10)); if(g) longs.push({date:r.debut.slice(0,10),gap:r.dureeH,kg:g.debut}); }
+    for(const x of longs){ const gi=gpts.findIndex(y=>y.debut===x.kg), nx=gi>=0?gpts[gi+1]:null, l=nx?rjParGpt[nx.debut]:null;
+      if(l&&l.length&&Math.max(...l)<A.rhrLongRj) add('rhrLong',x.date,`RHR de ${fmtH(x.gap)} ; dans la GPT suivante (du ${dFull(nx.debut)}), repos à résidence de ${fmtH(Math.max(...l))} au plus`); }
+    // mois entiers présents : 8 RP et un repos double samedi-dimanche
+    const parMois=groupBy(J,({j})=>j.date.slice(0,7));
+    for(const [m,l] of parMois){ const nj=new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7),0)).getUTCDate(); if(l.length<nj) continue;
+      const nrp=l.filter(({j})=>isRP(j)).length; if(nrp<A.rpMois) add('rpMois',m+'-01',`${nrp} RP en ${MOIS[+m.slice(5)-1]} ${m.slice(0,4)}`);
+      const we=l.some(({j})=>isRP(j)&&new Date(D0(j.date)).getUTCDay()===6&&runs.some(x=>x.debut<=j.date&&jDiff(j.date,x.fin)>=1));
+      if(!we) add('weMois',m+'-01',`${MOIS[+m.slice(5)-1]} ${m.slice(0,4)}`); }
+    // semaines : 48 h, moyenne de 44 h sur 4 semaines consécutives, attente de la commande / disposition
+    const sem=list.filter(a=>!a.partiel).map(a=>({w:a.weekId,lundi:a.jours[0].date,h:a.heuresPlanifiees||0,a}));
+    for(const s of sem){ if(s.h>A.hebdoMax) add('hebdo',s.lundi,`${fmtH(s.h)} en ${s.w}`);
+      if(A.commandes){ const d=s.a.jours.filter(j=>j.kind==='SERVICE'), at=d.filter(j=>(j.missions||[]).some(isATCMD)).length, di=d.filter(j=>(j.missions||[]).some(m=>/DISPO/i.test(m.label||''))).length;
+        if(at>A.atcmdSem||di>A.dispoSem||at+di>A.cmdTotalSem) add('cmd',s.lundi,`${at} ATCMD et ${di} DISPO en ${s.w}`); } }
+    for(let i=3;i<sem.length;i++){ const q=sem.slice(i-3,i+1); if(jDiff(q[0].lundi,q[3].lundi)!==21) continue; const moy=q.reduce((t,x)=>t+x.h,0)/4;
+      if(moy>A.moy4sem) add('moy4',q[0].lundi,`${fmtH(moy)} en moyenne de ${q[0].w} à ${q[3].w}`); }
+  }
+  out.sort((x,y)=>x.date.localeCompare(y.date)||x.nom.localeCompare(y.nom));
+  return out;
+}
+/** Équité (demandé par l'utilisateur) : répartition, par semaine de présence, des jours de service, nuit, RHR, DISPO, journées
+    blanches, ATCMD, heures sup et week-ends travaillés, comparée à la moyenne de l'agence et du métier de l'agent. */
+const EQUITE=[['joursService','Jours de service'],['heuresNuit','Heures de nuit','h'],['nbRHR','RHR'],['nbDISPO','DISPO'],
+  ['journeesBlanches','Journées blanches'],['nbATCMD','ATCMD'],['heuresSup','Heures sup','h'],['weekendTravaille','Jours de week-end travaillés']];
+function equiteData(rows){
+  const pers=[];
+  for(const [pk,l] of groupBy(rows,personKey)){ const last=l[l.length-1], jours=l.reduce((s,a)=>s+a.jours.filter(j=>!j.horsPeriode).length,0), sem=jours/7||1;
+    const p={pk,nom:last.nom,prenom:last.prenom,agence:last.agence,metier:last.metier,semaines:sem,v:{}};
+    for(const [k] of EQUITE) p.v[k]=l.reduce((s,a)=>s+(a[k]||0),0)/sem; pers.push(p); }
+  const groupes=[];
+  for(const [k,l] of groupBy(pers,p=>p.agence+'|'+p.metier)){
+    const st={}; for(const [m] of EQUITE){ const v=l.map(p=>p.v[m]), moy=v.reduce((s,x)=>s+x,0)/v.length, et=Math.sqrt(v.reduce((s,x)=>s+(x-moy)**2,0)/v.length);
+      st[m]={moy,et,min:Math.min(...v),max:Math.max(...v),cv:moy?et/moy:0}; }
+    l.forEach(p=>p.g=st); const [agence,metier]=k.split('|'); groupes.push({agence,metier,n:l.length,st});
+  }
+  return {pers,groupes};
+}
 /** Onglet Production (demandé par l'utilisateur) : chiffres orientés production, calculés sur le planning seulement
     (ni réalisé, ni effectif théorique, ni coûts). `rows` : lignes agent-semaine du périmètre (coupées au jour près) ;
     `pool` : toutes les lignes des mêmes semaines, toutes agences (trains qu'un autre agent a assurés, pour l'optimisation). */
@@ -1879,7 +2021,7 @@ function productionData(rows,pool,rulesIn){
     const J=list.flatMap(a=>a.jours.filter(j=>!j.horsPeriode).map(j=>({j,a}))).sort((x,y)=>x.j.date.localeCompare(y.j.date));
     const isRepos=j=>j.kind==='CODE'&&!j.rpDouble&&FAM_REPOS.includes(j.family);
     const p={pk,nom:last.nom,prenom:last.prenom,agence:last.agence,metier:last.metier,jours:J.length,
-      reposPris:0,reposDus:null,weekends:0,weekendsPossibles:0,periodesRepos:0,reposDoubles:0,reposCourts:[],
+      reposPris:0,reposDus:null,doublesDus:0,weDus:0,doublesWE:0,weekends:0,weekendsPossibles:0,periodesRepos:0,reposDoubles:0,reposCourts:[],
       joursService:0,tte:0,heuresSup:0,absences:0,absParCode:{},
       neutre:0,neutreVoy:0,nbCourtes:0,nbTraj:0,hTraj:0,joursTrajSeul:0,jb:0,autresVides:0,dispo:0,atcmd:0,
       nbRHR:0,rhrNuits:0,rhrLong:0,rhrLieux:{},ecartsPrise:[],alternances:0,enchainements:0};
@@ -1892,14 +2034,18 @@ function productionData(rows,pool,rulesIn){
       const wd=a.jours; if(!wd[5].horsPeriode&&!wd[6].horsPeriode){ p.weekendsPossibles++; if(isRepos(wd[5])&&isRepos(wd[6])) p.weekends++; }
     }
     // repos : pris (codes choisis dans Réglages), dus au prorata des jours présents dans les fichiers
-    if(nDus) p.reposDus=J.reduce((s,{j})=>s+nDus*partJour(j.date),0);
+    // repos dus : nombre réglé à la main, sinon l'accord (117 RP / an conducteurs, 113 AFR et coordinateurs), au prorata des jours présents
+    const Acc=accordOf(R), rpAn=isAFR(last.metier)?Acc.continuite.rpAn:Acc.roulant.rpAn;
+    p.reposDus=nDus?J.reduce((s,{j})=>s+nDus*partJour(j.date),0):J.reduce((s,{j})=>s+rpAn/diy(j.date),0);
+    p.doublesDus=J.reduce((s,{j})=>s+Acc.rdAn/diy(j.date),0); p.weDus=J.reduce((s,{j})=>s+Acc.rdWeAn/diy(j.date),0);
     let run=0, prev=null, prevSvc=null;
     const resSet=a=>new Set([a.residence,...(a.rattachement||a.residencePerso?[]:((R.lieuxResidence||{})[a.agence]||[]))].filter(Boolean).map(normLieu));
     for(const {j,a} of J){
       if(j.kind==='CODE'&&!j.rpDouble&&codesR.includes(j.family)) p.reposPris++;
       // périodes de repos : jours de repos consécutifs (RP, RF, JF, RCL, RCC), « doubles » à partir de 2 jours
-      const suite=prev&&jDiff(prev,j.date)===1;
-      if(isRepos(j)){ run=suite&&run?run+1:1; if(run===1) p.periodesRepos++; if(run===2) p.reposDoubles++; } else run=0;
+      const suite=prev&&jDiff(prev,j.date)===1, rp=j.kind==='CODE'&&j.family==='RP';
+      // repos double : au moins deux RP d'affilée (RP seulement, choix de l'utilisateur) ; samedi-dimanche compté à part
+      if(rp){ run=suite&&run?run+1:1; if(run===1) p.periodesRepos++; if(run===2){ p.reposDoubles++; if(new Date(Date.parse(j.date+'T00:00:00Z')).getUTCDay()===0) p.doublesWE++; } } else run=0;
       prev=j.date;
       if(j.kind!=='SERVICE'||!j.missions||!j.missions.length) continue;
       p.joursService++;
@@ -2943,30 +3089,34 @@ function viewProduction(){
   const ecarts=L.flatMap(p=>p.ecartsPrise), ench=T('enchainements'), alt=T('alternances'), abs=T('absences'), absC={};
   L.forEach(p=>Object.entries(p.absParCode).forEach(([k,v])=>absC[k]=(absC[k]||0)+v));
   const eco=d.pistes.filter(x=>x.journeeEco).length, gain=d.pistes.reduce((s,x)=>s+x.traj.h,0);
+  const conf=conformiteData(sc,S.rules), nc=conf.filter(x=>x.niveau==='nc'), ncAg=new Set(nc.map(x=>x.pk)).size, eq=equiteData(sc);
+  const parType=[...groupBy(conf,x=>x.type)].map(([t,l])=>({t,l:CONF_TYPES[t]?CONF_TYPES[t][0]:t,art:CONF_TYPES[t]?CONF_TYPES[t][1]:'',n:l.length,ag:new Set(l.map(x=>x.pk)).size,niv:l[0].niveau}));
   const points=[
+    nc.length?`<b>${nf(nc.length)} écarts à l’accord d’entreprise</b> chez ${nf(ncAg)} agent${ncAg>1?'s':''} — le plus fréquent : ${esc((parType.filter(x=>x.niv==='nc').sort((a,b)=>b.n-a.n)[0]||{}).l||'')}.`:'Aucun écart à l’accord d’entreprise détecté sur le planning.',
     neutre?`<b>${fmtH(neutre)}</b> comptées sans être travaillées (${nf(T('nbCourtes'))} missions de moins de ${nfa(S.rules.minMission)} h), dont <b>${fmtH(neutreVoy)}</b> sur des trajets seuls.`:'',
     T('nbTraj')?`<b>${nf(T('nbTraj'))} trajets seuls</b> (${fmtH(hTraj)}, soit ${pct(hTraj,tte)} du TTE) ; ${nf(T('joursTrajSeul'))} journées de service composées uniquement de trajets seuls.`:'',
     d.pistes.length?`<b>${nf(d.pistes.length)} trajets seuls</b> auraient pu être remplacés par un train productif sur le même parcours (${fmtH(gain)} de trajet)${eco?` ; dans ${nf(eco)} cas, l’agent qui a assuré ce train était venu en trajet seul et n’a rien fait d’autre : sa journée pourrait être économisée`:''}.`:'',
     reeqT?`<b>${fmtH(reeqT)}</b> d’heures sup auraient pu être confiées à des agents de la même agence et du même métier restés sous ${nfa(S.rules.seuilHebdo)} h la même semaine.`:'',
     hs?`${pct(partTop,1)} des heures sup sont faites par ${nf(top)} agent${top>1?'s':''} : les 20 % qui en font le plus, sur ${nf(hsTri.length)} agents en heures sup.`:'',
-    dusOk?(deficit.length?`<b>${nf(deficit.length)} agent${deficit.length>1?'s':''}</b> ont moins de repos (${esc(codesR)}) que ceux dus sur la période.`:'Tous les agents ont au moins les repos dus sur la période.'):'Repos dus non réglés : Réglages → « Production ».',
+    dusOk?(deficit.length?`<b>${nf(deficit.length)} agent${deficit.length>1?'s':''}</b> ont moins de repos (${esc(codesR)}) que ceux dus sur la période.`:'Tous les agents ont au moins les repos dus sur la période.'):'',
     courts.length?`<b>${nf(courts.length)} repos à résidence</b> plus courts que ${nfa(+P.reposResMin)} h entre deux jours de service.`:'',
   ].filter(Boolean);
   const card=(t,s,body,note)=>`<section class="card"><div class="card-h"><div><h2>${t}</h2><p class="card-s">${s}</p></div></div><div class="card-b stack">${note?`<div class="note">${note}</div>`:''}${body}</div></section>`;
   const repos=card('Repos','repos pris et dus, week-ends, périodes de repos',
     `<div class="kpis">${kp('Repos pris',nf(pris),esc(codesR)+' comptés')}
-      ${kp('Repos dus',dusOk?nf(dus,1):'à régler',dusOk?`${nfa(+P.reposDus)} ${parL}, au prorata des jours présents`:'Réglages → Production')}
+      ${kp('Repos dus',dusOk?nf(dus,1):'—',P.reposDus?`${nfa(+P.reposDus)} ${parL}, au prorata des jours présents`:`accord : ${nfa(accordOf(S.rules).roulant.rpAn)} RP / an (conducteurs), ${nfa(accordOf(S.rules).continuite.rpAn)} (AFR, coordo), au prorata des jours présents`)}
       ${kp('Écart',dusOk?(pris-dus>=0?'+':'')+nf(pris-dus,1):'—',dusOk?`${nf(deficit.length)} agent${deficit.length>1?'s':''} en dessous`:'',dusOk&&deficit.length)}
       ${kp('Week-ends complets',nf(T('weekends')),`sur ${nf(T('weekendsPossibles'))} week-ends (${pct(T('weekends'),T('weekendsPossibles'))})`)}
-      ${kp('Repos doubles',nf(T('reposDoubles')),`${pct(T('reposDoubles'),T('periodesRepos'))} des ${nf(T('periodesRepos'))} périodes de repos`)}
+      ${kp('Repos doubles',nf(T('reposDoubles')),`dus : ${nf(T('doublesDus'),1)} (${nfa(accordOf(S.rules).rdAn)} / an) · ${nf(T('periodesRepos'))} périodes de RP`,T('reposDoubles')<Math.floor(T('doublesDus')))}
+      ${kp('Doubles samedi-dimanche',nf(T('doublesWE')),`dus : ${nf(T('weDus'),1)} (${nfa(accordOf(S.rules).rdWeAn)} / an au minimum)`,T('doublesWE')<Math.floor(T('weDus')))}
       ${P.reposResMin?kp('Repos à résidence courts',nf(courts.length),`moins de ${nfa(+P.reposResMin)} h entre deux services`,courts.length):''}</div>
     ${stable('prRepos',[nom,ag,{k:'jours',l:'Jours présents'},{k:'reposPris',l:'Repos pris'},
       {k:'reposDus',l:'Repos dus',f:p=>p.reposDus==null?z:nf(p.reposDus,1)},
       {k:'ecart',l:'Écart',v:p=>p.reposDus==null?0:p.reposPris-p.reposDus,f:p=>p.reposDus==null?z:(p.reposPris<Math.floor(p.reposDus)?`<b class="warn">${nf(p.reposPris-p.reposDus,1)}</b>`:nf(p.reposPris-p.reposDus,1))},
-      {k:'weekends',l:'Week-ends complets',f:p=>`${nf(p.weekends)} / ${nf(p.weekendsPossibles)}`},{k:'periodesRepos',l:'Périodes de repos'},{k:'reposDoubles',l:'Repos doubles'},
+      {k:'weekends',l:'Week-ends complets',f:p=>`${nf(p.weekends)} / ${nf(p.weekendsPossibles)}`},{k:'periodesRepos',l:'Périodes de RP'},{k:'reposDoubles',l:'Repos doubles',f:p=>`${nf(p.reposDoubles)} / ${nf(p.doublesDus,1)}`},{k:'doublesWE',l:'Doubles sam.-dim.',f:p=>`${nf(p.doublesWE)} / ${nf(p.weDus,1)}`},
       ...(P.reposResMin?[{k:'rc',l:'Repos à résidence courts',v:p=>p.reposCourts.length,f:p=>p.reposCourts.length?`<b class="warn" title="${esc(p.reposCourts.map(c=>`${dtISO(c.fin)} → ${dtISO(c.reprise)} : ${fmtH(c.h)}`).join(' · '))}">${p.reposCourts.length}</b>`:z}]:[])],
       L,{sort:dusOk?{k:'ecart',dir:'asc'}:{k:'reposPris',dir:'asc'},tall:true,sticky:true})}`,
-    `Repos pris : jours codés ${esc(codesR)} (réglable) ; un numéro RP déjà lu n’est pas recompté. Repos dus : nombre réglé ${parL||''}, ramené aux jours où l’agent est dans les fichiers de la période. Week-end complet : samedi et dimanche en repos (RP, RF, JF, RCL, RCC). Repos double : au moins deux jours de repos d’affilée.`);
+    `Repos pris : jours codés ${esc(codesR)} (réglable) ; un numéro RP déjà lu n’est pas recompté. Repos dus : accord d’entreprise (117 RP par an pour les conducteurs, art. 19 ; 113 pour les AFR et coordinateurs, art. 30), ou nombre réglé dans Réglages, ramené aux jours où l’agent est dans les fichiers. Repos double : au moins deux RP d’affilée (39 par an dont 12 samedi-dimanche au minimum, art. 20 / 31). Week-end complet : samedi et dimanche en repos (RP, RF, JF, RCL, RCC).`);
   const util=card('Utilisation du personnel','jours en service, TTE, heures sup et rééquilibrage',
     `<div class="kpis">${kp('Jours en service',pct(js,jours),`${nf(js)} jours sur ${nf(jours)} jours présents`)}
       ${kp('TTE / jour de service',fmtH(js?tte/js:0),`${fmtH(tte)} de TTE`)}
@@ -3007,8 +3157,25 @@ function viewProduction(){
       {k:'eco',l:'Journée économisable',v:x=>x.journeeEco?2:x.venuEnVoy?1:0,f:x=>x.journeeEco?'<span class="pill pill-a">oui</span>':x.venuEnVoy?'<span class="pill">venu en trajet seul</span>':z}],
       d.pistes,{sort:{k:'eco',dir:'desc'},tall:true}):'<p class="mut">Aucun trajet seul remplaçable trouvé sur ce périmètre.</p>',
     `Pour chaque trajet seul X → Y : un train productif (ni trajet seul, ni DISPO, ni ATCMD) X → Y assuré par un autre agent du même métier, qui part entre l’arrivée de l’agent à X (fin de sa mission précédente) et ${nfa(+P.optiFenetre||0)} h après le départ prévu du trajet seul (réglable). « Journée économisable » : l’agent qui a assuré ce train était venu à X en trajet seul et n’a rien fait d’autre ce jour-là. À vérifier avant toute décision : habilitations, connaissance de ligne, repos, roulements.`);
+  const confCard=card('Conformité à l’accord d’entreprise','écarts du planning aux règles de l’accord ECR 2018, agent par agent',
+    `<div class="kpis">${kp('Écarts',nf(nc.length),`${nf(ncAg)} agent${ncAg>1?'s':''} concerné${ncAg>1?'s':''}`,nc.length>0)}
+      ${kp('À surveiller',nf(conf.length-nc.length),'repos compensateurs dus (RHR de moins de 11 h)')}
+      ${kp('Agents conformes',nf(L.length-ncAg),`sur ${nf(L.length)}`)}</div>
+    ${parType.length?stable('prConfT',[{k:'l',l:'Règle',cls:'l',f:x=>`${x.niv==='info'?'':'<b>'}${esc(x.l)}${x.niv==='info'?'':'</b>'}`},{k:'art',l:'Accord',cls:'l mono',f:x=>esc(x.art)},{k:'n',l:'Cas'},{k:'ag',l:'Agents'}],parType,{sort:{k:'n',dir:'desc'}}):''}
+    ${conf.length?stable('prConf',[{k:'date',l:'Jour',cls:'l mono',f:x=>dFull(x.date)},{k:'nom',l:'Agent',cls:'l',f:x=>`<span class="nm">${esc(x.nom)}</span> <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span>`},
+      {k:'type',l:'Règle',cls:'l',v:x=>(CONF_TYPES[x.type]||[x.type])[0],f:x=>`${x.niveau==='info'?'<span class="pill">à surveiller</span> ':''}${esc((CONF_TYPES[x.type]||[x.type])[0])}`},{k:'detail',l:'Détail',cls:'l',f:x=>esc(x.detail)}],conf,{sort:{k:'date',dir:'asc'},tall:true,sticky:true}):'<p class="mut">Aucun écart détecté.</p>'}`,
+    `Règles de l’accord pré-remplies et réglables (Réglages → « Accord d’entreprise »). Conducteurs : chapitre 3 ; AFR et coordinateurs : chapitre 4, titre 2. Repos périodique = RP seulement ; grande période de travail (GPT) = jours consécutifs sans repos (RP, RF, JF, RCL, RCC). Contrôlé sur le planning des fichiers : le temps de conduite et le réalisé n’y figurent pas. ${accordOf(S.rules).commandes?'':'Attente de la commande et disposition à l’agence : non contrôlées tant que la correspondance ATCMD / DISPO n’est pas confirmée (Réglages).'}`);
+  const eqv=(p,k,u)=>{ const g=p.g[k], v=p.v[k], c=g.et>0&&v>g.moy+g.et?'hi':g.et>0&&v<g.moy-g.et?'lo':'';
+    return `<span class="eqv ${c}" title="moyenne ${esc(p.agence)} · ${esc(p.metier)} : ${u?fmtH(g.moy):nf(g.moy,2)} par semaine">${u?fmtH(v):nf(v,2)}</span>`; };
+  const eqCard=card('Équité de répartition','par semaine de présence, comparée aux agents de la même agence et du même métier',
+    stable('prEqG',[{k:'agence',l:'Agence',cls:'l',f:x=>esc(x.agence)},{k:'metier',l:'Métier',cls:'l',f:x=>esc(x.metier)},{k:'n',l:'Agents'},
+      ...EQUITE.map(([k,l,u])=>({k,l:l+' / sem.',v:x=>x.st[k].cv,f:x=>`${u?fmtH(x.st[k].moy):nf(x.st[k].moy,2)} <span class="mut">(${u?fmtH(x.st[k].min):nf(x.st[k].min,1)}–${u?fmtH(x.st[k].max):nf(x.st[k].max,1)})</span>${x.n>1&&x.st[k].cv>0.5?' <span class="pill pill-w" title="écart-type supérieur à la moitié de la moyenne">inégal</span>':''}`}))],
+      eq.groupes,{sort:{k:'n',dir:'desc'}})+
+    stable('prEqP',[nom,ag,{k:'metier',l:'Métier',cls:'l',f:p=>esc(p.metier)},{k:'semaines',l:'Semaines',f:p=>nf(p.semaines,1)},
+      ...EQUITE.map(([k,l,u])=>({k,l,v:p=>p.v[k],f:p=>eqv(p,k,u)}))],eq.pers,{sort:{k:'joursService',dir:'desc'},tall:true,sticky:true}),
+    `Chaque valeur est ramenée à une semaine de présence dans les fichiers. En ambre : au-dessus de la moyenne de l’agence et du métier de plus d’un écart-type ; en rose : en dessous. « Inégal » : écart-type supérieur à la moitié de la moyenne du groupe.`);
   return `<section class="card"><div class="card-h"><div><h2>Points d’attention</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · ${nf(L.length)} agents · calculés sur le planning (pas sur le réalisé)</p></div></div>
-    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${repos}${util}${nonProd}${irr}${opti}`;
+    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
 }
 /* ---------- journées blanches ---------- */
 function viewBlanches(){
@@ -3184,7 +3351,7 @@ function rulesDiff(a,b){
     rhrCountPending:'Coupure ouverte en fin de semaine comptée',jbExcludeNightOverlap:'Lendemain de nuit exclu des journées blanches',
     jbRequireFramed:'Journée blanche encadrée par deux services',jbExcludeHorsResidence:'Pas de journée blanche hors résidence',panierRHR:'Panier en RHR',
     horsColonne:'Missions hors colonne',seuilHebdo:'Seuil des heures sup (h)',heuresATCMD:'Heures d’une ATCMD',minMission:'Minimum compté par mission (h)',nuitAFR:'Nuit AFR',nuitCDR:'Nuit conducteurs',
-    trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',agencesExclues:'Agences hors production',lieuxResidence:'Lieux reconnus comme résidence',production:'Production (repos dus, repos à résidence, fenêtre)'};
+    trajetTypes:'Trajet seul',rhrMetiers:'Métiers avec RHR',residences:'Résidences',agencesAlias:'Noms d’agence',agencesExclues:'Agences hors production',lieuxResidence:'Lieux reconnus comme résidence',production:'Production (repos dus, repos à résidence, fenêtre)',accord:'Accord d’entreprise (conformité)'};
   const v=x=>typeof x==='boolean'?(x?'oui':'non'):Array.isArray(x)?x.join(', '):x&&typeof x==='object'?Object.entries(x).map(([k,y])=>`${k} → ${Array.isArray(y)?y.join('/'):y}`).join(' ; ')||'—':String(x);
   return Object.keys(L).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).map(k=>`${L[k]} : ${v(a[k])} → ${v(b[k])}`);
 }
@@ -4572,7 +4739,7 @@ function correctionsCard(){
     </tbody></table></div>`:'<p class="mut">Aucune correction. Ouvrez la fiche d’un agent (onglet Agents) pour corriger une coupure ou une case vide, ou lier deux missions.</p>'}</div></section>`;
 }
 function viewReglages(){
-  const ags=allAgences(), r=S.rules, mets=allMetiers(), rp={...DEFAULT_RULES.production,...(r.production||{})};
+  const ags=allAgences(), r=S.rules, mets=allMetiers(), rp={...DEFAULT_RULES.production,...(r.production||{})}, ac=accordOf(r);
   // résidences et lieux relevés, toutes semaines chargées confondues
   const first={residences:{},residenceSource:{},locCounts:{}};
   for(const w of [...S.loaded.values()]){ Object.assign(first.residences,w.meta.residences); Object.assign(first.residenceSource,w.meta.residenceSource);
@@ -4628,6 +4795,17 @@ function viewReglages(){
           <span class="inl">codes comptés ${FAM_REPOS.map(c=>`<label class="mut"><input type="checkbox" data-prc="${c}" ${(rp.reposCodes||['RP']).includes(c)?'checked':''}> ${c}</label>`).join(' ')}</span>
           <span class="inl">repos à résidence d'au moins <input type="text" id="prRM" value="${esc(rp.reposResMin??'')}" inputmode="decimal"> <span class="mut">h (vide = non contrôlé)</span></span>
           <span class="inl">fenêtre d'optimisation <input type="text" id="prOF" value="${esc(rp.optiFenetre??2)}" inputmode="decimal"> <span class="mut">h</span></span></span></div>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Accord d'entreprise (conformité, onglet Production)</span>
+          <span class="rd">Valeurs de l'accord ECR 2018, pré-remplies. Conducteurs : chapitre 3 (art. 12, 17, 19) ; AFR et coordinateurs : chapitre 4 (art. 28, 29, 30). Heures en décimal (9,5 = 9h30).</span>
+          <div class="tw"><table class="acc-t"><thead><tr><th class="l">Règle</th><th>Conducteurs</th><th>AFR / coordo</th></tr></thead><tbody>
+          ${[['tteMax','TTE max par journée (h)'],['tteMaxNuit','TTE max, journée de nuit (h)'],['ampMax','Amplitude max (h)'],['ampMaxNuit','Amplitude max, journée de nuit (h)'],
+            ['nuitSeuil','Journée de nuit : plus de … h dans la plage de nuit'],['rj','Repos journalier à résidence (h)'],['rjReduit','Repos journalier réduit, minimum (h)'],['rjApresNuit','Repos après une journée de nuit, minimum (h)'],['rpAn','Repos périodiques par an']]
+            .map(([k,l])=>`<tr><td class="l">${l}</td>${['roulant','continuite'].map(c=>`<td><input type="text" data-acc="${c}.${k}" value="${esc(String(ac[c][k]).replace('.',','))}" inputmode="decimal" style="width:70px"></td>`).join('')}</tr>`).join('')}
+          ${[['rdAn','Repos doubles par an'],['rdWeAn','dont samedi-dimanche, au minimum'],['rpMois','Repos périodiques par mois'],['gptMax','GPT : jours de suite au maximum'],['gpt6Par4sem','GPT de 6 jours sur 4 semaines, au maximum'],
+            ['hebdoMax','Heures par semaine, au maximum'],['moy4sem','Moyenne sur 4 semaines, au maximum (h)'],['rhrMin','RHR minimum (h)'],['rhrComp','RHR : repos compensateur en dessous de (h)'],['rhrLongRj','Repos à résidence après un RHR de plus de 24 h (h)'],['pauseMin','Pause minimale au-delà de 6 h de travail (min)']]
+            .map(([k,l])=>`<tr><td class="l">${l}</td><td colspan="2" class="l"><input type="text" data-acc="${k}" value="${esc(String(ac[k]).replace('.',','))}" inputmode="decimal" style="width:70px"></td></tr>`).join('')}
+          </tbody></table></div>
+          <label class="mut"><input type="checkbox" id="accCmd" ${ac.commandes?'checked':''}> contrôler « ATCMD » comme attente de la commande et « DISPO » comme disposition à l'agence (2 fois par semaine chacune, 3 au total ; art. 15–16, 36–37)</label></span></div>
       </div>
       <div class="btns"><button class="btn btn-pri" id="saveRules">Appliquer et enregistrer</button></div>
     </div></section>
@@ -5163,6 +5341,10 @@ document.addEventListener('click',async e=>{
       production: (()=>{ const o=v=>{ const x=parseFloat(String(el(v)?.value??'').replace(',','.')); return isFinite(x)&&x>0?x:null; };
         const c=[...document.querySelectorAll('[data-prc]')].filter(i=>i.checked).map(i=>i.dataset.prc);
         return {reposDus:o('prRD'),reposPar:el('prRP')?.value||'an',reposCodes:c.length?c:['RP'],reposResMin:o('prRM'),optiFenetre:o('prOF')??0}; })(),
+      accord: (()=>{ const o=structuredClone(accordOf(S.rules));
+        document.querySelectorAll('[data-acc]').forEach(i=>{ const v=parseFloat(String(i.value).replace(',','.')); if(!isFinite(v)) return;
+          const [a,b]=i.dataset.acc.split('.'); if(b) o[a][b]=v; else o[a]=v; });
+        o.commandes=!!el('accCmd')?.checked; return o; })(),
       trajetTypes: String(el('rTraj').value).split(/[,;]/).map(x=>x.trim().toUpperCase()).filter(Boolean),
       // une résidence déduite automatiquement reste automatique (elle peut s'écrire BX une semaine, BORDEAUX une autre) :
       // seule une valeur déjà manuelle, ou modifiée à la main, est enregistrée

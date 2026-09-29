@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -700,4 +700,19 @@ test('Production : repos pris / dus, week-end complet, heures neutralisées, tra
   assert.equal(pa[0].train.label, 'T5');
   assert.equal(pa[0].journeeEco, true);   // B était venu en trajet seul pour ce train
   assert.equal(d.pistes.filter((x) => x.nom.startsWith('B')).length, 0);   // aucun train HENDAYE → BORDEAUX
+});
+
+test('Conformité à l’accord : amplitude, TTE, pause, repos journalier, reprise après RP, GPT de plus de 6 jours', () => {
+  const w = run(week([2026, 9, 7], [
+    { mat: '1', nom: 'A', j: [svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '17:30']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '03:00', 8, '08:00']), 'RP',
+      svc(['T3', 'HENDAYE', 'HENDAYE', 10, '04:00', 10, '10:00', [[10, '07:00', 10, '07:30']]]), 'RP', 'RP', 'RP'] },
+    { mat: '2', nom: 'B', j: [7, 8, 9, 10, 11, 12, 13].map((d) => svc(['T' + d, 'HENDAYE', 'HENDAYE', d, '08:00', d, '12:00'])) },
+  ]), RES);
+  const c = E.conformiteData(w.agents, E.loadRules(RES));
+  const t = (n) => c.filter((x) => x.nom.startsWith(n)).map((x) => x.type).sort().join(',');
+  assert.equal(t('A'), 'amp,pause,rj,rpLendemain,tte');
+  assert.equal(t('B'), 'gpt');
+  const e = E.equiteData(w.agents);
+  assert.equal(e.groupes.length, 1);
+  assert.equal(e.pers.find((p) => p.nom === 'B').v.joursService, 7);
 });
