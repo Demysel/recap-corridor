@@ -131,7 +131,8 @@ Semaine au choix (semaines importées + les 4 qui suivent la dernière, `planifS
 métier du filtre à la création) avec les missions dans les cases (intitulé, horaire, trajet), un code par jour (RP, RF, JF,
 RCL, RCC, CP, MAL, AT, FORM ou rien) et une ligne « Réserve » par jour.
 - Premier brouillon (`construirePlanif`) : semaine importée = missions et codes du fichier ; semaine à venir = jours de RP du
-  planning type pour S+1 (vide au-delà). **Trains réguliers** (choix de l'utilisateur : même intitulé, même jour de semaine,
+  planning type pour S+1 (vide au-delà). **Trains réguliers** (choix de l'utilisateur : même intitulé, même trajet départ → arrivée — ajouté à la demande, pour ne pas
+  confondre des missions génériques comme « MHIS » —, même jour de semaine,
   au moins 2 fois sur les 4 semaines importées qui précèdent ; ATCMD et DISPO exclus, ce ne sont pas des trains) :
   `trainsReguliers` (horaire, trajet et pauses les plus fréquents ; agent habituel = celui qui l'a fait le plus) ; semaine à
   venir : **pré-remplissage par agence** (demandé par l'utilisateur : un agent de Hendaye ne fait pas une mission de

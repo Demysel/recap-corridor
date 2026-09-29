@@ -2010,14 +2010,14 @@ function equiteData(rows){
 }
 /** Planification (demandé par l'utilisateur) : semaine au choix, missions dans les cases, trains réguliers pré-placés,
     ajout à la main par glisser-déposer, alertes de l'accord à chaque changement ; brouillon enregistré sur le serveur.
-    Train régulier : même intitulé, même jour de semaine, présent au moins `seuil` fois sur les semaines données (2 sur 4,
+    Train régulier : même intitulé, même trajet (départ → arrivée, demandé par l'utilisateur), même jour de semaine, présent au moins `seuil` fois sur les semaines données (2 sur 4,
     choix de l'utilisateur) ; horaire, trajet et pauses = ceux qui reviennent le plus ; agent habituel = celui qui l'a fait le plus. */
 function trainsReguliers(weeks,seuil){
   const G=new Map(), hmOf=t=>{ const d=new Date(t); return d.getUTCHours()*60+d.getUTCMinutes(); };
   for(const w of weeks){ const d0=Date.parse(w.meta.monday+'T00:00:00Z');
     for(const a of w.agents||[]) (a.jours||[]).forEach((j,d)=>{ if(j.kind!=='SERVICE') return;
       for(const m of j.missions||[]){ if(!m.start||!m.end||isATCMD(m)||/DISPO/i.test(m.label||'')) continue;   // ATCMD / DISPO : pas des trains (objectif 0)
-        const k=normLieu(m.label)+'|'+d, s=Date.parse(m.start), e=Date.parse(m.end), base=d0+d*DAY;
+        const k=normLieu(m.label)+'|'+normLieu(m.from)+'>'+normLieu(m.to)+'|'+d, s=Date.parse(m.start), e=Date.parse(m.end), base=d0+d*DAY;
         const x={w:w.meta.weekId,pk:personKey(a),nom:`${a.nom||''} ${a.prenom||''}`.trim(),label:m.label,from:m.from||'',to:m.to||'',
           s:Math.round((s-base)/6e4),dur:Math.round((e-s)/6e4),pauses:(m.pauses||[]).filter(Array.isArray).map(([p,q])=>[Math.round((Date.parse(p)-base)/6e4),Math.round((Date.parse(q)-base)/6e4)])};
         if(!G.has(k)) G.set(k,[]); G.get(k).push(x); } }); }
@@ -3437,7 +3437,7 @@ async function construirePlanif(id){
   if(importee){ const fam=m=>isAFR(m)?'AFR':'CDR', ags=new Set(agents.map(a=>a.agence));
     planifPreremplir({meta,agents:[]},reg,info,new Map(),S.rules);   // rattache seulement chaque train à son agence
     for(const t of reg){ if(!t.agence||!ags.has(t.agence)) continue;
-      const deja=brut.agents.some(b=>(b.jours[t.d].missions||[]).some(x=>normLieu(x.label)===normLieu(t.label)));
+      const deja=brut.agents.some(b=>(b.jours[t.d].missions||[]).some(x=>normLieu(x.label)===normLieu(t.label)&&normLieu(x.from)===normLieu(t.from)&&normLieu(x.to)===normLieu(t.to)));
       if(!deja) reserve.push({...missionDuJour(t,meta.days[t.d],plId()),d:t.d,agence:t.agence,fam:t.fam}); } }
   else { const prec=S.parsedCache.get(avant[avant.length-1]), fins=new Map();
     if(prec) for(const b of prec.agents){ const e=b.jours.flatMap(j=>j.missions||[]).map(m=>Date.parse(m.end)); if(e.length) fins.set(personKey(b),Math.max(...e)); }
@@ -3496,7 +3496,7 @@ function viewPlanif(){
   const nNc=al.filter(x=>x.niveau==='nc').length;
   return `<section class="card"><div class="card-h"><div><h2>Planification — ${weekLabel(P.meta)}</h2><p class="card-s">${dFull(P.meta.monday)} au ${dFull(P.meta.sunday)} · départ : ${P.source==='fichier'?'missions du fichier importé':'planning type'} · ${esc((P.perimetre||[]).join(', '))} · ${P.nbReguliers||0} trains réguliers repérés</p></div></div>
     <div class="card-b stack">${sel}
-      <div class="note">Glissez une mission d’une case à l’autre, vers la réserve ou depuis la réserve (sur téléphone : touchez la mission, puis la case). Pré-remplissage à partir des semaines précédentes : les trains réguliers (même intitulé le même jour au moins 2 semaines sur les 4 dernières importées, hors ATCMD et DISPO, en ambre) appartiennent à l’agence et au métier des agents qui les ont assurés et ne vont qu’à un agent de cette agence et de ce métier — l’agent qui les fait le plus souvent, sinon un collègue libre ce jour-là (repos et amplitude dans les minimums de l’accord), le moins chargé à égalité ; sinon ils restent en réserve. La grille et la réserve suivent le filtre d’agence et de métier en haut de page. Chaque changement est contrôlé avec les règles de l’accord (repos journalier, amplitude, TTE, repos périodiques, GPT, RHR, 48 h…) en tenant compte des semaines précédentes ; une alerte apparaît dans la case et en haut de page. Le brouillon est enregistré sur le serveur (admins seulement).</div>
+      <div class="note">Glissez une mission d’une case à l’autre, vers la réserve ou depuis la réserve (sur téléphone : touchez la mission, puis la case). Pré-remplissage à partir des semaines précédentes : les trains réguliers (même intitulé et même trajet le même jour au moins 2 semaines sur les 4 dernières importées, hors ATCMD et DISPO, en ambre) appartiennent à l’agence et au métier des agents qui les ont assurés et ne vont qu’à un agent de cette agence et de ce métier — l’agent qui les fait le plus souvent, sinon un collègue libre ce jour-là (repos et amplitude dans les minimums de l’accord), le moins chargé à égalité ; sinon ils restent en réserve. La grille et la réserve suivent le filtre d’agence et de métier en haut de page. Chaque changement est contrôlé avec les règles de l’accord (repos journalier, amplitude, TTE, repos périodiques, GPT, RHR, 48 h…) en tenant compte des semaines précédentes ; une alerte apparaît dans la case et en haut de page. Le brouillon est enregistré sur le serveur (admins seulement).</div>
       <div class="kpis">${`<div class="kpi${nNc?' hot':''}"><div class="k">Alertes</div><div class="v">${nf(nNc)}</div><div class="n">${nf(al.length-nNc)} à surveiller</div></div>`}
         <div class="kpi"><div class="k">Missions placées</div><div class="v">${nf(P.agents.reduce((s,a)=>s+a.jours.reduce((t,j)=>t+j.m.length,0),0))}</div><div class="n">${nf(P.reserve.length)} en réserve</div></div></div>
       <details class="qd"><summary>Ajouter une mission à la réserve</summary><div class="frow" style="gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">

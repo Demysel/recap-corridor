@@ -788,3 +788,11 @@ test('Planification : pré-remplissage par agence — le train de Hendaye va à 
   assert.equal(pl.agents[0].jours[0].m.length, 0);
   assert.equal(res.length, 0);                           // T9 (Vaires) : aucune agence Vaires dans la grille, ignoré
 });
+
+test('Planification : même intitulé mais trajets différents = deux trains réguliers distincts', () => {
+  const m = (d) => svc(['MHIS', 'HENDAYE', 'IRUN', d, '06:00', d, '10:00']), n = (d) => svc(['MHIS', 'BAYONNE', 'HENDAYE', d, '14:00', d, '18:00']);
+  const mk = (l) => E.parseWeek(week(l, [{ mat: '1', nom: 'A', j: [m(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }, { mat: '2', nom: 'B', j: [n(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  const reg = E.trainsReguliers([mk([2026, 9, 7]), mk([2026, 9, 14])], 2);
+  assert.equal(reg.length, 2);
+  assert.equal(reg.map((t) => t.from + '>' + t.to).sort().join(), 'BAYONNE>HENDAYE,HENDAYE>IRUN');
+});
