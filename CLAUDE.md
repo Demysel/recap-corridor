@@ -114,6 +114,16 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   de préférence un agent venu en trajet seul pour ce train (« trajet seul » économisé) ou qui n'a rien fait d'autre
   (« journée ») — tableau dans « Optimisation des plannings ».
 - Périmètre choisi par l'utilisateur : contrôle + équité + pistes sur les plannings importés (pas de génération automatique).
+- **Planning type de la semaine suivante** (demandé par l'utilisateur ; choix : trame service / repos **sans trains**, pour la
+  semaine qui suit la dernière importée, périmètre du filtre) : `trameSemaine(rowsAll, lastWeekId, scopePks, rules)` (moteur,
+  testé), carte « Planning type — Sxx » en haut de Production (`trameCard`). État repris de S-1 : GPT en cours, RP en fin de
+  semaine, dernier service (fin, lieu, résidence ou RHR, journée de nuit), RP pris depuis le 1er janvier, repos double
+  samedi-dimanche du mois. Règles appliquées (affichées) : RP de la semaine = dus à la fin de la semaine − pris, borné 2–3, en
+  un seul bloc ; bloc placé pour GPT ≤ 6 jours, ≤ 3 RP d'affilée avec la fin de S-1, sur samedi-dimanche si le mois n'en a
+  pas (obligatoire au dernier samedi du mois), pas deux week-ends de suite sinon, puis équilibre de l'effectif en service par
+  jour (cible : moyenne des 4 dernières semaines du groupe agence × métier). Contraintes relâchées dans l'ordre week-end,
+  3 RP d'affilée si elles ne tiennent pas avec la GPT (signalé). Notes par jour : reprise au plus tôt (repos journalier,
+  RHR, lendemain de repos), fin au plus tard la veille du repos, GPT de 6 jours. Congés / absences de S+1 inconnus.
 
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 

@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -728,4 +728,24 @@ test('Production : ATCMD / DISPO pendant laquelle un autre agent, venu en trajet
   assert.equal(d.pistesCmd[0].journeeEco, true);
   const c = E.conformiteData(w.agents, E.loadRules(RES));
   assert.equal(c.filter((x) => x.type === 'cmd').length, 0);
+});
+
+test('Planning type S+1 : GPT de 6 jours en cours → repos double dès le lundi ; week-end déjà pris → pas deux de suite', () => {
+  const d = (x) => svc(['T' + x, 'HENDAYE', 'HENDAYE', x, '08:00', x, '15:00']);
+  const w = run(week([2026, 9, 7], [
+    { mat: '1', nom: 'A', j: ['RP', d(8), d(9), d(10), d(11), d(12), d(13)] },
+    { mat: '2', nom: 'B', j: [d(7), d(8), d(9), d(10), d(11), 'RP', 'RP'] },
+  ]), RES);
+  w.agents.forEach((a) => a.weekId = w.meta.weekId);
+  const t = E.trameSemaine(w.agents, w.meta.weekId, new Set(w.agents.map(E.personKey)), E.loadRules(RES));
+  assert.equal(t.jours[0], '2026-09-14');
+  const A = t.agents.find((x) => x.nom.startsWith('A')), B = t.agents.find((x) => x.nom.startsWith('B'));
+  assert.equal(A.g, 6);
+  assert.equal(A.s, 0);
+  assert.ok(A.n >= 2);
+  assert.equal(A.cases[0].t, 'RP');
+  assert.equal(B.k, 2);
+  assert.ok(B.s >= 1);                                   // pas plus de 3 RP d'affilée avec ceux du week-end
+  assert.ok(!(B.s <= 5 && B.s + B.n >= 7));             // week-end déjà pris ce mois-ci
+  assert.match(B.cases[0].notes.join(' '), /reprise ≥ 03:00/);
 });

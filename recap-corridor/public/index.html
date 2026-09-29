@@ -263,6 +263,8 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .kpis.lead{grid-template-columns:repeat(4,minmax(0,1fr))}
 .eqv{padding:1px 6px;border-radius:5px}.eqv.hi{background:color-mix(in srgb,var(--signal) 30%,transparent);font-weight:700}.eqv.lo{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.trame td{vertical-align:top}.trame td.tr-rp{background:color-mix(in srgb,var(--accent) 14%,var(--surface))!important;font-weight:700;text-align:center!important}
+.tr-s span{display:block}.tr-s .nt{font-size:11px;color:var(--ink-3);white-space:nowrap}.tr-g td{background:var(--surface-2)}.tr-f td{font-weight:600;border-top:2px solid var(--line)}
 .prod-h3{font-size:14px;margin:6px 0 0}
 .prod-pts{margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45}.warn{color:var(--amber,#B45309)}
 .kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 17px 16px;min-width:0;
@@ -2000,6 +2002,77 @@ function equiteData(rows){
   }
   return {pers,groupes};
 }
+/** Planning type de la semaine suivante (demandé par l'utilisateur) : trame service / repos par agent, sans trains, pour la
+    semaine qui suit la dernière importée, en reprenant l'état de la semaine précédente (GPT en cours, dernier service, repos
+    en cours, repos pris depuis le 1er janvier, repos double samedi-dimanche du mois) et les règles de l'accord.
+    Principes (affichés dans la page) : RP de la semaine = repos dus à la fin de la semaine − RP pris, entre 2 et 3 ; les RP
+    en un seul bloc (repos double ou triple) ; bloc placé pour que la GPT ne dépasse pas 6 jours, sans faire plus de 3 RP
+    d'affilée avec ceux de la veille, sur le samedi-dimanche si le mois n'en a pas encore, pas deux week-ends de suite sinon,
+    puis de façon à équilibrer le nombre d'agents en service chaque jour (moyenne des 4 dernières semaines du groupe). */
+function trameSemaine(rowsAll,lastWeekId,scopePks,rulesIn){
+  const R={...DEFAULT_RULES,...(rulesIn||{})}, A=accordOf(R), D=d=>Date.parse(d+'T00:00:00Z');
+  const rowsL=rowsAll.filter(a=>a.weekId===lastWeekId); if(!rowsL.length) return null;
+  const lundi=new Date(D(rowsL[0].jours[0].date)+7*DAY), jours=Array.from({length:7},(_,i)=>isoD(new Date(lundi.getTime()+i*DAY)));
+  const jDiff=(a,b)=>Math.round((D(b)-D(a))/DAY), isRP=j=>j.kind==='CODE'&&j.family==='RP', isRepos=j=>j.kind==='CODE'&&FAM_REPOS.includes(j.family);
+  const diy=y=>(y%4===0&&y%100!==0)||y%400===0?366:365, an=+jours[6].slice(0,4);
+  const semId=(()=>{ const ids=[...new Set(rowsAll.map(a=>a.weekId))].sort(); return ids.slice(Math.max(0,ids.indexOf(lastWeekId)-3),ids.indexOf(lastWeekId)+1); })();
+  // effectif en service habituel par jour de semaine et par groupe (agence × métier), 4 dernières semaines
+  const cible={};
+  for(const a of rowsAll) if(semId.includes(a.weekId)) a.jours.forEach((j,d)=>{ const k=a.agence+'|'+a.metier; (cible[k]=cible[k]||Array.from({length:7},()=>0))[d]+=j.kind==='SERVICE'?1/semId.length:0; });
+  const agents=[];
+  for(const [pk,list] of groupBy(rowsAll,personKey)){
+    if(!scopePks.has(pk)) continue;
+    const der=list.find(a=>a.weekId===lastWeekId); if(!der) continue;
+    const afr=isAFR(der.metier), C=afr?A.continuite:A.roulant;
+    const J=list.flatMap(a=>a.jours.map(j=>({j,a}))).sort((x,y)=>x.j.date.localeCompare(y.j.date)).filter(x=>x.j.date<jours[0]);
+    // GPT en cours et repos en cours à la fin de la semaine précédente
+    let g=0, k=0; for(let i=J.length-1;i>=0;i--){ const x=J[i].j; if(i<J.length-1&&jDiff(x.date,J[i+1].j.date)!==1) break; if(isRepos(x)) break; g++; }
+    for(let i=J.length-1;i>=0;i--){ const x=J[i].j; if(i<J.length-1&&jDiff(x.date,J[i+1].j.date)!==1) break; if(!isRP(x)) break; k++; }
+    const svc=J.filter(x=>x.j.kind==='SERVICE'&&(x.j.missions||[]).length), ls=svc[svc.length-1];
+    let fin=null, lieu=null, res=true, nuit=false;
+    if(ls){ const ms=[...ls.j.missions].sort((x,y)=>Date.parse(x.end)-Date.parse(y.end)), m=ms[ms.length-1]; fin=Date.parse(m.end); lieu=m.to||'';
+      const rs=new Set([ls.a.residence,...(ls.a.rattachement||ls.a.residencePerso?[]:((R.lieuxResidence||{})[ls.a.agence]||[]))].filter(Boolean).map(normLieu));
+      res=rs.has(normLieu(lieu)); nuit=(((ls.a.parJour||[])[ls.j.d]||{}).nuit||0)>C.nuitSeuil; }
+    // repos périodiques : pris depuis le 1er janvier, dus à la fin de la semaine (au prorata des jours présents + 7)
+    const Jan=J.filter(x=>+x.j.date.slice(0,4)===an), pris=Jan.filter(x=>isRP(x.j)&&!x.j.rpDouble).length;
+    const dus=C.rpAn*(Jan.length+7)/diy(an), n=Math.min(3,Math.max(2,Math.round(dus-pris)));
+    // repos double samedi-dimanche du mois du samedi de la semaine
+    const mois=jours[5].slice(0,7), weFait=J.some((x,i)=>isRP(x.j)&&x.j.date.slice(0,7)===mois&&new Date(D(x.j.date)).getUTCDay()===6&&J[i+1]&&isRP(J[i+1].j)&&jDiff(x.j.date,J[i+1].j.date)===1);
+    const dernierSamediDuMois=isoD(new Date(D(jours[5])+7*DAY)).slice(0,7)!==mois, weDernier=J.length>=2&&J.slice(-2).every(x=>isRP(x.j))&&new Date(D(J[J.length-1].j.date)).getUTCDay()===0;
+    const absent=der.jours.every(j=>j.kind==='CODE'&&!FAM_REPOS.includes(j.family));
+    agents.push({pk,nom:`${der.nom} ${der.prenom}`.trim(),agence:der.agence,metier:der.metier,afr,C,g,k,fin,lieu,res,nuit,pris,dus,n,weFait,weObl:!weFait&&dernierSamediDuMois,weDernier,absent,grp:der.agence+'|'+der.metier});
+  }
+  // placement du bloc de RP : agents les plus contraints d'abord, puis équilibre de l'effectif par jour
+  const eff={}; for(const a of agents) eff[a.grp]=eff[a.grp]||Array.from({length:7},()=>0);
+  // contraintes relâchées dans cet ordre si elles ne tiennent pas ensemble (signalé) : week-end du mois, 3 RP d'affilée ; la GPT passe avant
+  const options=a=>{ const essai=(we,cons,gpt)=>{ const o=[]; for(let s=0;s+a.n<=7;s++){ if(gpt&&a.g+s>A.gptMax) continue; if(cons&&s===0&&a.k+a.n>A.rpConsecMax) continue; if(we&&a.weObl&&!(s<=5&&s+a.n>=7)) continue; o.push(s); } return o; };
+    let o=essai(true,true,true); if(o.length) return o;
+    o=essai(false,true,true); if(o.length){ a.alerte='week-end du mois impossible avec la GPT en cours'; return o; }
+    o=essai(false,false,true); if(o.length){ a.alerte='plus de 3 RP d’affilée pour tenir la GPT'; return o; }
+    a.alerte=`GPT déjà de ${a.g} jours : repos dès le lundi`; return [0]; };
+  agents.forEach(a=>a.opts=options(a)); agents.sort((x,y)=>x.opts.length-y.opts.length);
+  for(const a of agents){
+    const ci=cible[a.grp]||Array.from({length:7},()=>0), e=eff[a.grp];
+    const score=s=>{ const we=s<=5&&s+a.n>=7; let t=0;
+      for(let d=0;d<7;d++){ const v=e[d]+(d>=s&&d<s+a.n?0:1); t+=(v-ci[d])**2-(e[d]-ci[d])**2; }
+      if(!a.weFait&&we) t-=4; if(a.weDernier&&we&&!a.weObl) t+=4; return t; };
+    const s=a.opts.reduce((b,x)=>score(x)<score(b)?x:b,a.opts[0]); a.s=s;
+    for(let d=0;d<7;d++) if(!(d>=s&&d<s+a.n)) e[d]++;
+    const dbl=a.n>=2, H2=h=>String(Math.floor(h)).padStart(2,'0')+':'+String(Math.round(h%1*60)).padStart(2,'0');
+    a.cases=jours.map((date,d)=>{ if(d>=s&&d<s+a.n) return {date,t:'RP'};
+      const c={date,t:'S',notes:[]};
+      if(d===0){ if(a.k>0) c.notes.push(`reprise ≥ ${H2(a.k>=2?A.lendemainDouble:A.lendemainSimple)}`);
+        else if(a.fin!=null){ const min=a.res?(a.nuit&&!a.afr?Math.max(a.C.rjApresNuit,a.C.rjReduit):a.C.rj):A.rhrMin, t=new Date(a.fin+min*H);
+          if(isoD(t)>=date) c.notes.push(a.res?`reprise ≥ ${isoD(t)===date?hm(t.toISOString()):'le '+dISO(t.toISOString())+' '+hm(t.toISOString())} (repos ${fmtH(min)})`:`suite RHR à ${a.lieu} : reprise ≥ ${hm(t.toISOString())}`); } }
+      if(d===s-1) c.notes.push(`fin ≤ ${H2(dbl?A.veilleDouble:A.veilleSimple)}`);
+      if(d===s+a.n) c.notes.push(`reprise ≥ ${H2(dbl?A.lendemainDouble:A.lendemainSimple)}`);
+      return c; });
+    const gp=d=>d<s?a.g+d+1:d-(s+a.n)+1; a.gptFin=gp(6)*(s+a.n<=6?1:0);
+    if(s+a.n<7&&7-(s+a.n)>=A.gptMax) a.cases[s+a.n+A.gptMax-1].notes.push('GPT de 6 jours : repos double ensuite');
+  }
+  agents.sort((x,y)=>x.agence.localeCompare(y.agence)||x.metier.localeCompare(y.metier)||x.nom.localeCompare(y.nom));
+  return {jours,agents,eff,cible,semaines:semId};
+}
 /** Onglet Production (demandé par l'utilisateur) : chiffres orientés production, calculés sur le planning seulement
     (ni réalisé, ni effectif théorique, ni coûts). `rows` : lignes agent-semaine du périmètre (coupées au jour près) ;
     `pool` : toutes les lignes des mêmes semaines, toutes agences (trains qu'un autre agent a assurés, pour l'optimisation). */
@@ -2557,6 +2630,8 @@ const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includ
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
   const ids=S.weeks.map(w=>w.weekId).sort(), out=new Set(activeWeeks());
   if(S.tab==='agents') for(const id of periodWeeks('y:'+anneeCP(),S.weeks)) out.add(id);
+  // Production : planning type de S+1 — la dernière semaine, ses 3 précédentes et toute son année (repos pris depuis le 1er janvier)
+  if(S.tab==='production'&&ids.length){ const l=S.weeks.find(w=>w.weekId===ids[ids.length-1]); ids.slice(-4).forEach(x=>out.add(x)); for(const id of periodWeeks('y:'+l.sunday.slice(0,4),S.weeks)) out.add(id); }
   { const t=isoD(new Date(nowW())); for(const w of S.weeks) if(w.monday<=t&&t<=w.sunday){ out.add(w.weekId); const i=ids.indexOf(w.weekId); if(i>0) out.add(ids[i-1]); } }
   for(const id of activeWeeks()){ const i=ids.indexOf(id); if(i>0) out.add(ids[i-1]); if(i>=0&&i<ids.length-1) out.add(ids[i+1]); }
   return [...out]; };
@@ -3205,8 +3280,31 @@ function viewProduction(){
     stable('prEqP',[nom,ag,{k:'metier',l:'Métier',cls:'l',f:p=>esc(p.metier)},{k:'semaines',l:'Semaines',f:p=>nf(p.semaines,1)},
       ...EQUITE.map(([k,l,u])=>({k,l,v:p=>p.v[k],f:p=>eqv(p,k,u)}))],eq.pers,{sort:{k:'joursService',dir:'desc'},tall:true,sticky:true}),
     `Chaque valeur est ramenée à une semaine de présence dans les fichiers. En ambre : au-dessus de la moyenne de l’agence et du métier de plus d’un écart-type ; en rose : en dessous. « Inégal » : écart-type supérieur à la moitié de la moyenne du groupe.`);
+  const trame=trameCard();
   return `<section class="card"><div class="card-h"><div><h2>Points d’attention</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · ${nf(L.length)} agents · calculés sur le planning (pas sur le réalisé)</p></div></div>
-    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
+    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${trame}${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
+}
+/** Planning type de la semaine qui suit la dernière importée (trame service / repos, sans trains) */
+function trameCard(){
+  const ids=S.weeks.map(w=>w.weekId).sort(), lastId=ids[ids.length-1], W=S.weeks.find(w=>w.weekId===lastId);
+  if(!W||!S.loaded.get(lastId)) return '';
+  const rowsAll=[...S.loaded.entries()].flatMap(([id,v])=>v.agents.filter(a=>!a.exclu).map(a=>{ a.weekId=a.weekId||id; return a; }));
+  const pks=new Set(S.loaded.get(lastId).agents.filter(a=>!a.exclu&&(!S.selAgences||S.selAgences.includes(a.agence))&&(!S.selMetiers||S.selMetiers.includes(a.metier))
+    &&(!S.selAgents||!S.selAgents.length||S.selAgents.includes(personKey(a)))).map(personKey));
+  const t=trameSemaine(rowsAll,lastId,pks,S.rules); if(!t||!t.agents.length) return '';
+  const JC=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'], A=accordOf(S.rules);
+  const cell=c=>c.t==='RP'?'<td class="tr-rp">RP</td>':`<td class="tr-s"><span>Service</span>${c.notes.map(n=>`<span class="nt">${esc(n)}</span>`).join('')}</td>`;
+  const grps=[...new Set(t.agents.map(a=>a.grp))];
+  const lignes=grps.map(gk=>{ const l=t.agents.filter(a=>a.grp===gk), [ag,me]=gk.split('|'), e=t.eff[gk], c=t.cible[gk]||[];
+    return `<tr class="tr-g"><td class="l" colspan="10"><b>${esc(ag)}</b> · ${esc(me)} <span class="mut">${l.length} agent${l.length>1?'s':''}</span></td></tr>`+
+      l.map(a=>`<tr><td class="l"><span class="nm">${esc(a.nom)}</span>${a.absent?' <span class="pill pill-w" title="code d’absence ou de congé toute la semaine précédente : à confirmer">absent S-1</span>':''}</td>${a.cases.map(cell).join('')}
+        <td title="RP pris depuis le 1er janvier / dus à la fin de la semaine">${a.n} RP <span class="mut">(${nf(a.pris)} / ${nf(a.dus,1)})</span></td>
+        <td class="l sm">${a.g?`GPT en cours : ${a.g} j`:a.k?`${a.k} RP en fin de S-1`:''}${a.weObl?' · <b>week-end à donner ce mois</b>':a.weFait?' · week-end du mois fait':''}${a.alerte?` · <span class="warn">${esc(a.alerte)}</span>`:''}</td></tr>`).join('')+
+      `<tr class="tr-f"><td class="l">En service <span class="mut">(habituel)</span></td>${e.map((v,d)=>`<td>${v} <span class="mut">(${nf(c[d]||0,1)})</span></td>`).join('')}<td></td><td></td></tr>`; }).join('');
+  const nx=isoD(new Date(Date.parse(W.monday+'T00:00:00Z')+7*DAY)), sid=weekLabel(isoWeek(new Date(Date.parse(nx+'T00:00:00Z'))))
+  return `<section class="card"><div class="card-h"><div><h2>Planning type — ${sid}</h2><p class="card-s">trame service / repos proposée pour la semaine du ${dFull(nx)} au ${dFull(t.jours[6])}, à partir de la dernière semaine importée (${weekLabel(W)}) · sans trains</p></div></div>
+    <div class="card-b stack"><div class="note">Pour chaque agent : RP de la semaine = repos dus à la fin de la semaine (accord : ${nfa(A.roulant.rpAn)} par an pour les conducteurs, ${nfa(A.continuite.rpAn)} pour les AFR et coordinateurs, au prorata des jours présents) moins les RP pris depuis le 1er janvier, entre 2 et 3, en un seul bloc (repos double ou triple). Le bloc est placé pour que la grande période de travail en cours ne dépasse pas ${nfa(A.gptMax)} jours, sans plus de ${nfa(A.rpConsecMax)} RP d’affilée avec ceux de la fin de semaine précédente, sur le samedi-dimanche quand le mois n’en a pas encore eu (obligatoire au dernier samedi du mois), pas deux week-ends de suite sinon, puis pour équilibrer le nombre d’agents en service chaque jour (entre parenthèses : moyenne des ${t.semaines.length} dernières semaines). Les heures notées viennent de l’accord (repos journalier, veille et lendemain de repos). Congés et absences de la semaine à venir ne sont pas connus : à ajuster.</div>
+    <div class="tw tall"><table class="trame"><thead><tr><th class="l">Agent</th>${t.jours.map((d,i)=>`<th>${JC[i]} ${dISO(d)}</th>`).join('')}<th>Repos</th><th class="l">État S-1</th></tr></thead><tbody>${lignes}</tbody></table></div></div></section>`;
 }
 /* ---------- journées blanches ---------- */
 function viewBlanches(){
