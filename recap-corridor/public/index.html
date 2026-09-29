@@ -3702,7 +3702,7 @@ async function planifContexte(id){
   const ctx={res:{},resAg:{},fins:{},lieux:{},gpt:{},rpFin:{},trajets:planifTrajets(ids.map(x=>S.parsedCache.get(x)).filter(Boolean))}, R=effRules();
   for(const x of [prevId,refId].filter(Boolean)) for(const a of (S.loaded.get(x)||{agents:[]}).agents){
     const l=[a.residence,...(a.rattachement||a.residencePerso?[]:((R.lieuxResidence||{})[a.agence]||[]))].filter(Boolean).map(normLieu);
-    if(l.length) ctx.res[personKey(a)]=l; if(a.residence&&!ctx.resAg[a.agence]) ctx.resAg[a.agence]=[normLieu(a.residence)]; }
+    if(l.length) ctx.res[personKey(a)]=l; if(a.residence&&!a.residencePerso&&!a.rattachement&&!ctx.resAg[a.agence]) ctx.resAg[a.agence]=[normLieu(a.residence)]; }   // résidence propre d'un agent : jamais celle de son agence
   const prec=prevId&&S.parsedCache.get(prevId);
   if(prec) for(const b of prec.agents){ const pk=personKey(b), ms=b.jours.flatMap(j=>j.missions||[]).filter(m=>m.end).sort((x,y)=>x.end.localeCompare(y.end));
     if(ms.length){ const l=ms[ms.length-1]; ctx.fins[pk]=Date.parse(l.end); if(l.to) ctx.lieux[pk]=normLieu(l.to); }

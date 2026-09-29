@@ -202,8 +202,9 @@ Seuil des trains réguliers réglable dans la page (1 à 4 fois sur 4 semaines, 
   (`pourquoi`). `planifRelier` refait tous les trajets seuls après chaque changement (y compris à la main) ; liaison
   impossible → alerte « retour à organiser » (une fois, l'agent est ensuite compté rentré). Contexte (`planifContexte`) :
   résidences de l'agent (règles du site, résidence propre de la fiche comprise), état de fin de S-1, horaires observés sur
-  toutes les semaines chargées. Résidence inconnue ⇒ aucun contrôle de retour. Remarque données S35 : une AFR de Hendaye
-  finit toutes ses journées à BYE → alerte, à corriger dans sa fiche (résidence propre) si c'est sa résidence (non déduit).
+  toutes les semaines chargées. Résidence inconnue ⇒ aucun contrôle de retour. Résidence propre d'un agent (fiche) prise
+  en compte, jamais étendue à son agence (précisé par l'utilisateur : l'unique AFR de Bayonne est rattaché à l'agence de
+  Hendaye mais prend et finit toujours son service à Bayonne ; résidence propre BYE déjà saisie sur les deux sites).
 - Interface : bandeau de synthèse (`plSynthese` : missions placées, à placer, TTE moyen, sous / au-dessus de 35 h, nuits en
   RHR, trajets seuls ajoutés, alertes) ; sous chaque nom, heures / 35 h avec barre (ambre sous, rouge au-dessus), RHR et
   trajets ajoutés (`plStats`) ; dans les cases « depuis X (RHR) » et « ☾ RHR · X » ; trajets ajoutés en pointillé (non
