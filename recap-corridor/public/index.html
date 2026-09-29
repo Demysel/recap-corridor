@@ -3129,6 +3129,8 @@ const COLS=[
   {g:'temps',k:'pauseTotaleMin',l:'Pauses',f:a=>{const v=pv(a,'pauseTotaleMin');return v?nf(v)+' min':'<span class="z">—</span>';}},
   {g:'temps',k:'heuresNuit',l:'H. nuit',f:numF('heuresNuit',fmtH)},
   {g:'temps',k:'heuresDimanche',l:'H. dimanche',f:numF('heuresDimanche',fmtH)},
+  {g:'temps',k:'rjMin',l:'RJ au minimum',f:a=>a.rjMin?`<button class="lk" data-cdet="rjmin|${esc(personKey(a))}" title="Repos journaliers à résidence égaux au minimum : 13 h conducteurs, 12 h AFR / coordo — cliquez pour le détail">${nf(a.rjMin)}</button>`:'<span class="z">0</span>',t:a=>a.rjMin},
+  {g:'temps',k:'rjSous',l:'RJ sous le minimum',f:a=>a.rjSous?`<button class="lk warn" data-cdet="rjsous|${esc(personKey(a))}" title="Repos journaliers à résidence plus courts que le minimum : 13 h conducteurs, 12 h AFR / coordo — cliquez pour le détail">${nf(a.rjSous)}</button>`:'<span class="z">0</span>',t:a=>a.rjSous},
   {g:'paniers',k:'nbPaniers',l:'Paniers'},
   {g:'paniers',k:'ratioPanierJS',l:'Panier / JS',f:a=>a.ratioPanierJS?nf(a.ratioPanierJS,2):'<span class="z">0</span>',t:a=>a.ratioPanierJS},
   // une seule colonne : journées blanches, avec en petit les cases vides (qui les contiennent) — demandé par l'utilisateur
@@ -3141,8 +3143,6 @@ const COLS=[
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
-  {g:'temps',k:'rjMin',l:'RJ au minimum',f:a=>a.rjMin?`<button class="lk" data-cdet="rjmin|${esc(personKey(a))}" title="Repos journaliers à résidence égaux au minimum : 13 h conducteurs, 12 h AFR / coordo — cliquez pour le détail">${nf(a.rjMin)}</button>`:'<span class="z">0</span>',t:a=>a.rjMin},
-  {g:'temps',k:'rjSous',l:'RJ sous le minimum',f:a=>a.rjSous?`<button class="lk warn" data-cdet="rjsous|${esc(personKey(a))}" title="Repos journaliers à résidence plus courts que le minimum : 13 h conducteurs, 12 h AFR / coordo — cliquez pour le détail">${nf(a.rjSous)}</button>`:'<span class="z">0</span>',t:a=>a.rjSous},
   {g:'absences',k:'autresVides',l:'Autres cases vides',f:a=>a.autresVides?`<button class="lk" data-cdet="autres|${esc(personKey(a))}" title="Cases vides qui ne sont pas des journées blanches : cliquez pour le détail jour par jour">${nf(a.autresVides)}</button>`:'<span class="z">0</span>',t:a=>a.autresVides},
   {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<button class="lk" data-cdet="hors|${esc(personKey(a))}" title="Jours où l’agent n’est dans aucun fichier : cliquez pour le détail (arrivée, départ, autre agence, agence hors production, agent exclu)">${nf(a.horsFichier)}</button>`:'<span class="z">0</span>',t:a=>a.horsFichier},
   {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<button class="lk" data-cdet="nonclasses|${esc(personKey(a))}" title="Jours présents dans les fichiers mais rangés dans aucune colonne : cliquez pour le détail">${nf(a.nonClasses)}</button>`:'<span class="z">0</span>',t:a=>a.nonClasses},
