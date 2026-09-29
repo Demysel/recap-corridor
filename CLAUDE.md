@@ -89,9 +89,15 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Page : `lgForm` / `lgValider` (connexion, inscription, oubli, nouveau mot de passe), `reprendre` (session mémorisée,
   prefs `jeton`), onglets « Utilisateurs » (droit admin) et « Mon compte » (droits, changer de mot de passe).
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
-  ont été ajoutés directement dans Supabase (`recap_dev`) ; à refaire dans `recap` lors du passage sur le principal.
+  ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
+  `APP_URL` réglée sur les deux services Render.
 
 ## Onglet Production (demandé par l'utilisateur, admin seulement, groupe Pilotage)
+
+**Encore en travail** (demandé par l'utilisateur) : Production et Planification ne s'affichent que sur le site de test
+(`EN_TRAVAIL`, `enTest()` = page marquée `data-env="dev"`) ; sur le principal, onglets masqués ainsi que les réglages
+« Production » et « Accord d'entreprise » (valeurs par défaut de l'accord utilisées, notamment par les colonnes RJ).
+Le code est le même sur les deux branches ; retirer un onglet de `EN_TRAVAIL` pour le publier.
 
 Chiffres orientés production, calculés sur le planning seulement (ni réalisé, ni effectif théorique, ni coûts) par
 `productionData(rows, pool, rules)` (moteur, testé) sur le périmètre et la période du filtre principal ; `viewProduction`.
