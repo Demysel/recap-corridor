@@ -68,7 +68,8 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 ## Comptes e-mail et droits (demandé par l'utilisateur)
 
 - Connexion par **e-mail + mot de passe** (écran par défaut) ; les **codes d'accès restent valables en parallèle** (onglet
-  « Code d'accès »). Choix de l'utilisateur : Brevo pour les e-mails, 5 droits séparés, inscription libre + validation.
+  « Code d'accès »). Choix de l'utilisateur : 5 droits séparés, inscription libre + validation, **aucun e-mail envoyé**
+  (Brevo abandonné : SMS de confirmation jamais reçu ; l'admin transmet lui-même les liens par SMS, WhatsApp…).
 - **Droits** (`DROITS`, `capsDe`) : `vitrine` (statistiques anonymes), `coco` (vue covoiturage), `lecture` (consultation
   complète nominative, sans rien modifier), `modif` (import, réglages, corrections, planification, choix Coco ; comprend
   lecture), `admin` (gestion des comptes ; comprend tout). CODE_ADMIN = tous ; CODE_LECTURE = vitrine ; CODE_COVOIT = coco.
@@ -80,10 +81,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   routes publiques `POST /api/auth/login|inscription|oubli|reinit` (réponses identiques que l'adresse existe ou non ;
   compteur d'essais `echec`) ; `POST /api/auth/logout|mdp` ; `GET|POST|PUT|DELETE /api/utilisateurs` (droit admin :
   liste, invitation avec lien 3 jours, droits / validation / suspension, lien de mot de passe 24 h, suppression ; **le
-  dernier administrateur ne peut être ni retiré ni supprimé**). Lien « mot de passe oublié » valable 1 h (`/?reinit=…`),
-  toutes les sessions fermées après changement. E-mails Brevo (`mail`) : variables Render `BREVO_API_KEY`, `MAIL_FROM`,
-  `APP_URL` ; sans elles rien n'est envoyé et le lien s'affiche à l'administrateur. Les admins validés sont prévenus des
-  nouvelles inscriptions.
+  dernier administrateur ne peut être ni retiré ni supprimé**). « Mot de passe oublié » note la demande (colonne
+  `demande`) : pastille et bandeau dans Utilisateurs, compteur sur l'onglet (inscriptions en attente + demandes) ; l'admin
+  crée le lien (`/?reinit=…`, 24 h, invitation 3 jours, usage unique, bouton « Copier ») et le transmet ; la demande
+  s'efface quand le mot de passe est changé ; toutes les sessions sont fermées après changement. Variable Render `APP_URL`
+  (adresse du site dans les liens).
 - Page : `lgForm` / `lgValider` (connexion, inscription, oubli, nouveau mot de passe), `reprendre` (session mémorisée,
   prefs `jeton`), onglets « Utilisateurs » (droit admin) et « Mon compte » (droits, changer de mot de passe).
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs

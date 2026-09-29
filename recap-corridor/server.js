@@ -9,9 +9,7 @@
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
      CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
      CODE_COVOIT    code « Coco » (copain covoit) : missions de la semaine des seuls agents choisis par l'admin
-     BREVO_API_KEY  clé de l'API Brevo (envoi des e-mails : mot de passe oublié, invitation, nouvelle inscription)
-     MAIL_FROM      adresse d'expédition validée dans Brevo
-     APP_URL        adresse du site (liens des e-mails), ex. https://recap-corridor.onrender.com
+     APP_URL        adresse du site (liens de mot de passe créés par l'admin), ex. https://recap-corridor.onrender.com
      PORT           fourni par Render
      DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
      APP_ENV        « dev » : site de test, couleurs différentes et bandeau « SITE DE TEST »
@@ -75,7 +73,9 @@ function role(req) {
 /* Comptes e-mail + mot de passe (en plus des codes, gardés en parallèle). Cinq droits séparés :
    vitrine (statistiques anonymes), coco (vue covoiturage), lecture (consultation complète, nominative),
    modif (import, réglages, corrections, planification) et admin (gestion des utilisateurs). admin ⇒ tous ; modif ⇒ lecture.
-   Mots de passe : empreinte scrypt seulement. Sessions et liens de réinitialisation : seule l'empreinte SHA-256 du jeton est gardée. */
+   Mots de passe : empreinte scrypt seulement. Sessions et liens de réinitialisation : seule l'empreinte SHA-256 du jeton est gardée.
+   Aucun e-mail envoyé (choix de l'utilisateur) : l'admin crée les liens (invitation, nouveau mot de passe) et les transmet lui-même ;
+   « mot de passe oublié » et les inscriptions apparaissent dans Administration → Utilisateurs. */
 const DROITS = ['vitrine', 'coco', 'lecture', 'modif', 'admin'];
 function capsDe(d) {
   const c = Object.fromEntries(DROITS.map((k) => [k, !!(d && d[k])]));
@@ -108,6 +108,7 @@ async function tablesAuth(p) {
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     create table if not exists ${SCHEMA}.jetons_mdp (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+    alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
     alter table ${SCHEMA}.jetons_mdp enable row level security;`);
@@ -127,26 +128,12 @@ async function acces(req) {
   const caps = u.valide ? capsDe(u.droits) : capsDe({});   // droits relus à chaque appel : un retrait prend effet tout de suite
   return { role: roleDe(caps), caps, user: { email: u.email, nom: u.nom } };
 }
-/** Adresse du site pour les liens des e-mails : APP_URL, sinon l'hôte Render de la requête (jamais un hôte arbitraire) */
+/** Adresse du site pour les liens de mot de passe : APP_URL, sinon l'hôte Render de la requête (jamais un hôte arbitraire) */
 function base(req) {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, '');
   const h = String(req.headers.host || '');
   return /^[a-z0-9-]+\.onrender\.com$/i.test(h) ? 'https://' + h : /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(h) ? 'http://' + h : null;
 }
-const escH = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-/** Envoi d'un e-mail par l'API Brevo ; sans clé configurée, rien n'est envoyé (renvoie false) */
-async function mail(to, sujet, html) {
-  if (!process.env.BREVO_API_KEY || !process.env.MAIL_FROM) { console.warn('E-mail non envoyé (BREVO_API_KEY ou MAIL_FROM absente) :', sujet); return false; }
-  try {
-    const r = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST',
-      headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + 'Récap Corridor' }, to: [{ email: to }], subject: (DEV ? '[TEST] ' : '') + sujet,
-        htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px">${html}<p style="color:#888;font-size:12px;margin-top:24px">Récap Corridor — message automatique, merci de ne pas y répondre.</p></div>` }) });
-    if (!r.ok) { console.error('Brevo a refusé l’envoi :', r.status, (await r.text()).slice(0, 300)); return false; }
-    return true;
-  } catch (e) { console.error('Brevo injoignable :', e.message); return false; }
-}
-const bouton = (href, txt) => `<p><a href="${escH(href)}" style="display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">${escH(txt)}</a></p><p style="font-size:12px;color:#666">Ou copiez ce lien : ${escH(href)}</p>`;
 /** Lien de réinitialisation (ou d'invitation) : jeton aléatoire, empreinte seule en base */
 async function lienMdp(p, req, email, heures) {
   const j = jetonNeuf();
@@ -183,22 +170,14 @@ async function authPublique(req, res, route, ip) {
     if (!EMAIL.test(email)) return json(req, res, 400, { error: 'Adresse e-mail invalide.' });
     if (!nom) return json(req, res, 400, { error: 'Indiquez votre nom.' });
     if (!mdpValide(body.mdp)) return json(req, res, 400, { error: 'Le mot de passe doit faire au moins 10 caractères.' });
-    const ins = await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash) values ($1, $2, $3) on conflict (email) do nothing returning email`, [email, nom, await hacher(body.mdp)]);
-    if (ins.rowCount) {   // prévient les administrateurs
-      const adm = (await p.query(`select email from ${SCHEMA}.utilisateurs where valide and (droits->>'admin')::boolean is true`)).rows;
-      const b = base(req);
-      for (const a of adm) await mail(a.email, 'Nouvelle inscription à valider', `<p>${escH(nom)} (${escH(email)}) a créé un compte sur Récap Corridor.</p><p>Il n’a aucun droit tant que vous ne l’avez pas validé dans Administration → Utilisateurs.</p>${b ? bouton(b + '/', 'Ouvrir Récap Corridor') : ''}`);
-    }
-    // même réponse si l'adresse existe déjà : on ne révèle pas qui est inscrit
+    await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash) values ($1, $2, $3) on conflict (email) do nothing`, [email, nom, await hacher(body.mdp)]);
+    // le compte apparaît « en attente » dans Administration → Utilisateurs ; même réponse si l'adresse existe déjà : on ne révèle pas qui est inscrit
     return json(req, res, 200, { ok: true });
   }
   if (route === 'auth/oubli') {
     echec(ip);
-    const u = EMAIL.test(email) && (await p.query(`select email, nom from ${SCHEMA}.utilisateurs where email = $1 and valide`, [email])).rows[0];
-    if (u) {
-      const lien = await lienMdp(p, req, u.email, 1);
-      if (lien) await mail(u.email, 'Réinitialisation de votre mot de passe', `<p>Bonjour${u.nom ? ' ' + escH(u.nom) : ''},</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :</p>${bouton(lien, 'Choisir un nouveau mot de passe')}<p>Si vous n’avez rien demandé, ignorez ce message.</p>`);
-    }
+    // la demande est notée : l'admin la voit dans Utilisateurs et transmet lui-même un lien
+    if (EMAIL.test(email)) await p.query(`update ${SCHEMA}.utilisateurs set demande = now() where email = $1`, [email]);
     return json(req, res, 200, { ok: true });   // même réponse que l'adresse existe ou non
   }
   if (route === 'auth/reinit') {
@@ -206,7 +185,7 @@ async function authPublique(req, res, route, ip) {
     if (!mdpValide(body.mdp)) return json(req, res, 400, { error: 'Le mot de passe doit faire au moins 10 caractères.' });
     const t = JETON.test(j) && (await p.query(`delete from ${SCHEMA}.jetons_mdp where jeton = $1 and expire > now() returning email`, [sha(j)])).rows[0];
     if (!t) { echec(ip); return json(req, res, 400, { error: 'Lien expiré ou déjà utilisé. Refaites « Mot de passe oublié ».' }); }
-    await p.query(`update ${SCHEMA}.utilisateurs set hash = $2, maj = now() where email = $1`, [t.email, await hacher(body.mdp)]);
+    await p.query(`update ${SCHEMA}.utilisateurs set hash = $2, demande = null, maj = now() where email = $1`, [t.email, await hacher(body.mdp)]);
     await p.query(`delete from ${SCHEMA}.sessions where email = $1`, [t.email]);   // toutes les sessions ouvertes sont fermées
     return json(req, res, 200, { ok: true, email: t.email });
   }
@@ -316,27 +295,22 @@ async function api(req, res, url) {
     await tablesAuth(p);
     const moi = A.user ? A.user.email : '';
     if (req.method === 'GET') {
-      const q = await p.query(`select email, nom, droits, valide, cree, derniere from ${SCHEMA}.utilisateurs order by valide, lower(nom), email`);
-      return json(req, res, 200, { utilisateurs: q.rows, moi, mail: !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM) });
+      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
+      return json(req, res, 200, { utilisateurs: q.rows, moi });
     }
     if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
       const body = await readBody(req), email = emailNorm(body.email), nom = String(body.nom || '').trim().slice(0, 120);
       if (!EMAIL.test(email)) return json(req, res, 400, { error: 'Adresse e-mail invalide.' });
       const ins = await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash, droits, valide) values ($1, $2, 'aucun', $3, true) on conflict (email) do nothing`, [email, nom, droitsPropres(body.droits)]);
       if (!ins.rowCount) return json(req, res, 409, { error: 'Cette adresse a déjà un compte.' });
-      const lien = await lienMdp(p, req, email, 72);
-      const envoye = lien ? await mail(email, 'Invitation à Récap Corridor', `<p>Bonjour${nom ? ' ' + escH(nom) : ''},</p><p>Un compte Récap Corridor a été créé pour vous. Choisissez votre mot de passe avec ce lien (valable 3 jours) :</p>${bouton(lien, 'Choisir mon mot de passe')}`) : false;
-      return json(req, res, 200, { ok: true, lien, envoye });
+      return json(req, res, 200, { ok: true, lien: await lienMdp(p, req, email, 72) });
     }
     if (req.method === 'PUT') {
       const body = await readBody(req), email = emailNorm(body.email);
       const u = (await p.query(`select email, nom, droits, valide from ${SCHEMA}.utilisateurs where email = $1`, [email])).rows[0];
       if (!u) return json(req, res, 404, { error: 'Compte introuvable.' });
-      if (body.action === 'reinit') {   // lien de réinitialisation envoyé par e-mail et affiché à l'administrateur
-        const lien = await lienMdp(p, req, email, 24);
-        const envoye = lien ? await mail(email, 'Réinitialisation de votre mot de passe', `<p>Un administrateur vous a envoyé un lien pour choisir un nouveau mot de passe (valable 24 heures) :</p>${bouton(lien, 'Choisir un nouveau mot de passe')}`) : false;
-        return json(req, res, 200, { ok: true, lien, envoye });
-      }
+      if (body.action === 'reinit')   // lien de réinitialisation, transmis par l'administrateur lui-même
+        return json(req, res, 200, { ok: true, lien: await lienMdp(p, req, email, 24) });
       const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;
       const restaitAdmin = valide && !!droits.admin;
       if (u.valide && u.droits && u.droits.admin && !restaitAdmin && !(await nbAdmins(p, email)))
@@ -344,7 +318,6 @@ async function api(req, res, url) {
       const nom = body.nom != null ? String(body.nom).trim().slice(0, 120) : u.nom;
       await p.query(`update ${SCHEMA}.utilisateurs set droits = $2, valide = $3, nom = $4, maj = now() where email = $1`, [email, droits, valide, nom]);
       if (!valide) await p.query(`delete from ${SCHEMA}.sessions where email = $1`, [email]);
-      if (valide && !u.valide) { const b = base(req); await mail(email, 'Votre compte est validé', `<p>Votre compte Récap Corridor a été validé par un administrateur.</p>${b ? bouton(b + '/', 'Se connecter') : ''}`); }
       return json(req, res, 200, { ok: true });
     }
     if (req.method === 'DELETE') {

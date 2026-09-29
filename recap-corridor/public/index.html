@@ -2919,11 +2919,11 @@ function stable(id,cols,rows,opt={}){
 
 function renderTabs(){
   const sc=scopeAgents();
-  const cnt={verifier:S.alN,agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length};
+  const cnt={verifier:S.alN,agents:new Set(sc.map(personKey)).size,rhr:sc.reduce((s,a)=>s+a.nbRHR,0),blanches:sc.reduce((s,a)=>s+a.journeesBlanches,0),import:S.weeks.length,utilisateurs:S.users?(S.users.utilisateurs||[]).filter(u=>!u.valide||u.demande).length||null:null};
   const vis=TABS.filter(tabVisible), grps=[...new Set(vis.map(t=>t.g))];
   el('tabs').innerHTML=grps.map(g=>`<div class="ngrp">${grps.length>1?`<div class="nglab">${g}</div>`:''}${vis.filter(t=>t.g===g).map(t=>
     `<button class="tab" role="tab" data-tab="${t.k}" aria-selected="${S.tab===t.k}" title="${t.l}"><svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${TI[t.k]}"/></svg><span class="tl">${t.l}</span>${
-      cnt[t.k]!=null&&S.weeks.length?`<span class="cnt${t.k==='verifier'&&cnt[t.k]?' hot':''}">${nf(cnt[t.k])}</span>`:''}</button>`).join('')}</div>`).join('');
+      cnt[t.k]!=null&&(S.weeks.length||t.k==='utilisateurs')?`<span class="cnt${(t.k==='verifier'||t.k==='utilisateurs')&&cnt[t.k]?' hot':''}">${nf(cnt[t.k])}</span>`:''}</button>`).join('')}</div>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
   el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture','mentions'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
   { const rl=S.role==='admin'?(peut('modif')?'Accès complet':'Consultation'):S.role==='covoit'?'Coco · covoiturage':S.role==='mixte'?'Vitrine + Coco':S.role==='aucun'?'En attente de droits':'Visiteur · anonyme';
@@ -5396,7 +5396,7 @@ function lgForm(){
     ${champ('lgMdp','Mot de passe (10 caractères au moins)','password','','new-password')}${champ('lgMdp2','Confirmer le mot de passe','password','','new-password')}
     <p class="lg-n">Le compte n’a aucun droit tant qu’un administrateur ne l’a pas validé.</p>${go('Créer le compte')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
   if(m==='oubli') return `<h2 style="font-size:16px">Mot de passe oublié</h2>${champ('lgMail','E-mail du compte','email','prenom.nom@…','email',S.lgMail||'')}
-    ${go('Recevoir un lien')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
+    <p class="lg-n">Aucun e-mail n’est envoyé : votre demande apparaît chez les administrateurs, qui vous transmettent un lien.</p>${go('Prévenir un administrateur')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
   if(m==='reinit') return `<h2 style="font-size:16px">Nouveau mot de passe</h2>${champ('lgMdp','Nouveau mot de passe (10 caractères au moins)','password','','new-password')}${champ('lgMdp2','Confirmer','password','','new-password')}
     ${go('Enregistrer')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
   return `${tabs}${champ('lgMail','E-mail','email','prenom.nom@…','username',S.lgMail||'')}${champ('lgMdp','Mot de passe','password','','current-password')}
@@ -5412,9 +5412,9 @@ async function lgValider(){
   try{
     if((m==='inscr'||m==='reinit')&&mdp!==mdp2) throw new Error('Les deux mots de passe ne correspondent pas.');
     if(m==='inscr'){ await withLoad(api.post('auth/inscription',{email:S.lgMail,nom:S.lgNom,mdp}));
-      S.lg='mail'; S.lgInfo='Demande enregistrée. Un administrateur doit valider le compte et vous accorder des droits ; vous serez prévenu par e-mail.'; }
+      S.lg='mail'; S.lgInfo='Demande enregistrée. Un administrateur doit valider le compte et vous accorder des droits : prévenez-le, puis connectez-vous.'; }
     if(m==='oubli'){ await withLoad(api.post('auth/oubli',{email:S.lgMail}));
-      S.lgInfo='Si cette adresse a un compte validé, un e-mail avec un lien (valable 1 heure) vient d’être envoyé. Pensez aux indésirables.'; }
+      S.lgInfo='Demande transmise aux administrateurs : ils vous enverront un lien (SMS, message…) pour choisir un nouveau mot de passe.'; }
     if(m==='reinit'){ const r=await withLoad(api.post('auth/reinit',{jeton:S.reinit,mdp}));
       S.reinit=null; try{ history.replaceState(null,'',location.pathname); }catch(_){}
       S.lg='mail'; S.lgMail=r.email||S.lgMail||''; S.lgInfo='Mot de passe enregistré : vous pouvez vous connecter.'; }
@@ -5446,23 +5446,25 @@ function viewUtilisateurs(){
   const L=U.utilisateurs||[], att=L.filter(u=>!u.valide);
   const ligne=u=>{ const d=u.droits||{};
     return `<tr><td class="l nm">${esc(u.nom||'—')}${u.email===U.moi?' <span class="pill pill-n">vous</span>':''}</td><td class="l mono">${esc(u.email)}</td>
-      <td class="l">${u.valide?'<span class="pill pill-g">validé</span>':'<span class="pill pill-w">en attente</span>'}</td>
+      <td class="l">${u.valide?'<span class="pill pill-g">validé</span>':'<span class="pill pill-w">en attente</span>'}${u.demande?' <span class="pill pill-c">mot de passe oublié</span>':''}</td>
       ${DROITS_L.map(([k,l])=>{ const impl=(k!=='admin'&&d.admin)||(k==='lecture'&&d.modif);
         return `<td><input type="checkbox" data-udr="${esc(u.email)}|${k}"${d[k]||impl?' checked':''}${impl?' disabled':''} title="${l}${impl?' (compris dans un droit supérieur)':''}" aria-label="${l}"></td>`; }).join('')}
       <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.valide?`<button class="btn btn-sm" data-uval="${esc(u.email)}" data-v="">Suspendre</button>`:`<button class="btn btn-sm btn-pri" data-uval="${esc(u.email)}" data-v="1">Valider</button>`}
-        <button class="btn btn-sm" data-ureinit="${esc(u.email)}" title="Envoie un lien pour choisir un nouveau mot de passe (valable 24 h)">Lien mot de passe</button>
+        <button class="btn btn-sm${u.demande?' btn-pri':''}" data-ureinit="${esc(u.email)}" title="Crée un lien pour choisir un nouveau mot de passe (valable 24 h), à transmettre vous-même">Lien mot de passe</button>
         <button class="btn btn-sm dgr" data-udel="${esc(u.email)}">Supprimer</button></span></td>
       <td class="l mono">${fmtDH(u.derniere)}</td></tr>`; };
   const cases=DROITS_L.map(([k,l])=>`<label style="display:inline-flex;gap:6px;align-items:center;margin-right:12px"><input type="checkbox" data-uinv="${k}"${k==='vitrine'?' checked':''}> ${l}</label>`).join(' ');
-  return `${U.mail?'':`<div class="note w"><b>Envoi d’e-mails non configuré</b> : ajoutez BREVO_API_KEY et MAIL_FROM dans les variables Render. En attendant, les liens de mot de passe s’affichent ici pour être transmis à la main.</div>`}
-  ${S.uLien?`<div class="note"><b>Lien${S.uLien.envoye?' envoyé par e-mail à':' à transmettre à'} ${esc(S.uLien.email)}</b>${S.uLien.lien?` : <span class="mono" style="word-break:break-all">${esc(S.uLien.lien)}</span>`:' (adresse du site inconnue : renseignez APP_URL dans Render)'}</div>`:''}
+  const dem=L.filter(u=>u.demande);
+  return `${S.uLien?`<div class="note"><b>Lien à transmettre à ${esc(S.uLien.email)}</b> (SMS, WhatsApp…) — ${esc(S.uLien.duree)}, une seule utilisation :
+    ${S.uLien.lien?`<span class="mono" style="word-break:break-all">${esc(S.uLien.lien)}</span> <button class="btn btn-sm" id="uCopy">Copier</button>`:'adresse du site inconnue : renseignez APP_URL dans Render'}</div>`:''}
+  ${dem.length?`<div class="note w"><b>Mot de passe oublié</b> : ${dem.map(u=>`${esc(u.nom||u.email)} (${fmtDH(u.demande)})`).join(', ')} — cliquez « Lien mot de passe » sur sa ligne et transmettez le lien.</div>`:''}
   <section class="card"><div class="card-h"><div><h2>Comptes</h2><p class="card-s">${nf(L.length)} compte${L.length>1?'s':''}${att.length?` · <b>${nf(att.length)} en attente de validation</b>`:''} · les codes d’accès restent valables en parallèle</p></div></div>
     <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
       <tbody>${L.map(ligne).join('')}</tbody></table></div>`:'<p class="mut">Aucun compte.</p>'}
     <p class="lg-n mt"><b>Vitrine</b> : statistiques anonymes · <b>Coco</b> : vue covoiturage · <b>Consultation complète</b> : tous les onglets nominatifs, sans rien modifier ·
       <b>Modification</b> : import, réglages, corrections, planification (comprend la consultation) · <b>Administration</b> : gestion des comptes (comprend tout).
       Un changement de droits prend effet tout de suite. Le dernier administrateur ne peut être ni retiré ni supprimé.</p></div></section>
-  <section class="card"><div class="card-h"><div><h2>Inviter une personne</h2><p class="card-s">compte validé avec les droits cochés ; la personne choisit son mot de passe avec le lien reçu (valable 3 jours)</p></div></div>
+  <section class="card"><div class="card-h"><div><h2>Inviter une personne</h2><p class="card-s">compte validé avec les droits cochés ; un lien s’affiche (valable 3 jours) : transmettez-le, la personne y choisit son mot de passe</p></div></div>
     <div class="card-b"><div class="frow"><label class="fld"><span class="flabel">E-mail</span><input type="email" id="uiMail" style="width:240px"></label>
       <label class="fld"><span class="flabel">Nom</span><input type="text" id="uiNom" style="width:200px"></label></div>
       <div class="frow mt">${cases}</div><p class="mt"><button class="btn btn-pri" id="uiGo">Inviter</button></p></div></section>`;
@@ -5694,13 +5696,13 @@ async function actionComptes(b){
       if(!on&&!confirm(`Suspendre le compte ${email} ? La personne est déconnectée et ne peut plus se connecter.`)) return;
       await withLoad(api.userSet({email,valide:on})); S.msg={m:on?`Compte ${email} validé${Object.keys((S.users.utilisateurs.find(u=>u.email===email)||{}).droits||{}).length?'':' — cochez maintenant ses droits'}.`:`Compte ${email} suspendu.`}; }
     if(b.dataset.ureinit!=null){ const email=b.dataset.ureinit;
-      const r=await withLoad(api.userSet({email,action:'reinit'})); S.uLien={email,lien:r.lien,envoye:r.envoye}; }
+      const r=await withLoad(api.userSet({email,action:'reinit'})); S.uLien={email,lien:r.lien,duree:'valable 24 h'}; }
     if(b.dataset.udel!=null){ const email=b.dataset.udel; if(!confirm(`Supprimer définitivement le compte ${email} ?`)) return;
       await withLoad(api.userDel(email)); S.msg={m:`Compte ${email} supprimé.`}; }
     if(b.id==='uiGo'){ const email=v('uiMail').trim(), nom=v('uiNom').trim(), droits={};
       document.querySelectorAll('[data-uinv]').forEach(c=>{ if(c.checked) droits[c.dataset.uinv]=true; });
       if(!email) throw new Error('Indiquez l’e-mail de la personne à inviter.');
-      const r=await withLoad(api.userInvite({email,nom,droits})); S.uLien={email,lien:r.lien,envoye:r.envoye}; }
+      const r=await withLoad(api.userInvite({email,nom,droits})); S.uLien={email,lien:r.lien,duree:'valable 3 jours'}; }
     await loadUsers();
   }catch(e){ S.msg={m:e.message,t:'c'}; render(); }
 }
@@ -5711,6 +5713,7 @@ document.addEventListener('click',async e=>{
     '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-cdet],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-cocow],[data-cocoadd],[data-cocodel],[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
     if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
+  if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
   { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
     if(b){ await actionComptes(b); return; } }
   if(S.tab==='planif'&&admin()){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd')||{id:'',dataset:{}};
@@ -6081,6 +6084,7 @@ async function boot(){
     if(!S.selAgences){ const pr=['Hendaye'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
     if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
     S.mentions=await api.mentions().catch(()=>({}))||{}; S.mnDraft=null;
+    if(backend.mode==='web'&&peut('admin')) api.users().then(u=>{ S.users=u; renderTabs(); }).catch(()=>{});   // compteur : inscriptions à valider, mots de passe oubliés
     if(S.tab==='compte'){ render(); if(S.role==='admin') await ensureLoaded(toLoad()); }
     else if(S.tab==='utilisateurs'){ render(); await loadUsers(); }
     else if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
