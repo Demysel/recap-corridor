@@ -123,6 +123,8 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line-2);bord
 .side-f{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
 .sf-b{display:flex;gap:0}
 .side-f .ib{width:30px;height:30px}
+/* nom ou e-mail du compte : coupé (…) pour ne jamais repousser les boutons, dont « Se déconnecter » */
+#rolebadge{flex:1 1 auto;min-width:0}#rolebadge .badge{max-width:100%}#rolebadge .bl-t{overflow:hidden;text-overflow:ellipsis}#rolebadge .badge::before{flex-shrink:0}.side-f .sf-b{flex-shrink:0}
 .main{min-width:0;padding:0 32px 70px}
 
 /* navigation : sections regroupées ; la section active est marquée par un rail rouge */
@@ -5435,6 +5437,7 @@ function viewCompte(){
   const pw=(id,l,ac)=>`<label class="fld"><span class="flabel">${l}</span><input type="password" id="${id}" autocomplete="${ac}" style="width:220px"></label>`;
   return `<section class="card"><div class="card-h"><div><h2>Mon compte</h2><p class="card-s">${esc(u.email||'')}</p></div></div>
     <div class="card-b"><p>Nom : <b>${esc(u.nom||'—')}</b></p>
+    <p class="mt"><button class="btn btn-sm" data-act="out">Se déconnecter</button></p>
     <p class="mt">Droits : ${DROITS_L.filter(([k])=>c[k]).map(([,l])=>`<span class="pill pill-a">${l}</span>`).join(' ')||'<span class="pill pill-w">aucun pour l’instant — un administrateur doit vous en accorder</span>'}</p></div></section>
   <section class="card"><div class="card-h"><div><h2>Changer de mot de passe</h2><p class="card-s">10 caractères au moins ; vos autres appareils seront déconnectés</p></div></div>
     <div class="card-b"><div class="frow">${pw('cpA','Mot de passe actuel','current-password')}${pw('cpN','Nouveau mot de passe','new-password')}${pw('cpN2','Confirmer','new-password')}
