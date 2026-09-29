@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -795,4 +795,14 @@ test('Planification : même intitulé mais trajets différents = deux trains ré
   const reg = E.trainsReguliers([mk([2026, 9, 7]), mk([2026, 9, 14])], 2);
   assert.equal(reg.length, 2);
   assert.equal(reg.map((t) => t.from + '>' + t.to).sort().join(), 'BAYONNE>HENDAYE,HENDAYE>IRUN');
+});
+
+test('Repos journaliers à résidence : réduits (sous 13 h) et sous le minimum (11 h conducteurs)', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '17:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '12:00'], ['T2B', 'HENDAYE', 'HENDAYE', 8, '15:00', 8, '20:00']),
+    svc(['T3', 'HENDAYE', 'HENDAYE', 9, '05:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  a.weekId = '2026-S37';
+  const r = E.reposJournaliersCourts([a], E.loadRules(RES));
+  assert.equal(r.reduits.length, 1);   // lundi 17:00 → mardi 05:00 : 12 h
+  assert.equal(r.sous.length, 1);      // mardi 20:00 → mercredi 05:00 : 9 h
+  assert.equal(r.sous[0].h, 9);
 });

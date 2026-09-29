@@ -1999,6 +1999,30 @@ function conformiteData(rows,rulesIn){
   out.sort((x,y)=>x.date.localeCompare(y.date)||x.nom.localeCompare(y.nom));
   return out;
 }
+/** Repos journaliers à résidence courts (demandé par l'utilisateur, tableau des agents) : entre deux jours de service qui se
+    suivent (aucun jour entre les deux), quand la journée précédente finit à la résidence (conducteurs ; AFR / coordo : toujours).
+    « réduit » : sous la durée normale de l'accord (13 h conducteurs, 12 h AFR) mais au moins au plancher ; « sous le minimum » :
+    sous le plancher (11 h conducteurs, 12 h après une journée de nuit ; 10 h AFR). Les RHR ne sont pas comptés (choix de l'utilisateur). */
+function reposJournaliersCourts(rows,rulesIn){
+  const R={...DEFAULT_RULES,...(rulesIn||{})}, A=accordOf(R), out={reduits:[],sous:[]};
+  if(!rows.length) return out;
+  const afr=isAFR(rows[rows.length-1].metier), C=afr?A.continuite:A.roulant;
+  const svc=[];
+  for(const a of [...rows].sort((x,y)=>String(x.weekId).localeCompare(String(y.weekId)))){
+    const rs=new Set([a.residence,...(a.rattachement||a.residencePerso?[]:((R.lieuxResidence||{})[a.agence]||[]))].filter(Boolean).map(normLieu));
+    for(const j of a.jours){ if(j.horsPeriode||j.kind!=='SERVICE'||!(j.missions||[]).length) continue;
+      const ms=[...j.missions].sort((x,y)=>Date.parse(x.start)-Date.parse(y.start)); let nuit=0;
+      for(const m of ms){ const S=Date.parse(m.start),E=Date.parse(m.end); nuit+=hoursInDailyWindow(workSegments(m),C.nuit[0],C.nuit[1],Math.floor(S/DAY)*DAY-DAY,Math.floor(E/DAY)*DAY); }
+      const last=ms.reduce((b,m)=>Date.parse(m.end)>Date.parse(b.end)?m:b,ms[0]);
+      svc.push({date:j.date,s:Date.parse(ms[0].start),e:Date.parse(last.end),to:last.to,res:afr||rs.has(normLieu(last.to)),nuit:nuit>C.nuitSeuil}); } }
+  svc.sort((x,y)=>x.date.localeCompare(y.date));
+  for(let i=1;i<svc.length;i++){ const a=svc[i-1], b=svc[i];
+    if(Math.round((Date.parse(b.date)-Date.parse(a.date))/DAY)!==1||!a.res) continue;
+    const g=(b.s-a.e)/H; if(g<0) continue;
+    const plancher=a.nuit&&!afr?C.rjApresNuit:C.rjReduit, x={date:a.date,fin:new Date(a.e).toISOString(),reprise:new Date(b.s).toISOString(),h:rM(g),plancher,normal:C.rj,nuit:a.nuit};
+    if(g<plancher-1e-9) out.sous.push(x); else if(g<C.rj-1e-9) out.reduits.push(x); }
+  return out;
+}
 /** Équité (demandé par l'utilisateur) : répartition, par semaine de présence, des jours de service, nuit, RHR, DISPO, journées
     blanches, ATCMD, heures sup et week-ends travaillés, comparée à la moyenne de l'agence et du métier de l'agent. */
 const EQUITE=[['joursService','Jours de service'],['heuresNuit','Heures de nuit','h'],['nbRHR','RHR'],['nbDISPO','DISPO'],
@@ -3092,6 +3116,8 @@ const COLS=[
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
+  {g:'temps',k:'rjReduits',l:'RJ réduits',f:a=>a.rjReduits?`<button class="lk" data-cdet="rjred|${esc(personKey(a))}" title="Repos journaliers à résidence sous la durée normale de l’accord (13 h conducteurs, 12 h AFR), au moins au plancher : cliquez pour le détail">${nf(a.rjReduits)}</button>`:'<span class="z">0</span>',t:a=>a.rjReduits},
+  {g:'temps',k:'rjSous',l:'RJ sous le minimum',f:a=>a.rjSous?`<button class="lk warn" data-cdet="rjsous|${esc(personKey(a))}" title="Repos journaliers à résidence sous le plancher de l’accord (11 h conducteurs, 12 h après une journée de nuit ; 10 h AFR) : cliquez pour le détail">${nf(a.rjSous)}</button>`:'<span class="z">0</span>',t:a=>a.rjSous},
   {g:'absences',k:'autresVides',l:'Autres cases vides',f:a=>a.autresVides?`<button class="lk" data-cdet="autres|${esc(personKey(a))}" title="Cases vides qui ne sont pas des journées blanches : cliquez pour le détail jour par jour">${nf(a.autresVides)}</button>`:'<span class="z">0</span>',t:a=>a.autresVides},
   {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<button class="lk" data-cdet="hors|${esc(personKey(a))}" title="Jours où l’agent n’est dans aucun fichier : cliquez pour le détail (arrivée, départ, autre agence, agence hors production, agent exclu)">${nf(a.horsFichier)}</button>`:'<span class="z">0</span>',t:a=>a.horsFichier},
   {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<button class="lk" data-cdet="nonclasses|${esc(personKey(a))}" title="Jours présents dans les fichiers mais rangés dans aucune colonne : cliquez pour le détail">${nf(a.nonClasses)}</button>`:'<span class="z">0</span>',t:a=>a.nonClasses},
@@ -3144,8 +3170,10 @@ function detailControle(kind,pk){
       else if(!c) pq=`absent du fichier de cette semaine (arrivée, départ ou mutation)`;
       else pq='non retrouvé';
       jr.push(`<tr><td class="l mono">${jours.length===7?'toute la semaine':jours.map(d=>`${JS[(new Date(d+'T00:00:00Z').getUTCDay()+6)%7]} ${dISO(d)}`).join(', ')}</td><td class="l mono">${esc(weekLabel(w))}</td><td class="l">${pq}</td></tr>`); } }
-  const T={autres:'Autres cases vides',hors:'Hors fichier',nonclasses:'Non classés'}[kind];
-  openPanel(`${T} — ${a.nom} ${a.prenom}`,`${esc(periodLabel(S.selWeek,S.weeks))} · ${a[{autres:'autresVides',hors:'horsFichier',nonclasses:'nonClasses'}[kind]]} jour(s)`,
+  if(kind==='rjred'||kind==='rjsous'){ for(const x of (a.rjListe||{reduits:[],sous:[]})[kind==='rjred'?'reduits':'sous']){ const id=(rows.find(r=>r.jours.some(j=>j.date===x.date))||{}).weekId;
+      jr.push(ligne(x.date,id,`<b>${fmtH(x.h)}</b> de repos à résidence : fin ${dtISO(x.fin)} → reprise ${dtISO(x.reprise)} (normal ${fmtH(x.normal)}, minimum ${fmtH(x.plancher)}${x.nuit?' après une journée de nuit':''})`)); } }
+  const T={autres:'Autres cases vides',hors:'Hors fichier',nonclasses:'Non classés',rjred:'Repos journaliers réduits',rjsous:'Repos journaliers sous le minimum'}[kind];
+  openPanel(`${T} — ${a.nom} ${a.prenom}`,`${esc(periodLabel(S.selWeek,S.weeks))} · ${a[{autres:'autresVides',hors:'horsFichier',nonclasses:'nonClasses',rjred:'rjReduits',rjsous:'rjSous'}[kind]]} ${kind.startsWith('rj')?'repos':'jour(s)'}`,
     `<section class="card"><div class="card-b">${jr.length?`<div class="tw"><table><thead><tr><th class="l">Jour</th><th class="l">Semaine</th><th class="l">À quoi correspond la case</th></tr></thead><tbody>${jr.join('')}</tbody></table></div>`
       :'<p class="mut">Aucun jour à détailler (écart de calcul : cases de service ou de code comptées ailleurs).</p>'}</div></section>`);
 }
@@ -3162,7 +3190,8 @@ function viewAgents(){
     const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
     o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
     o.autresVides=Math.max(0,(a.joursVides||0)-(a.journeesBlanches||0));
-    o.horsFichier=Math.max(0,jp-presents); o.nonClasses=Math.max(0,presents-o.totalJours-o.autresVides); return o; });
+    o.horsFichier=Math.max(0,jp-presents); o.nonClasses=Math.max(0,presents-o.totalJours-o.autresVides);
+    const rj=reposJournaliersCourts(a.parSemaine||[a],S.rules); o.rjListe=rj; o.rjReduits=rj.reduits.length; o.rjSous=rj.sous.length; return o; });
   const list=sortAgents(merged), cols=visCols().map(c=>c.k==='cpAnnee'?{...c,l:'CP '+yr}:c), nW=nbWeeksLoaded();
   S.rows_agents=list;
   const spans=[]; let cur=null;
