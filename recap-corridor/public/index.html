@@ -265,6 +265,12 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .eqv{padding:1px 6px;border-radius:5px}.eqv.hi{background:color-mix(in srgb,var(--signal) 30%,transparent);font-weight:700}.eqv.lo{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .trame td{vertical-align:top}.trame td.tr-rp{background:color-mix(in srgb,var(--accent) 14%,var(--surface))!important;font-weight:700;text-align:center!important}
 .tr-s span{display:block}.tr-s .nt{font-size:11px;color:var(--ink-3);white-space:nowrap}.tr-g td{background:var(--surface-2)}.tr-f td{font-weight:600;border-top:2px solid var(--line)}
+.planif{table-layout:fixed;min-width:1180px}.planif th:first-child,.planif td:first-child{width:150px}.planif td{vertical-align:top;text-align:left!important}.planif td[data-pdrop]{transition:background .15s}.planif td.pl-over{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.pl-m{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--ink-3);border-radius:6px;padding:4px 6px;margin:4px 0;cursor:grab;text-align:left;font-size:12px;line-height:1.3}
+.pl-m{overflow:hidden}.pl-m b{display:block;overflow-wrap:anywhere}.pl-m small{display:block;color:var(--ink-3);font-size:10.5px;white-space:normal;overflow-wrap:anywhere}.pl-m.reg{border-left-color:var(--signal)}.pl-m.sel{outline:2px solid var(--accent)}
+.pl-c{display:block;font-size:11px;padding:1px 4px;width:auto;margin:0 0 2px auto}.planif td.pl-code{background:color-mix(in srgb,var(--accent) 8%,var(--surface))!important}
+.planif td.pl-al{box-shadow:inset 0 0 0 2px var(--crit,#D00)}.pl-a{font-size:10.5px;line-height:1.3;margin-top:3px;color:var(--crit,#B00);white-space:normal;overflow-wrap:anywhere}.pl-a.info{color:var(--ink-3)}
+.pl-res td{background:color-mix(in srgb,var(--signal) 10%,var(--surface))!important}
 .prod-h3{font-size:14px;margin:6px 0 0}
 .prod-pts{margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45}.warn{color:var(--amber,#B45309)}
 .kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 17px 16px;min-width:0;
@@ -2002,6 +2008,53 @@ function equiteData(rows){
   }
   return {pers,groupes};
 }
+/** Planification (demandé par l'utilisateur) : semaine au choix, missions dans les cases, trains réguliers pré-placés,
+    ajout à la main par glisser-déposer, alertes de l'accord à chaque changement ; brouillon enregistré sur le serveur.
+    Train régulier : même intitulé, même jour de semaine, présent au moins `seuil` fois sur les semaines données (2 sur 4,
+    choix de l'utilisateur) ; horaire, trajet et pauses = ceux qui reviennent le plus ; agent habituel = celui qui l'a fait le plus. */
+function trainsReguliers(weeks,seuil){
+  const G=new Map(), hmOf=t=>{ const d=new Date(t); return d.getUTCHours()*60+d.getUTCMinutes(); };
+  for(const w of weeks){ const d0=Date.parse(w.meta.monday+'T00:00:00Z');
+    for(const a of w.agents||[]) (a.jours||[]).forEach((j,d)=>{ if(j.kind!=='SERVICE') return;
+      for(const m of j.missions||[]){ if(!m.start||!m.end||isATCMD(m)||/DISPO/i.test(m.label||'')) continue;   // ATCMD / DISPO : pas des trains (objectif 0)
+        const k=normLieu(m.label)+'|'+d, s=Date.parse(m.start), e=Date.parse(m.end), base=d0+d*DAY;
+        const x={w:w.meta.weekId,pk:personKey(a),nom:`${a.nom||''} ${a.prenom||''}`.trim(),label:m.label,from:m.from||'',to:m.to||'',
+          s:Math.round((s-base)/6e4),dur:Math.round((e-s)/6e4),pauses:(m.pauses||[]).filter(Array.isArray).map(([p,q])=>[Math.round((Date.parse(p)-base)/6e4),Math.round((Date.parse(q)-base)/6e4)])};
+        if(!G.has(k)) G.set(k,[]); G.get(k).push(x); } }); }
+  const top=(l,f)=>{ const c=new Map(); for(const x of l){ const k=f(x); c.set(k,(c.get(k)||0)+1); } return [...c.entries()].sort((a,b)=>b[1]-a[1])[0][0]; };
+  const out=[];
+  for(const [k,l] of G){ const n=new Set(l.map(x=>x.w)).size; if(n<seuil) continue;
+    const h=top(l,x=>x.s+'|'+x.dur), ref=l.find(x=>x.s+'|'+x.dur===h), pk=top(l,x=>x.pk), od=top(l,x=>x.from+'>'+x.to);
+    out.push({key:k,d:+k.split('|').pop(),label:ref.label,from:od.split('>')[0],to:od.split('>')[1],s:ref.s,dur:ref.dur,pauses:ref.pauses,semaines:n,pk,nom:l.find(x=>x.pk===pk).nom}); }
+  return out.sort((a,b)=>a.d-b.d||a.s-b.s);
+}
+/** Mission d'un train régulier posée sur un jour donné (horaire du train régulier) */
+function missionDuJour(t,date,id){
+  const base=Date.parse(date+'T00:00:00Z'), iso=x=>new Date(base+x*6e4).toISOString();
+  return {id,label:t.label,from:t.from,to:t.to,start:iso(t.s),end:iso(t.s+t.dur),pauses:t.pauses.map(([p,q])=>[iso(p),iso(q)]),regulier:true};
+}
+/** Semaine planifiée → semaine lue (même forme que parseWeek), pour réutiliser tous les calculs */
+function planifVersSemaine(pl){
+  return {meta:{...pl.meta},anomalies:[],agents:pl.agents.map(a=>({matricule:a.matricule||'',nom:a.nom,prenom:a.prenom||'',agence:a.agence,metier:a.metier,
+    jours:a.jours.map(j=>j.m&&j.m.length?{kind:'SERVICE',missions:[...j.m].sort((x,y)=>x.start.localeCompare(y.start)).map(m=>({...m,type:missionType(m.label),pauses:m.pauses||[]}))}
+      :j.c?{kind:'CODE',code:j.c,family:codeFam(j.c)}:{kind:'VIDE'})}))};
+}
+/** Alertes de la semaine planifiée : règles de l'accord (conformiteData, avec les semaines précédentes pour les repos et la
+    GPT en cours) et missions qui se chevauchent ; rangées par agent et par jour */
+function planifAlertes(pl,avant,rules){
+  const R=rules||{}, w=planifVersSemaine(pl), rows=[];
+  for(const p of avant||[]){ const v=applyRules(p,R); v.agents.forEach(a=>{ a.weekId=p.meta.weekId; rows.push(a); }); }
+  const v=applyRules(w,R); v.agents.forEach(a=>{ a.weekId=pl.meta.weekId; rows.push(a); });
+  const pks=new Set(v.agents.map(personKey)), d0=isoD(new Date(Date.parse(pl.meta.monday+'T00:00:00Z')-DAY));
+  // la veille (semaine précédente) : seuls les écarts qui touchent la semaine planifiée (repos, GPT, RHR), pas ceux de la journée elle-même
+  const propres=['tte','amp','pause','hebdo','moy4','cmd','rpMois','weMois'];
+  const al=conformiteData(rows.filter(a=>pks.has(personKey(a))),R).filter(x=>x.date>=d0&&x.date<=pl.meta.sunday&&!(x.date<pl.meta.monday&&propres.includes(x.type)))
+    .map(x=>({pk:x.pk,date:x.date<pl.meta.monday?pl.meta.monday:x.date,type:x.type,niveau:x.niveau,texte:`${(CONF_TYPES[x.type]||[x.type])[0]} : ${x.detail}`}));
+  for(const a of pl.agents){ const pk=personKey(a), ms=a.jours.flatMap((j,d)=>(j.m||[]).map(m=>({...m,d}))).sort((x,y)=>x.start.localeCompare(y.start));
+    for(let i=1;i<ms.length;i++) if(ms[i].start<ms[i-1].end) al.push({pk,date:pl.meta.days[ms[i].d],type:'chev',niveau:'nc',texte:`« ${ms[i].label} » chevauche « ${ms[i-1].label} »`});
+    a.jours.forEach((j,d)=>{ if(j.c&&j.m&&j.m.length) al.push({pk,date:pl.meta.days[d],type:'code',niveau:'nc',texte:`mission posée sur un jour codé ${j.c}`}); }); }
+  return al;
+}
 /** Planning type de la semaine suivante (demandé par l'utilisateur) : trame service / repos par agent, sans trains, pour la
     semaine qui suit la dernière importée, en reprenant l'état de la semaine précédente (GPT en cours, dernier service, repos
     en cours, repos pris depuis le 1er janvier, repos double samedi-dimanche du mois) et les règles de l'accord.
@@ -2479,6 +2532,18 @@ const backend={
     await ensureLoaded(voisins); const ws=voisins.map(x=>S.parsedCache.get(x)).filter(Boolean);
     return {agents:S.coco.agents,semaine:S.parsedCache.get(id)?cocoCalcul(ws,S.rules,id,S.coco.agents):null};
   },
+  async planif(id){
+    if(backend.mode!=='artifact') return backend.call('planif?id='+encodeURIComponent(id));
+    const d=await ADB.doc('config/planif_'+id).get(); return {planif:d||null};
+  },
+  async savePlanif(id,pl){
+    if(backend.mode!=='artifact') return backend.call('planif?id='+encodeURIComponent(id),{method:'PUT',body:JSON.stringify(pl)});
+    await ADB.doc('config/planif_'+id).set(pl); return {ok:true};
+  },
+  async delPlanif(id){
+    if(backend.mode!=='artifact') return backend.call('planif?id='+encodeURIComponent(id),{method:'DELETE'});
+    await ADB.doc('config/planif_'+id).set(null); return {ok:true};
+  },
   async saveCoco(c){
     if(backend.mode!=='artifact') return backend.call('coco',{method:'PUT',body:JSON.stringify(c)});
     await ADB.doc('config/coco').set(c); return {ok:true};
@@ -2699,7 +2764,7 @@ function barChart(items,opts={}){
    11. VUES
    ========================================================================== */
 const el=id=>document.getElementById(id);
-const TI={production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
+const TI={planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2',production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
   agents:'M6 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1.8 13.5c.5-2.4 2.2-3.8 4.2-3.8s3.7 1.4 4.2 3.8M10.5 2.8a2.3 2.3 0 0 1 0 4.4M12 9.9c1.2.5 2 1.7 2.3 3.6',
   rhr:'M13 9.5A5.5 5.5 0 1 1 6.5 3a4.3 4.3 0 0 0 6.5 6.5z',blanches:'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3',
   graphiques:'M3 13.5V8M6.5 13.5V3.5M10 13.5V6.5M13.5 13.5V10',stats:'M2 12l3.5-4 3 2.5L14 4M10.5 4H14v3.5',
@@ -2712,14 +2777,14 @@ const TI={production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3
 /** Mentions légales : uniquement dans la vue visiteur (l'admin les rédige et les prévisualise dans Réglages) */
 const tabVisible=t=>S.role==='admin'?t.k!=='mentions':S.role==='covoit'?t.k==='coco':['vitrine','lecture','mentions'].includes(t.k);
 const TABS=[
-  {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'production',l:'Production',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
+  {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'production',l:'Production',g:'Pilotage'},{k:'planif',l:'Planification',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
   {k:'agents',l:'Agents',g:'Détail'},{k:'rhr',l:'RHR',g:'Détail'},{k:'blanches',l:'Journées blanches',g:'Détail'},
   {k:'graphiques',l:'Graphiques',g:'Analyse'},{k:'stats',l:'Statistiques',g:'Analyse'},{k:'comparer',l:'Comparer',g:'Analyse'},
   {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},{k:'coco',l:'Coco',g:'Diffusion'},
   {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
-const TAB_CTX={production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
+const TAB_CTX={planif:'missions de la semaine, trains réguliers, glisser-déposer et alertes de l’accord',production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
   comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',coco:'copain covoit — missions de la semaine des agents choisis',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
@@ -3305,6 +3370,103 @@ function trameCard(){
   return `<section class="card"><div class="card-h"><div><h2>Planning type — ${sid}</h2><p class="card-s">trame service / repos proposée pour la semaine du ${dFull(nx)} au ${dFull(t.jours[6])}, à partir de la dernière semaine importée (${weekLabel(W)}) · sans trains</p></div></div>
     <div class="card-b stack"><div class="note">Pour chaque agent : RP de la semaine = repos dus à la fin de la semaine (accord : ${nfa(A.roulant.rpAn)} par an pour les conducteurs, ${nfa(A.continuite.rpAn)} pour les AFR et coordinateurs, au prorata des jours présents) moins les RP pris depuis le 1er janvier, entre 2 et 3, en un seul bloc (repos double ou triple). Le bloc est placé pour que la grande période de travail en cours ne dépasse pas ${nfa(A.gptMax)} jours, sans plus de ${nfa(A.rpConsecMax)} RP d’affilée avec ceux de la fin de semaine précédente, sur le samedi-dimanche quand le mois n’en a pas encore eu (obligatoire au dernier samedi du mois), pas deux week-ends de suite sinon, puis pour équilibrer le nombre d’agents en service chaque jour (entre parenthèses : moyenne des ${t.semaines.length} dernières semaines). Les heures notées viennent de l’accord (repos journalier, veille et lendemain de repos). Congés et absences de la semaine à venir ne sont pas connus : à ajuster.</div>
     <div class="tw tall"><table class="trame"><thead><tr><th class="l">Agent</th>${t.jours.map((d,i)=>`<th>${JC[i]} ${dISO(d)}</th>`).join('')}<th>Repos</th><th class="l">État S-1</th></tr></thead><tbody>${lignes}</tbody></table></div></div></section>`;
+}
+/* ---------- planification (demandé par l'utilisateur) ---------- */
+const PL_CODES=['','RP','RF','JF','RCL','RCC','CP','MAL','AT','FORM'];
+function lundiISO(year,week){ const j4=new Date(Date.UTC(year,0,4)); return new Date(j4.getTime()-((j4.getUTCDay()+6)%7)*DAY+(week-1)*7*DAY); }
+function metaSemaine(id){ const [y,w]=id.split('-S').map(Number), m=lundiISO(y,w), days=Array.from({length:7},(_,i)=>isoD(new Date(m.getTime()+i*DAY)));
+  return {weekId:id,year:y,week:w,monday:days[0],sunday:days[6],days}; }
+/** Semaines proposées : toutes les semaines importées et les 4 qui suivent la dernière */
+function planifSemaines(){ const ids=S.weeks.map(w=>w.weekId).sort(); if(!ids.length) return [];
+  const l=metaSemaine(ids[ids.length-1]), out=[...ids];
+  for(let i=1;i<=4;i++){ const x=isoWeek(new Date(Date.parse(l.monday+'T00:00:00Z')+i*7*DAY)); out.push(`${x.year}-S${String(x.week).padStart(2,'0')}`); }
+  return out; }
+let plSeq=0; const plId=()=>'m'+Date.now().toString(36)+(plSeq++);
+const plMission=m=>({id:plId(),label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end,pauses:(m.pauses||[]).filter(Array.isArray),...(m.regulier?{regulier:true}:{})});
+/** Premier brouillon d'une semaine : missions du fichier si la semaine est importée, sinon planning type (S+1) ;
+    trains réguliers des 4 semaines importées précédentes posés chez leur agent habituel, sinon en réserve */
+async function construirePlanif(id){
+  const ids=S.weeks.map(w=>w.weekId).sort(), importee=ids.includes(id), avant=ids.filter(x=>x<id).slice(-4), refId=importee?id:ids[ids.length-1];
+  await ensureLoaded([...new Set([refId,...avant])]);
+  const meta=metaSemaine(id), ref=S.loaded.get(refId), brut=S.parsedCache.get(refId); if(!ref||!brut) return null;
+  const rows=new Map(ref.agents.filter(a=>!a.exclu&&(!S.selAgences||S.selAgences.includes(a.agence))&&(!S.selMetiers||S.selMetiers.includes(a.metier))).map(a=>[personKey(a),a]));
+  const agents=[];
+  for(const b of brut.agents){ const pk=personKey(b), a=rows.get(pk); if(!a||agents.some(x=>personKey(x)===pk)) continue;
+    agents.push({matricule:b.matricule||'',nom:b.nom,prenom:b.prenom||'',agence:a.agence,metier:a.metier,
+      jours:importee?b.jours.map(j=>j.kind==='SERVICE'?{c:'',m:(j.missions||[]).map(plMission)}:{c:j.kind==='CODE'?j.code:'',m:[]}):meta.days.map(()=>({c:'',m:[]}))}); }
+  // semaine qui suit la dernière importée : jours de repos du planning type
+  if(!importee&&id===planifSemaines()[ids.length]){ const rowsAll=[...S.loaded.entries()].flatMap(([w,v])=>v.agents.filter(a=>!a.exclu).map(a=>{ a.weekId=a.weekId||w; return a; }));
+    const t=trameSemaine(rowsAll,refId,new Set(agents.map(personKey)),S.rules);
+    if(t) for(const x of t.agents){ const a=agents.find(y=>personKey(y)===x.pk); if(a) x.cases.forEach((c,d)=>{ if(c.t==='RP') a.jours[d].c='RP'; }); } }
+  const reg=trainsReguliers(avant.map(x=>S.parsedCache.get(x)).filter(Boolean),2), reserve=[];
+  for(const t of reg){ const date=meta.days[t.d], m=missionDuJour(t,date,plId());
+    if(importee){ const deja=brut.agents.some(b=>(b.jours[t.d].missions||[]).some(x=>normLieu(x.label)===normLieu(t.label))); if(!deja) reserve.push({...m,d:t.d}); continue; }
+    const a=agents.find(y=>personKey(y)===t.pk), j=a&&a.jours[t.d];
+    if(j&&!j.c&&!j.m.some(x=>x.start<m.end&&m.start<x.end)) j.m.push(m); else reserve.push({...m,d:t.d}); }
+  return {meta,agents,reserve,source:importee?'fichier':'planning type',perimetre:[...new Set(agents.map(a=>a.agence+' · '+a.metier))],nbReguliers:reg.length};
+}
+async function loadPlanif(){
+  const opts=planifSemaines(); if(!opts.length) return;
+  if(!S.plW||!opts.includes(S.plW)) S.plW=opts[S.weeks.length]||opts[opts.length-1];
+  const ids=S.weeks.map(w=>w.weekId).sort(); await ensureLoaded(ids.filter(x=>x<S.plW).slice(-4));
+  let pl=null; try{ pl=(await withLoad(api.planif(S.plW))).planif; }catch(e){ S.msg={m:'Planification : '+e.message,t:'c'}; }
+  S.pl=pl||await construirePlanif(S.plW); planifCalcul(); render();
+}
+/** Alertes de la semaine planifiée (avec les 2 semaines importées qui précèdent) */
+function planifCalcul(){ if(!S.pl){ S.plAl=[]; return; }
+  const avant=S.weeks.map(w=>w.weekId).sort().filter(x=>x<S.pl.meta.weekId).slice(-2).map(x=>S.parsedCache.get(x)).filter(Boolean);
+  try{ S.plAl=planifAlertes(S.pl,avant,S.rules); }catch(e){ S.plAl=[]; console.error(e); } }
+let plTimer=null;
+function planifSauver(){ clearTimeout(plTimer); plTimer=setTimeout(async()=>{ try{ await api.savePlanif(S.pl.meta.weekId,S.pl); S.plSave=new Date().toISOString(); render(); }catch(e){ S.msg={m:'Planning non enregistré : '+e.message,t:'c'}; render(); } },700); }
+const plDecale=(m,n)=>{ if(!n) return m; const f=x=>new Date(Date.parse(x)+n*DAY).toISOString(); return {...m,start:f(m.start),end:f(m.end),pauses:(m.pauses||[]).map(([p,q])=>[f(p),f(q)])}; };
+/** Déplacement d'une mission : src « a|d|i » (case) ou « R|i » (réserve) ; dest « a|d » (case) ou « R|d » (réserve du jour) */
+function planifDeplacer(src,dest){
+  const P=S.pl, [s0,s1,s2]=src.split('|'), [d0,d1]=dest.split('|'); let m, dSrc;
+  if(s0==='R'){ m=P.reserve[+s1]; if(!m) return; dSrc=m.d; }
+  else { m=P.agents[+s0].jours[+s1].m[+s2]; if(!m) return; dSrc=+s1; }
+  const dDest=+d1; if(s0!=='R'&&s0===d0&&dSrc===dDest) return;
+  const avant=new Set(S.plAl.map(x=>x.pk+'|'+x.date+'|'+x.texte));
+  if(s0==='R') P.reserve.splice(+s1,1); else P.agents[+s0].jours[+s1].m.splice(+s2,1);
+  const n={...plDecale(m,dDest-dSrc)}; delete n.d;
+  if(d0==='R') P.reserve.push({...n,d:dDest}); else P.agents[+d0].jours[dDest].m.push(n);
+  planifCalcul(); planifSauver();
+  if(d0!=='R'){ const a=P.agents[+d0], pk=personKey(a), nv=S.plAl.filter(x=>x.pk===pk&&!avant.has(x.pk+'|'+x.date+'|'+x.texte));
+    S.msg=nv.length?{m:`« ${n.label} » chez ${a.nom} ${a.prenom} : ${nv.map(x=>x.texte).join(' · ')}`,t:'c'}:null; }
+  render();
+}
+function viewPlanif(){
+  const opts=planifSemaines(); if(!opts.length) return emptyScope();
+  const P=S.pl, JC=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const sel=`<div class="frow" style="gap:8px;align-items:end;flex-wrap:wrap"><label class="fld"><span class="flabel">Semaine</span><select id="plW">${opts.slice().reverse().map(x=>{ const m=metaSemaine(x), imp=S.weeks.some(w=>w.weekId===x);
+      return `<option value="${x}"${x===S.plW?' selected':''}>${weekLabel(m)} · ${weekRange(m)}${imp?'':' · à venir'}</option>`; }).join('')}</select></label>
+    <button class="btn btn-sm" id="plReset">Repartir ${P&&P.source==='fichier'?'du fichier':'du planning type'}</button>
+    ${S.plSave?`<span class="hint">Enregistré à ${hm(S.plSave)}</span>`:P&&P.majLe?`<span class="hint">Enregistré le ${dtISO(P.majLe)}</span>`:''}</div>`;
+  if(!P) return `<section class="card"><div class="card-b">${sel}<p class="mut">Chargement…</p></div></section>`;
+  const al=S.plAl||[], parCase=new Map(); for(const x of al){ const k=x.pk+'|'+x.date; if(!parCase.has(k)) parCase.set(k,[]); parCase.get(k).push(x); }
+  const chip=(m,key)=>`<div class="pl-m${m.regulier?' reg':''}${S.plSel===key?' sel':''}" draggable="true" data-pm="${key}" title="${esc(`${m.label} · ${m.from||'?'} → ${m.to||'?'} · ${hm(m.start)}–${hm(m.end)}${m.regulier?' · train régulier':''}`)}">
+      <b>${esc(m.label)}</b><small>${hm(m.start)}–${hm(m.end)} · ${esc(m.from||'?')} → ${esc(m.to||'?')}</small></div>`;
+  const reserve=`<tr class="pl-res"><td class="l"><b>Réserve</b><br><span class="mut sm">${P.reserve.length} mission${P.reserve.length>1?'s':''} à placer</span></td>${P.meta.days.map((_,d)=>`<td data-pdrop="R|${d}">${P.reserve.map((m,i)=>m.d===d?chip(m,'R|'+i):'').join('')}</td>`).join('')}</tr>`;
+  const grps=[...new Set(P.agents.map(a=>a.agence+'|'+a.metier))];
+  const lignes=grps.map(g=>`<tr class="tr-g"><td class="l" colspan="8"><b>${esc(g.split('|')[0])}</b> · ${esc(g.split('|')[1])}</td></tr>`+P.agents.map((a,ai)=>a.agence+'|'+a.metier!==g?'':`<tr><td class="l"><span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}</td>${a.jours.map((j,d)=>{
+      const l=parCase.get(personKey(a)+'|'+P.meta.days[d])||[], nc=l.filter(x=>x.niveau==='nc');
+      return `<td data-pdrop="${ai}|${d}" class="${nc.length?'pl-al':l.length?'pl-info':''}${j.c?' pl-code':''}"><select class="pl-c" data-plc="${ai}|${d}">${[...new Set([...PL_CODES,j.c])].map(c=>`<option value="${esc(c)}"${c===j.c?' selected':''}>${c||'—'}</option>`).join('')}</select>
+        ${j.m.map((m,i)=>chip(m,`${ai}|${d}|${i}`)).join('')}${l.map(x=>`<div class="pl-a ${x.niveau}">${esc(x.texte)}</div>`).join('')}</td>`; }).join('')}</tr>`).join('')).join('');
+  const nNc=al.filter(x=>x.niveau==='nc').length;
+  return `<section class="card"><div class="card-h"><div><h2>Planification — ${weekLabel(P.meta)}</h2><p class="card-s">${dFull(P.meta.monday)} au ${dFull(P.meta.sunday)} · départ : ${P.source==='fichier'?'missions du fichier importé':'planning type'} · ${esc((P.perimetre||[]).join(', '))} · ${P.nbReguliers||0} trains réguliers repérés</p></div></div>
+    <div class="card-b stack">${sel}
+      <div class="note">Glissez une mission d’une case à l’autre, vers la réserve ou depuis la réserve (sur téléphone : touchez la mission, puis la case). Les trains réguliers (même intitulé le même jour au moins 2 semaines sur les 4 dernières importées, hors ATCMD et DISPO, en ambre) sont posés chez l’agent qui les fait le plus souvent quand il est en service, sinon en réserve. Chaque changement est contrôlé avec les règles de l’accord (repos journalier, amplitude, TTE, repos périodiques, GPT, RHR, 48 h…) en tenant compte des semaines précédentes ; une alerte apparaît dans la case et en haut de page. Le brouillon est enregistré sur le serveur (admins seulement).</div>
+      <div class="kpis">${`<div class="kpi${nNc?' hot':''}"><div class="k">Alertes</div><div class="v">${nf(nNc)}</div><div class="n">${nf(al.length-nNc)} à surveiller</div></div>`}
+        <div class="kpi"><div class="k">Missions placées</div><div class="v">${nf(P.agents.reduce((s,a)=>s+a.jours.reduce((t,j)=>t+j.m.length,0),0))}</div><div class="n">${nf(P.reserve.length)} en réserve</div></div></div>
+      <details class="qd"><summary>Ajouter une mission à la réserve</summary><div class="frow" style="gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px">
+        <label class="fld"><span class="flabel">Jour</span><select id="plNd">${P.meta.days.map((d,i)=>`<option value="${i}">${JC[i]} ${dISO(d)}</option>`).join('')}</select></label>
+        <label class="fld"><span class="flabel">Intitulé</span><input type="text" id="plNl" placeholder="TRAIN 8605" style="width:140px"></label>
+        <label class="fld"><span class="flabel">Départ</span><input type="text" id="plNf" placeholder="HENDAYE" style="width:120px"></label>
+        <label class="fld"><span class="flabel">Arrivée</span><input type="text" id="plNt" placeholder="BORDEAUX" style="width:120px"></label>
+        <label class="fld"><span class="flabel">Début</span><input type="time" id="plNs"></label>
+        <label class="fld"><span class="flabel">Fin</span><input type="time" id="plNe"></label>
+        <button class="btn btn-pri btn-sm" id="plAdd">Ajouter</button></div></details>
+      <div class="tw tall"><table class="planif"><thead><tr><th class="l">Agent</th>${P.meta.days.map((d,i)=>`<th>${JC[i]} ${dISO(d)}</th>`).join('')}</tr></thead><tbody>${reserve}${lignes}</tbody></table></div>
+    </div></section>`;
 }
 /* ---------- journées blanches ---------- */
 function viewBlanches(){
@@ -4994,7 +5156,7 @@ function render(){
   el('shell').hidden=false; el('login').hidden=true;
   renderFilters(); renderTabs();
   const v=el('view');
-  const body = S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
+  const body = S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='planif'?viewPlanif(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
     S.role==='covoit'||S.tab==='coco'?viewCoco(): S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
@@ -5404,8 +5566,20 @@ document.addEventListener('click',async e=>{
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs(); menuClose();
-    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.role==='admin') await ensureLoaded(toLoad());
+    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.tab==='planif'){ render(); await loadPlanif(); } else if(S.role==='admin') await ensureLoaded(toLoad());
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
+  if(S.tab==='planif'){
+    const ch=e.target.closest('[data-pm]'), dz=e.target.closest('[data-pdrop]');
+    if(ch&&!e.target.closest('select')){ S.plSel=S.plSel===ch.dataset.pm?null:ch.dataset.pm; render(); return; }
+    if(dz&&S.plSel&&!e.target.closest('select')){ const s=S.plSel; S.plSel=null; planifDeplacer(s,dz.dataset.pdrop); return; }
+    if(t.id==='plReset'){ if(!confirm('Effacer le brouillon de cette semaine et repartir '+(S.pl&&S.pl.source==='fichier'?'du fichier importé':'du planning type')+' ?')) return;
+      try{ await api.delPlanif(S.plW); }catch(err){} S.pl=await construirePlanif(S.plW); planifCalcul(); planifSauver(); render(); return; }
+    if(t.id==='plAdd'){ const d=+el('plNd').value, l=el('plNl').value.trim(), s=el('plNs').value, f=el('plNe').value;
+      if(!l||!s||!f){ S.msg={m:'Intitulé, début et fin obligatoires.',t:'c'}; render(); return; }
+      const date=S.pl.meta.days[d], st=Date.parse(date+'T'+s+':00Z'); let en=Date.parse(date+'T'+f+':00Z'); if(en<=st) en+=DAY;
+      S.pl.reserve.push({id:plId(),label:l,from:el('plNf').value.trim().toUpperCase(),to:el('plNt').value.trim().toUpperCase(),start:new Date(st).toISOString(),end:new Date(en).toISOString(),pauses:[],d});
+      planifSauver(); render(); return; }
+  }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; S.agtOpen=false; render(); return; }
   if(t.id==='agtBtn'){ S.agtOpen=!S.agtOpen; S.scopeOpen=false; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
   if(t.id==='agtClr'){ S.selAgents=null; render(); return; }
@@ -5490,6 +5664,8 @@ document.addEventListener('click',async e=>{
     render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
 });
 document.addEventListener('change',async e=>{
+  if(e.target.id==='plW'){ S.plW=e.target.value; S.pl=null; S.plSave=null; render(); await loadPlanif(); return; }
+  if(e.target.dataset&&e.target.dataset.plc){ const [a,d]=e.target.dataset.plc.split('|').map(Number); S.pl.agents[a].jours[d].c=e.target.value; planifCalcul(); planifSauver(); render(); return; }
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
   if(e.target.id==='dwPer'){ S.dwPer=e.target.value; await ensureLoaded(periodWeeks(S.dwPer,S.weeks)); renderDrawer(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }
@@ -5537,10 +5713,16 @@ document.addEventListener('keydown',e=>{
   if(S.role&&((e.key==='/'&&!typing)||(e.key.toLowerCase()==='k'&&(e.ctrlKey||e.metaKey)))){ e.preventDefault(); openPalette(); }
   if(e.key==='Enter'&&el('codeIn')&&document.activeElement===el('codeIn')) login();
 });
-document.addEventListener('dragover',e=>{ if(S.role!=='admin')return; e.preventDefault(); el('drop')?.classList.add('on'); });
+// planification : glisser-déposer des missions (distinct du dépôt de fichiers)
+document.addEventListener('dragstart',e=>{ const c=e.target.closest&&e.target.closest('[data-pm]'); if(!c) return; S.plDrag=c.dataset.pm; e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain',c.dataset.pm); }catch(_){} });
+document.addEventListener('dragend',()=>{ S.plDrag=null; document.querySelectorAll('.pl-over').forEach(x=>x.classList.remove('pl-over')); });
+document.addEventListener('dragover',e=>{ if(S.role!=='admin')return; e.preventDefault();
+  if(S.plDrag){ document.querySelectorAll('.pl-over').forEach(x=>x.classList.remove('pl-over')); e.target.closest&&e.target.closest('[data-pdrop]')?.classList.add('pl-over'); return; }
+  el('drop')?.classList.add('on'); });
 document.addEventListener('dragleave',e=>{ const d=el('drop'); if(d&&!d.contains(e.relatedTarget)) d.classList.remove('on'); });
 document.addEventListener('drop',e=>{
   if(S.role!=='admin') return;
+  if(S.plDrag){ e.preventDefault(); const z=e.target.closest&&e.target.closest('[data-pdrop]'), s=S.plDrag; S.plDrag=null; if(z) planifDeplacer(s,z.dataset.pdrop); return; }
   if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return;
   e.preventDefault(); el('drop')?.classList.remove('on');
   if(S.tab!=='import'){ S.tab='import'; savePrefs(); render(); }
@@ -5587,6 +5769,7 @@ async function boot(){
     if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
     else if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
     else if(S.tab==='coco'){ render(); await loadCoco(); }
+    else if(S.tab==='planif'){ await ensureLoaded(toLoad()); render(); await loadPlanif(); }
     else if(S.tab==='mentions'){ S.tab='reglages'; await ensureLoaded(toLoad()); }
     else if(S.tab==='vitrine'){ render(); await loadVitrine(true); }
     else await ensureLoaded(toLoad());
@@ -5602,7 +5785,7 @@ const saisieEnCours=()=>{ const a=document.activeElement; return !!(a&&/^(INPUT|
 let rafEnCours=false;
 async function rafraichir(){
   if(rafEnCours||document.hidden||!S.role||S.busy||S.queue.length||saisieEnCours()) return;
-  if(S.role==='admin'&&['reglages','import'].includes(S.tab)) return;
+  if(S.role==='admin'&&['reglages','import','planif'].includes(S.tab)) return;
   rafEnCours=true;
   try{
     if(S.role==='covoit'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }

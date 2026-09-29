@@ -125,6 +125,27 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   3 RP d'affilée si elles ne tiennent pas avec la GPT (signalé). Notes par jour : reprise au plus tôt (repos journalier,
   RHR, lendemain de repos), fin au plus tard la veille du repos, GPT de 6 jours. Congés / absences de S+1 inconnus.
 
+## Onglet Planification (demandé par l'utilisateur, admin seulement, groupe Pilotage)
+
+Semaine au choix (semaines importées + les 4 qui suivent la dernière, `planifSemaines`) ; grille agents × jours (agence ×
+métier du filtre à la création) avec les missions dans les cases (intitulé, horaire, trajet), un code par jour (RP, RF, JF,
+RCL, RCC, CP, MAL, AT, FORM ou rien) et une ligne « Réserve » par jour.
+- Premier brouillon (`construirePlanif`) : semaine importée = missions et codes du fichier ; semaine à venir = jours de RP du
+  planning type pour S+1 (vide au-delà). **Trains réguliers** (choix de l'utilisateur : même intitulé, même jour de semaine,
+  au moins 2 fois sur les 4 semaines importées qui précèdent ; ATCMD et DISPO exclus, ce ne sont pas des trains) :
+  `trainsReguliers` (horaire, trajet et pauses les plus fréquents ; agent habituel = celui qui l'a fait le plus) ; semaine à
+  venir : pré-placés chez l'agent habituel s'il est dans la grille, sans code ce jour-là et sans chevauchement, sinon en
+  réserve ; semaine importée : ceux absents de la semaine vont en réserve. Missions ajoutées à la main (formulaire : jour,
+  intitulé, départ, arrivée, début, fin) dans la réserve.
+- Glisser-déposer (case ↔ case, case ↔ réserve ; sur téléphone : toucher la mission puis la case) ; une mission changée de
+  jour garde son heure (`planifDeplacer`). À chaque changement, `planifAlertes` (moteur, testé) : semaine planifiée
+  convertie en semaine lue (`planifVersSemaine`) + 2 semaines importées précédentes → `conformiteData` (toutes les règles de
+  l'accord) + chevauchements + mission sur un jour codé ; alerte dans la case (cadre rouge) et message immédiat si le dépôt
+  crée une alerte pour l'agent. Écarts de la veille (S-1) repris seulement s'ils touchent la semaine (repos, GPT, RHR).
+- Brouillon enregistré sur le serveur (choix de l'utilisateur) : `GET|PUT|DELETE /api/planif?id=` (admin seulement), config
+  `planif` = {semaine: brouillon}, 30 semaines au plus ; « Repartir du fichier / du planning type » efface le brouillon.
+  La page ne se rafraîchit pas automatiquement dans cet onglet.
+
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 
 - RHR = repos journalier hors résidence (accord d'entreprise ECR 2018, art. 18 ; PDF fourni par

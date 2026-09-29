@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -748,4 +748,23 @@ test('Planning type S+1 : GPT de 6 jours en cours → repos double dès le lundi
   assert.ok(B.s >= 1);                                   // pas plus de 3 RP d'affilée avec ceux du week-end
   assert.ok(!(B.s <= 5 && B.s + B.n >= 7));             // week-end déjà pris ce mois-ci
   assert.match(B.cases[0].notes.join(' '), /reprise ≥ 03:00/);
+});
+
+test('Planification : train régulier (2 semaines sur 4), mission posée qui casse le repos journalier → alerte', () => {
+  const t5 = (d) => svc(['T5', 'HENDAYE', 'IRUN', d, '06:00', d, '14:00']);
+  const w1 = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: [t5(7), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  const w2 = E.parseWeek(week([2026, 9, 14], [{ mat: '1', nom: 'A', j: [t5(14), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+    { mat: '2', nom: 'B', j: ['RP', 'RP', 'RP', 'RP', 'RP', 'RP', svc(['N1', 'HENDAYE', 'HENDAYE', 20, '14:00', 20, '23:00'])] }]));
+  const reg = E.trainsReguliers([w1, w2], 2);
+  assert.equal(reg.length, 1);
+  assert.equal(reg[0].label, 'T5');
+  assert.equal(reg[0].d, 0);
+  assert.equal(reg[0].pk, 'm:1');
+  const days = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
+  const vide = () => days.map(() => ({ c: '', m: [] }));
+  const pl = { meta: { weekId: '2026-S39', year: 2026, week: 39, monday: days[0], sunday: days[6], days },
+    agents: [{ matricule: '2', nom: 'B', prenom: 'P', agence: 'Hendaye', metier: 'CONDUCTEUR', jours: vide() }] };
+  pl.agents[0].jours[0].m.push(E.missionDuJour(reg[0], days[0], 'x1'));   // B finit dimanche 23:00, reprend lundi 06:00 : 7 h
+  const al = E.planifAlertes(pl, [w2], E.loadRules(RES));
+  assert.ok(al.some((x) => x.type === 'rj' && x.date === days[0]));
 });

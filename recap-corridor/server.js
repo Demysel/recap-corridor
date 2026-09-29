@@ -197,6 +197,22 @@ async function api(req, res, url) {
     cocoCache.clear();
     return json(req, res, 200, { ok: true });
   }
+  if (route === 'planif') {   // planification : brouillon d'une semaine, partagé entre admins, jamais envoyé aux autres codes
+    if (!admin) return json(req, res, 403, { error: 'Réservé au code administrateur.' });
+    const id = url.searchParams.get('id') || '';
+    if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
+    const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'planif'`);
+    const tout = c.rows[0]?.valeur || {};
+    if (req.method === 'GET') return json(req, res, 200, { planif: tout[id] || null });
+    if (req.method === 'PUT' || req.method === 'DELETE') {
+      if (req.method === 'PUT') { const body = await readBody(req); if (!body || !Array.isArray(body.agents)) return json(req, res, 400, { error: 'Planning incomplet.' });
+        tout[id] = { ...body, majLe: new Date().toISOString() }; } else delete tout[id];
+      const garder = Object.keys(tout).sort().slice(-30);   // 30 semaines au plus
+      const o = Object.fromEntries(garder.map((k) => [k, tout[k]]));
+      await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('planif', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [JSON.stringify(o)]);
+      return json(req, res, 200, { ok: true });
+    }
+  }
   if (route === 'source' && req.method === 'GET') {   // fichier conservé avec la semaine (feuille lue + Extract), pour « Relire »
     if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
     const id = url.searchParams.get('id') || '';
