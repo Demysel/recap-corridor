@@ -127,9 +127,16 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
 
 ## Onglet Planification (demandé par l'utilisateur, admin seulement, groupe Pilotage)
 
-Semaine au choix (semaines importées + les 4 qui suivent la dernière, `planifSemaines`) ; grille agents × jours (agence ×
-métier du filtre à la création) avec les missions dans les cases (intitulé, horaire, trajet), un code par jour (RP, RF, JF,
-RCL, RCC, CP, MAL, AT, FORM ou rien) et une ligne « Réserve » par jour.
+Semaine au choix (semaines importées + les 4 qui suivent la dernière, `planifSemaines`). **Deux tableaux côte à côte**
+(demandé par l'utilisateur, pour que l'outil soit plus intuitif) : à gauche **Missions** (liste de toutes les missions de la
+semaine, placées ou à placer : jour, intitulé, horaire, trajet, agent ou « à placer », agence · métier, régularité x/4 ;
+filtres propres : agence, métier — conducteurs / AFR et coordo —, statut à placer / placées / toutes, jour ; boutons
+« Remplir automatiquement » et « Tout remettre à placer » ; formulaire d'ajout avec agence et métier), à droite **Planning**
+(grille agents × jours, filtres propres : agence, métier ; un code par jour : RP, RF, JF, RCL, RCC, CP, MAL, AT, FORM ou rien).
+Filtres par défaut : première agence du filtre du haut (Hendaye), tous métiers ; les missions suivent l'agence / le métier du
+planning tant qu'on ne les a pas changés (`plFiltres`). Le brouillon contient **toutes les agences** (les filtres ne
+choisissent que ce qu'on voit) ; les brouillons de l'ancienne version (une seule agence) demandent « Repartir ».
+Seuil des trains réguliers réglable dans la page (1 à 4 fois sur 4 semaines, défaut 2 ; refait le brouillon).
 - Premier brouillon (`construirePlanif`) : semaine importée = missions et codes du fichier ; semaine à venir = jours de RP du
   planning type pour S+1 (vide au-delà). **Trains réguliers** (choix de l'utilisateur : même intitulé, même trajet départ → arrivée — ajouté à la demande, pour ne pas
   confondre des missions génériques comme « MHIS » —, même jour de semaine,
@@ -142,9 +149,11 @@ RCL, RCC, CP, MAL, AT, FORM ou rien) et une ligne « Réserve » par jour.
   jour et repos avec la veille / le lendemain au-dessus des minimums de l'accord, fin de la semaine précédente comprise),
   le moins chargé à égalité ; sinon réserve (étiquetée avec l'agence). Trains d'agences absentes de la grille : ignorés.
   Semaine importée : les trains réguliers de ses agences absents de la semaine vont en réserve. La grille et la réserve
-  suivent le filtre agence / métier du haut de page ; une agence filtrée absente du brouillon est signalée (« Repartir »). Missions ajoutées à la main (formulaire : jour,
-  intitulé, départ, arrivée, début, fin) dans la réserve.
-- Glisser-déposer (case ↔ case, case ↔ réserve ; sur téléphone : toucher la mission puis la case) ; une mission changée de
+  suivent leurs filtres propres. « Remplir automatiquement » : `planifPlacer` (moteur) sur les missions à placer du filtre
+  missions (agent habituel d'abord, sinon le moins chargé de l'agence et du métier, libre et dans les minimums de
+  l'accord ; fin de la semaine précédente prise en compte, `fins`) ; message : combien placées, combien restent.
+  Missions ajoutées à la main (formulaire : jour, intitulé, départ, arrivée, début, fin, agence, métier) dans « à placer ».
+- Glisser-déposer (liste → case, case ↔ case, case → liste pour retirer une mission d'un agent ; sur téléphone : toucher la mission puis la case) ; une mission changée de
   jour garde son heure (`planifDeplacer`). À chaque changement, `planifAlertes` (moteur, testé) : semaine planifiée
   convertie en semaine lue (`planifVersSemaine`) + 2 semaines importées précédentes → `conformiteData` (toutes les règles de
   l'accord) + chevauchements + mission sur un jour codé ; alerte dans la case (cadre rouge) et message immédiat si le dépôt
