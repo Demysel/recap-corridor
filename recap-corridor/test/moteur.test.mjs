@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -679,4 +679,25 @@ test('vue Coco : missions et RHR des agents choisis, mission de nuit sur deux jo
   assert.equal(a.jours[2].m.length + a.jours[3].m.length, 2);   // mission de nuit : mercredi et suite jeudi
   assert.equal(a.jours[3].m[0].suite, true);
   assert.ok(!('heuresSup' in a) && !('codes' in a) && !/RP/.test(JSON.stringify(sem)));   // ni heures ni codes
+});
+
+test('Production : repos pris / dus, week-end complet, heures neutralisées, trajet seul remplaçable par un train', () => {
+  const w = run(week([2026, 9, 7], [
+    { mat: '1', nom: 'A', j: [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00'], ['VOY-1', 'BORDEAUX', 'HENDAYE', 7, '11:00', 7, '13:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+    { mat: '2', nom: 'B', j: [svc(['VOY-9', 'HENDAYE', 'BORDEAUX', 7, '07:00', 7, '09:00'], ['T5', 'BORDEAUX', 'HENDAYE', 7, '11:30', 7, '14:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+  ]), { ...RES, production: { reposDus: 104, reposPar: 'an', reposCodes: ['RP'], optiFenetre: 2 } });
+  const d = E.productionData(w.agents, w.agents, E.loadRules({ ...RES, production: { reposDus: 104, reposPar: 'an', reposCodes: ['RP'], optiFenetre: 2 } }));
+  const a = d.personnes.find((x) => x.nom === 'A');
+  assert.equal(a.reposPris, 6);
+  assert.equal(Math.round(a.reposDus * 100) / 100, Math.round(104 * 7 / 365 * 100) / 100);
+  assert.equal(a.weekends, 1);
+  assert.equal(a.reposDoubles, 1);
+  assert.equal(a.neutre, 1 + 3);          // T1 4 h → +1 h ; VOY 2 h → +3 h
+  assert.equal(a.neutreVoy, 3);
+  assert.equal(a.nbTraj, 1);
+  const pa = d.pistes.filter((x) => x.nom.startsWith('A'));
+  assert.equal(pa.length, 1);
+  assert.equal(pa[0].train.label, 'T5');
+  assert.equal(pa[0].journeeEco, true);   // B était venu en trajet seul pour ce train
+  assert.equal(d.pistes.filter((x) => x.nom.startsWith('B')).length, 0);   // aucun train HENDAYE → BORDEAUX
 });

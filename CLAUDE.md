@@ -65,6 +65,28 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 Quand l'utilisateur demande une modification : **garder l'affichage et les méthodes de calcul
 existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « moderniser ».
 
+## Onglet Production (demandé par l'utilisateur, admin seulement, groupe Pilotage)
+
+Chiffres orientés production, calculés sur le planning seulement (ni réalisé, ni effectif théorique, ni coûts) par
+`productionData(rows, pool, rules)` (moteur, testé) sur le périmètre et la période du filtre principal ; `viewProduction`.
+- **Points d'attention** : phrases automatiques reprenant les chiffres ci-dessous.
+- **Repos** : repos pris (codes choisis, défaut RP ; RP déjà lu non recompté) ; repos dus = nombre réglé par semaine /
+  mois / an, **vide par défaut** (choix de l'utilisateur : ne rien inventer ; indicateur masqué tant que vide), ramené aux
+  jours où l'agent est dans les fichiers ; écart ; week-ends complets (samedi + dimanche en RP/RF/JF/RCL/RCC) ; périodes
+  de repos et repos doubles (≥ 2 jours d'affilée) ; repos à résidence plus courts que le minimum réglé (vide = non contrôlé).
+- **Utilisation** : jours en service / jours présents, TTE par jour de service, heures sup, concentration (part faite par
+  les 20 % d'agents en heures sup qui en font le plus), rééquilibrage (même agence, métier et semaine entière : heures sup
+  face aux heures sous le seuil des agents présents toute la semaine sans congé ni absence).
+- **Temps non productif** : heures neutralisées (minimum compté − temps réel des missions courtes, dont trajets seuls),
+  trajets seuls (nombre, heures, % du TTE), journées « trajet seul », journées blanches, DISPO / ATCMD, RHR et lieux.
+- **Irrégularité et défaillances** : écart moyen de prise de service d'un jour de service au lendemain, alternance jour /
+  nuit (jour de nuit = jour avec heures de nuit), absences (codes hors repos et congés), RHR > 44 h, cases vides non classées.
+- **Optimisation des plannings** (idée de l'utilisateur) : trajet seul X → Y remplaçable par un train productif X → Y (ni
+  trajet seul, ni DISPO, ni ATCMD) assuré par un autre agent du même métier (toutes agences), parti entre l'arrivée de
+  l'agent à X et le départ prévu + fenêtre réglable (défaut 2 h) ; « journée économisable » si l'agent de ce train était
+  venu à X en trajet seul et n'a rien fait d'autre. Présenté comme piste à vérifier (habilitations, ligne, repos).
+- Réglages → « Production » (`rules.production` : reposDus, reposPar, reposCodes, reposResMin, optiFenetre).
+
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
 
 - RHR = repos journalier hors résidence (accord d'entreprise ECR 2018, art. 18 ; PDF fourni par
