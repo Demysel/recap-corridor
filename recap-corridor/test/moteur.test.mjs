@@ -716,3 +716,16 @@ test('Conformité à l’accord : amplitude, TTE, pause, repos journalier, repri
   assert.equal(e.groupes.length, 1);
   assert.equal(e.pers.find((p) => p.nom === 'B').v.joursService, 7);
 });
+
+test('Production : ATCMD / DISPO pendant laquelle un autre agent, venu en trajet seul, a assuré un train du même lieu', () => {
+  const w = run(week([2026, 9, 7], [
+    { mat: '1', nom: 'A', j: [svc(['DISPO', 'HENDAYE', 'HENDAYE', 7, '08:00', 7, '14:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+    { mat: '2', nom: 'B', ag: 'Bordeaux-St-Jean', j: [svc(['VOY-1', 'BORDEAUX', 'HENDAYE', 7, '06:00', 7, '08:30'], ['T9', 'HENDAYE', 'BORDEAUX', 7, '09:00', 7, '12:00']), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+  ]), RES);
+  const d = E.productionData(w.agents.filter((a) => a.nom === 'A'), w.agents, E.loadRules(RES));
+  assert.equal(d.pistesCmd.length, 1);
+  assert.equal(d.pistesCmd[0].train.label, 'T9');
+  assert.equal(d.pistesCmd[0].journeeEco, true);
+  const c = E.conformiteData(w.agents, E.loadRules(RES));
+  assert.equal(c.filter((x) => x.type === 'cmd').length, 0);
+});

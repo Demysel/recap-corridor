@@ -263,6 +263,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .kpis.lead{grid-template-columns:repeat(4,minmax(0,1fr))}
 .eqv{padding:1px 6px;border-radius:5px}.eqv.hi{background:color-mix(in srgb,var(--signal) 30%,transparent);font-weight:700}.eqv.lo{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.prod-h3{font-size:14px;margin:6px 0 0}
 .prod-pts{margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45}.warn{color:var(--amber,#B45309)}
 .kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 17px 16px;min-width:0;
   box-shadow:var(--shadow);overflow:hidden;transition:transform .2s var(--ease),box-shadow .2s,border-color .2s}
@@ -1867,7 +1868,7 @@ const ACCORD_DEF={
   gptMax:6,gpt6Par4sem:2,hebdoMax:48,moy4sem:44,                                                                                  // art. 3, 19
   rhrMin:9,rhrComp:11,rhrLongRj:15,rhrSuccParGpt:1,                                                                               // art. 18
   pauseSeuil:6,pauseMin:20,                                                                                                       // art. 22, 32
-  commandes:false,atcmdSem:2,dispoSem:2,cmdTotalSem:3   // art. 15–16, 36–37 : ATCMD = attente de la commande, DISPO = disposition à l'agence (à confirmer)
+  commandes:true,atcmdSem:2,dispoSem:2,cmdTotalSem:3    // art. 15–16, 36–37 : ATCMD = attente de la commande, DISPO = disponible à l'agence (confirmé par l'utilisateur)
 };
 const accordOf=rules=>{ const A=(rules&&rules.accord)||{}; return {...ACCORD_DEF,...A,roulant:{...ACCORD_DEF.roulant,...(A.roulant||{})},continuite:{...ACCORD_DEF.continuite,...(A.continuite||{})}}; };
 const CONF_TYPES={
@@ -2023,7 +2024,7 @@ function productionData(rows,pool,rulesIn){
     const p={pk,nom:last.nom,prenom:last.prenom,agence:last.agence,metier:last.metier,jours:J.length,
       reposPris:0,reposDus:null,doublesDus:0,weDus:0,doublesWE:0,weekends:0,weekendsPossibles:0,periodesRepos:0,reposDoubles:0,reposCourts:[],
       joursService:0,tte:0,heuresSup:0,absences:0,absParCode:{},
-      neutre:0,neutreVoy:0,nbCourtes:0,nbTraj:0,hTraj:0,joursTrajSeul:0,jb:0,autresVides:0,dispo:0,atcmd:0,
+      hCmd:0,neutre:0,neutreVoy:0,nbCourtes:0,nbTraj:0,hTraj:0,joursTrajSeul:0,jb:0,autresVides:0,dispo:0,atcmd:0,
       nbRHR:0,rhrNuits:0,rhrLong:0,rhrLieux:{},ecartsPrise:[],alternances:0,enchainements:0};
     for(const a of list){
       p.tte+=a.heuresPlanifiees||0; p.heuresSup+=a.heuresSup||0; p.jb+=a.journeesBlanches||0;
@@ -2052,6 +2053,7 @@ function productionData(rows,pool,rulesIn){
       const ms=[...j.missions].sort((x,y)=>Date.parse(x.start)-Date.parse(y.start));
       for(const m of ms){
         if(tts(m)){ p.nbTraj++; p.hTraj+=reel(m); }
+        if(isATCMD(m)||/DISPO/i.test(m.label||'')) p.hCmd+=missionMinutes(m).amp/60;
         if(missionCourte(m,R)){ const d=Math.max(0,R.minMission-reel(m)); p.nbCourtes++; p.neutre+=d; if(tts(m)) p.neutreVoy+=d; }
       }
       if(ms.every(tts)) p.joursTrajSeul++;
@@ -2067,7 +2069,7 @@ function productionData(rows,pool,rulesIn){
       prevSvc=cur;
     }
     p.ecartPrise=p.ecartsPrise.length?p.ecartsPrise.reduce((s,x)=>s+x,0)/p.ecartsPrise.length:null;
-    for(const k of ['tte','heuresSup','neutre','neutreVoy','hTraj']) p[k]=rM(p[k]);
+    for(const k of ['tte','heuresSup','neutre','neutreVoy','hTraj','hCmd']) p[k]=rM(p[k]);
     personnes.push(p);
   }
   // rééquilibrage : même agence, même métier, même semaine — heures sup d'un côté, heures sous le seuil de l'autre
@@ -2107,7 +2109,27 @@ function productionData(rows,pool,rulesIn){
     });
   }
   pistes.sort((x,y)=>x.traj.start.localeCompare(y.traj.start));
-  return {personnes,reeq,pistes,P};
+  // ATCMD (attente de la commande) et DISPO (disponible à l'agence) : temps payé sans train, à faire disparaître (objectif de
+  // l'utilisateur). Piste : un train productif qui part du lieu de l'agent pendant sa plage, assuré par un autre agent du même
+  // métier — de préférence un agent venu en trajet seul pour ce train (son trajet, voire sa journée, serait économisé).
+  const depuis=new Map();
+  for(const [k,l] of trains){ const f=k.split('>')[0]; if(!depuis.has(f)) depuis.set(f,[]); depuis.get(f).push(...l); }
+  const pistesCmd=[];
+  for(const a of rows) for(const j of a.jours) if(j.kind==='SERVICE'&&!j.horsPeriode) for(const m of j.missions||[]){
+    if(!(isATCMD(m)||/DISPO/i.test(m.label||''))) continue;
+    const lieu=normLieu(m.from||m.to||a.residence||''), t0=Date.parse(m.start), t1=Date.parse(m.end);
+    const cands=(depuis.get(lieu)||[]).filter(x=>x.pk!==personKey(a)&&isAFR(x.a.metier)===isAFR(a.metier)&&Date.parse(x.m.start)>=t0&&Date.parse(x.m.start)<t1)
+      .map(x=>{ const cs=Date.parse(x.m.start), ms=x.j.missions||[], voy=ms.some(n=>tts(n)&&normLieu(n.to)===lieu&&Date.parse(n.end)<=cs&&cs-Date.parse(n.end)<=6*H);
+        return {...x,voy,eco:voy&&ms.every(n=>n===x.m||tts(n))}; })
+      .sort((x,y)=>(y.eco-x.eco)||(y.voy-x.voy)||(Date.parse(x.m.start)-Date.parse(y.m.start)));
+    const c=cands[0];
+    pistesCmd.push({pk:personKey(a),nom:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,metier:a.metier,date:j.date,
+      slot:{label:m.label,lieu:m.from||m.to||'',start:m.start,end:m.end,h:rM(missionMinutes(m).amp/60)},nbTrains:cands.length,
+      train:c?{label:c.m.label,from:c.m.from,to:c.m.to,start:c.m.start,end:c.m.end,nom:`${c.a.nom} ${c.a.prenom}`.trim(),agence:c.a.agence}:null,
+      venuEnVoy:!!(c&&c.voy),journeeEco:!!(c&&c.eco)});
+  }
+  pistesCmd.sort((x,y)=>x.slot.start.localeCompare(y.slot.start));
+  return {personnes,reeq,pistes,pistesCmd,P};
 }
 
 /** Vue Coco (copain covoit) : missions et RHR de la semaine des agents choisis par l'admin, jour par jour, rien d'autre
@@ -3089,11 +3111,13 @@ function viewProduction(){
   const ecarts=L.flatMap(p=>p.ecartsPrise), ench=T('enchainements'), alt=T('alternances'), abs=T('absences'), absC={};
   L.forEach(p=>Object.entries(p.absParCode).forEach(([k,v])=>absC[k]=(absC[k]||0)+v));
   const eco=d.pistes.filter(x=>x.journeeEco).length, gain=d.pistes.reduce((s,x)=>s+x.traj.h,0);
+  const cmdN=T('dispo')+T('atcmd'), cmdH=T('hCmd'), cmdTrain=d.pistesCmd.filter(x=>x.train).length, cmdEco=d.pistesCmd.filter(x=>x.venuEnVoy).length;
   const conf=conformiteData(sc,S.rules), nc=conf.filter(x=>x.niveau==='nc'), ncAg=new Set(nc.map(x=>x.pk)).size, eq=equiteData(sc);
   const parType=[...groupBy(conf,x=>x.type)].map(([t,l])=>({t,l:CONF_TYPES[t]?CONF_TYPES[t][0]:t,art:CONF_TYPES[t]?CONF_TYPES[t][1]:'',n:l.length,ag:new Set(l.map(x=>x.pk)).size,niv:l[0].niveau}));
   const points=[
     nc.length?`<b>${nf(nc.length)} écarts à l’accord d’entreprise</b> chez ${nf(ncAg)} agent${ncAg>1?'s':''} — le plus fréquent : ${esc((parType.filter(x=>x.niv==='nc').sort((a,b)=>b.n-a.n)[0]||{}).l||'')}.`:'Aucun écart à l’accord d’entreprise détecté sur le planning.',
     neutre?`<b>${fmtH(neutre)}</b> comptées sans être travaillées (${nf(T('nbCourtes'))} missions de moins de ${nfa(S.rules.minMission)} h), dont <b>${fmtH(neutreVoy)}</b> sur des trajets seuls.`:'',
+    cmdN?`<b>${nf(cmdN)} ATCMD / DISPO</b> (${fmtH(cmdH)} payées sans train, objectif : 0) ; pour ${nf(cmdTrain)} d’entre elles, un train est parti du même lieu pendant la plage${cmdEco?`, dont ${nf(cmdEco)} assurés par un agent venu en trajet seul`:''}.`:'Aucune ATCMD ni DISPO sur le périmètre : objectif atteint.',
     T('nbTraj')?`<b>${nf(T('nbTraj'))} trajets seuls</b> (${fmtH(hTraj)}, soit ${pct(hTraj,tte)} du TTE) ; ${nf(T('joursTrajSeul'))} journées de service composées uniquement de trajets seuls.`:'',
     d.pistes.length?`<b>${nf(d.pistes.length)} trajets seuls</b> auraient pu être remplacés par un train productif sur le même parcours (${fmtH(gain)} de trajet)${eco?` ; dans ${nf(eco)} cas, l’agent qui a assuré ce train était venu en trajet seul et n’a rien fait d’autre : sa journée pourrait être économisée`:''}.`:'',
     reeqT?`<b>${fmtH(reeqT)}</b> d’heures sup auraient pu être confiées à des agents de la même agence et du même métier restés sous ${nfa(S.rules.seuilHebdo)} h la même semaine.`:'',
@@ -3132,7 +3156,7 @@ function viewProduction(){
       ${kp('Trajets seuls',nf(T('nbTraj')),`${fmtH(hTraj)} · ${pct(hTraj,tte)} du TTE`)}
       ${kp('Journées « trajet seul »',nf(T('joursTrajSeul')),'journées de service sans autre mission')}
       ${kp('Journées blanches',nf(T('jb')),`${nf(T('autresVides'))} autres cases vides`)}
-      ${kp('DISPO · ATCMD',`${nf(T('dispo'))} · ${nf(T('atcmd'))}`,'missions')}
+      ${kp('ATCMD · DISPO',`${nf(T('atcmd'))} · ${nf(T('dispo'))}`,`${fmtH(cmdH)} payées sans train · objectif 0`,cmdN>0)}
       ${kp('RHR',nf(T('nbRHR')),`${nf(T('rhrNuits'))} nuits · ${topLieux.map(([l,n])=>esc(l)+' '+n).join(', ')||'—'}`)}</div>
     ${stable('prNP',[nom,ag,{k:'neutre',l:'Heures neutralisées',f:p=>p.neutre?fmtH(p.neutre):z},{k:'nbCourtes',l:'Missions < '+nfa(S.rules.minMission)+' h'},
       {k:'nbTraj',l:'Trajets seuls'},{k:'hTraj',l:'Heures de trajet seul',f:p=>p.hTraj?fmtH(p.hTraj):z},{k:'joursTrajSeul',l:'Journées trajet seul'},
@@ -3148,15 +3172,22 @@ function viewProduction(){
       {k:'alternances',l:'Alternances jour / nuit',f:p=>`${nf(p.alternances)} / ${nf(p.enchainements)}`},{k:'absences',l:'Jours d’absence'},
       {k:'rhrLong',l:'RHR > '+nfa(S.rules.rhrMaxAbsence||44)+' h'},{k:'autresVides',l:'Cases vides non classées'}],L,{sort:{k:'ecartPrise',dir:'desc'},tall:true,sticky:true})}`,
     `Écart de prise : différence entre les heures de première prise de service de deux jours de service consécutifs. Jour de nuit : journée qui compte des heures de nuit (plage réglée par métier). Absences : codes hors repos et congés (MAL, AT…).`);
-  const opti=card('Optimisation des plannings','trajets seuls qui auraient pu être remplacés par un train productif',
-    d.pistes.length?stable('prOpti',[{k:'date',l:'Jour',cls:'l mono',f:x=>dFull(x.date)},{k:'nom',l:'Agent en trajet seul',cls:'l',f:x=>`<span class="nm">${esc(x.nom)}</span> <span class="mut">${esc(x.agence)}</span>`},
+  const opti=card('Optimisation des plannings','trajets seuls, ATCMD et DISPO qui auraient pu laisser place à un train productif',
+    (d.pistes.length?stable('prOpti',[{k:'date',l:'Jour',cls:'l mono',f:x=>dFull(x.date)},{k:'nom',l:'Agent en trajet seul',cls:'l',f:x=>`<span class="nm">${esc(x.nom)}</span> <span class="mut">${esc(x.agence)}</span>`},
       {k:'traj',l:'Trajet seul',cls:'l',v:x=>x.traj.start,f:x=>`${esc(x.traj.label)} · ${esc(x.traj.from)} → ${esc(x.traj.to)} · ${hm(x.traj.start)}–${hm(x.traj.end)}`},
       {k:'train',l:'Train possible',cls:'l',v:x=>x.train.start,f:x=>`<b>${esc(x.train.label)}</b> · ${hm(x.train.start)}–${hm(x.train.end)}`},
       {k:'par',l:'Assuré par',cls:'l',v:x=>x.train.nom,f:x=>`${esc(x.train.nom)} <span class="mut">${esc(x.train.agence)}</span>`},
       {k:'gain',l:'Trajet évité',v:x=>x.traj.h,f:x=>fmtH(x.traj.h)},
       {k:'eco',l:'Journée économisable',v:x=>x.journeeEco?2:x.venuEnVoy?1:0,f:x=>x.journeeEco?'<span class="pill pill-a">oui</span>':x.venuEnVoy?'<span class="pill">venu en trajet seul</span>':z}],
-      d.pistes,{sort:{k:'eco',dir:'desc'},tall:true}):'<p class="mut">Aucun trajet seul remplaçable trouvé sur ce périmètre.</p>',
-    `Pour chaque trajet seul X → Y : un train productif (ni trajet seul, ni DISPO, ni ATCMD) X → Y assuré par un autre agent du même métier, qui part entre l’arrivée de l’agent à X (fin de sa mission précédente) et ${nfa(+P.optiFenetre||0)} h après le départ prévu du trajet seul (réglable). « Journée économisable » : l’agent qui a assuré ce train était venu à X en trajet seul et n’a rien fait d’autre ce jour-là. À vérifier avant toute décision : habilitations, connaissance de ligne, repos, roulements.`);
+      d.pistes,{sort:{k:'eco',dir:'desc'},tall:true}):'<p class="mut">Aucun trajet seul remplaçable trouvé sur ce périmètre.</p>')+
+    `<h3 class="prod-h3">ATCMD et DISPO : trains qui auraient pu être confiés à l’agent</h3>`+(d.pistesCmd.length?stable('prCmd',[{k:'date',l:'Jour',cls:'l mono',f:x=>dFull(x.date)},
+      {k:'nom',l:'Agent en ATCMD / DISPO',cls:'l',f:x=>`<span class="nm">${esc(x.nom)}</span> <span class="mut">${esc(x.agence)}</span>`},
+      {k:'slot',l:'Plage',cls:'l',v:x=>x.slot.start,f:x=>`${esc(x.slot.label)} · ${esc(x.slot.lieu)} · ${hm(x.slot.start)}–${hm(x.slot.end)}`},
+      {k:'train',l:'Train parti du même lieu',cls:'l',v:x=>x.train?x.train.start:'',f:x=>x.train?`<b>${esc(x.train.label)}</b> · ${esc(x.train.from)} → ${esc(x.train.to)} · ${hm(x.train.start)}–${hm(x.train.end)}${x.nbTrains>1?` <span class="mut">(+${x.nbTrains-1})</span>`:''}`:'<span class="z">aucun</span>'},
+      {k:'par',l:'Assuré par',cls:'l',v:x=>x.train?x.train.nom:'',f:x=>x.train?`${esc(x.train.nom)} <span class="mut">${esc(x.train.agence)}</span>`:''},
+      {k:'eco',l:'Économie',v:x=>x.journeeEco?3:x.venuEnVoy?2:x.train?1:0,f:x=>x.journeeEco?'<span class="pill pill-a">journée</span>':x.venuEnVoy?'<span class="pill">trajet seul</span>':x.train?'<span class="mut">à étudier</span>':''}],
+      d.pistesCmd,{sort:{k:'eco',dir:'desc'},tall:true}):'<p class="mut">Aucune ATCMD ni DISPO sur ce périmètre.</p>'),
+    `ATCMD (attente de la commande) et DISPO (disponible à l’agence) sont du temps payé sans train : l’objectif est de n’en avoir plus. Pour chacune, les trains productifs partis du même lieu pendant la plage, assurés par un autre agent du même métier ; « trajet seul » : cet agent était venu en trajet seul pour ce train (trajet économisé), « journée » : il n’a rien fait d’autre ce jour-là. Pour chaque trajet seul X → Y : un train productif (ni trajet seul, ni DISPO, ni ATCMD) X → Y assuré par un autre agent du même métier, qui part entre l’arrivée de l’agent à X (fin de sa mission précédente) et ${nfa(+P.optiFenetre||0)} h après le départ prévu du trajet seul (réglable). « Journée économisable » : l’agent qui a assuré ce train était venu à X en trajet seul et n’a rien fait d’autre ce jour-là. À vérifier avant toute décision : habilitations, connaissance de ligne, repos, roulements.`);
   const confCard=card('Conformité à l’accord d’entreprise','écarts du planning aux règles de l’accord ECR 2018, agent par agent',
     `<div class="kpis">${kp('Écarts',nf(nc.length),`${nf(ncAg)} agent${ncAg>1?'s':''} concerné${ncAg>1?'s':''}`,nc.length>0)}
       ${kp('À surveiller',nf(conf.length-nc.length),'repos compensateurs dus (RHR de moins de 11 h)')}
@@ -3164,7 +3195,7 @@ function viewProduction(){
     ${parType.length?stable('prConfT',[{k:'l',l:'Règle',cls:'l',f:x=>`${x.niv==='info'?'':'<b>'}${esc(x.l)}${x.niv==='info'?'':'</b>'}`},{k:'art',l:'Accord',cls:'l mono',f:x=>esc(x.art)},{k:'n',l:'Cas'},{k:'ag',l:'Agents'}],parType,{sort:{k:'n',dir:'desc'}}):''}
     ${conf.length?stable('prConf',[{k:'date',l:'Jour',cls:'l mono',f:x=>dFull(x.date)},{k:'nom',l:'Agent',cls:'l',f:x=>`<span class="nm">${esc(x.nom)}</span> <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span>`},
       {k:'type',l:'Règle',cls:'l',v:x=>(CONF_TYPES[x.type]||[x.type])[0],f:x=>`${x.niveau==='info'?'<span class="pill">à surveiller</span> ':''}${esc((CONF_TYPES[x.type]||[x.type])[0])}`},{k:'detail',l:'Détail',cls:'l',f:x=>esc(x.detail)}],conf,{sort:{k:'date',dir:'asc'},tall:true,sticky:true}):'<p class="mut">Aucun écart détecté.</p>'}`,
-    `Règles de l’accord pré-remplies et réglables (Réglages → « Accord d’entreprise »). Conducteurs : chapitre 3 ; AFR et coordinateurs : chapitre 4, titre 2. Repos périodique = RP seulement ; grande période de travail (GPT) = jours consécutifs sans repos (RP, RF, JF, RCL, RCC). Contrôlé sur le planning des fichiers : le temps de conduite et le réalisé n’y figurent pas. ${accordOf(S.rules).commandes?'':'Attente de la commande et disposition à l’agence : non contrôlées tant que la correspondance ATCMD / DISPO n’est pas confirmée (Réglages).'}`);
+    `Règles de l’accord pré-remplies et réglables (Réglages → « Accord d’entreprise »). Conducteurs : chapitre 3 ; AFR et coordinateurs : chapitre 4, titre 2. Repos périodique = RP seulement ; grande période de travail (GPT) = jours consécutifs sans repos (RP, RF, JF, RCL, RCC). Contrôlé sur le planning des fichiers : le temps de conduite et le réalisé n’y figurent pas. ATCMD = attente de la commande, DISPO = disponible à l’agence : 2 fois par semaine chacune, 3 au total${accordOf(S.rules).commandes?'':' (contrôle désactivé dans Réglages)'}.`);
   const eqv=(p,k,u)=>{ const g=p.g[k], v=p.v[k], c=g.et>0&&v>g.moy+g.et?'hi':g.et>0&&v<g.moy-g.et?'lo':'';
     return `<span class="eqv ${c}" title="moyenne ${esc(p.agence)} · ${esc(p.metier)} : ${u?fmtH(g.moy):nf(g.moy,2)} par semaine">${u?fmtH(v):nf(v,2)}</span>`; };
   const eqCard=card('Équité de répartition','par semaine de présence, comparée aux agents de la même agence et du même métier',
@@ -4805,7 +4836,7 @@ function viewReglages(){
             ['hebdoMax','Heures par semaine, au maximum'],['moy4sem','Moyenne sur 4 semaines, au maximum (h)'],['rhrMin','RHR minimum (h)'],['rhrComp','RHR : repos compensateur en dessous de (h)'],['rhrLongRj','Repos à résidence après un RHR de plus de 24 h (h)'],['pauseMin','Pause minimale au-delà de 6 h de travail (min)']]
             .map(([k,l])=>`<tr><td class="l">${l}</td><td colspan="2" class="l"><input type="text" data-acc="${k}" value="${esc(String(ac[k]).replace('.',','))}" inputmode="decimal" style="width:70px"></td></tr>`).join('')}
           </tbody></table></div>
-          <label class="mut"><input type="checkbox" id="accCmd" ${ac.commandes?'checked':''}> contrôler « ATCMD » comme attente de la commande et « DISPO » comme disposition à l'agence (2 fois par semaine chacune, 3 au total ; art. 15–16, 36–37)</label></span></div>
+          <label class="mut"><input type="checkbox" id="accCmd" ${ac.commandes?'checked':''}> contrôler les ATCMD (attente de la commande) et DISPO (disponible à l'agence) : 2 fois par semaine chacune, 3 au total ; art. 15–16, 36–37)</label></span></div>
       </div>
       <div class="btns"><button class="btn btn-pri" id="saveRules">Appliquer et enregistrer</button></div>
     </div></section>

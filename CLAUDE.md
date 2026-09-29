@@ -98,9 +98,9 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   ≥ 5 h (double : 23 h / 3 h), repos périodique = 24 h × jours + repos journalier, GPT ≤ 6 jours, GPT de 6 jours suivie d'un
   repos double, 2 GPT de 6 jours au plus sur 4 semaines, 48 h / semaine, 44 h en moyenne sur 4 semaines, pause ≥ 20 min
   au-delà de 6 h (art. 3, 19–20, 22, 30–32). **Choix de l'utilisateur** : repos périodique = RP seulement (RF / JF à part) ;
-  GPT = jours consécutifs sans repos (RP, RF, JF, RCL, RCC ; CP et absences ne la coupent pas). Attente de la commande /
-  disposition à l'agence (2 + 1 par semaine) : contrôle désactivé tant que « ATCMD = attente de la commande, DISPO =
-  disposition à l'agence » n'est pas confirmé (case dans Réglages). Non contrôlables (absents des fichiers) : temps de
+  GPT = jours consécutifs sans repos (RP, RF, JF, RCL, RCC ; CP et absences ne la coupent pas). **ATCMD = attente de la
+  commande** (attend une mission pendant la plage), **DISPO = disponible à l'agence** (sur aucun train, prêt en cas de
+  besoin) — précisé par l'utilisateur : contrôle 2 fois par semaine chacune, 3 au total (art. 15–16, 36–37), actif par défaut. Non contrôlables (absents des fichiers) : temps de
   conduite, réalisé. `conformiteData` (moteur, testé) → carte « Conformité à l'accord d'entreprise » (écarts par règle, détail
   par agent et par jour ; « à surveiller » : repos compensateur dû).
 - Repos dus par défaut = accord (117 / 113 RP par an au prorata des jours présents) sauf nombre saisi dans Réglages ;
@@ -108,6 +108,11 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
 - **Équité de répartition** (`equiteData`) : jours de service, heures de nuit, RHR, DISPO, journées blanches, ATCMD, heures
   sup, jours de week-end travaillés, par semaine de présence ; par agence × métier : moyenne, min–max, « inégal » si
   écart-type > moitié de la moyenne ; par agent : ambre au-dessus de moyenne + écart-type, rose en dessous.
+- **ATCMD / DISPO = temps payé sans train, objectif 0** (l'utilisateur : avec des trains optimisés il ne devrait plus y en
+  avoir) : nombre et heures dans « Points d'attention » et « Temps non productif » ; `pistesCmd` : pour chaque ATCMD / DISPO,
+  les trains productifs partis du même lieu pendant la plage, assurés par un autre agent du même métier (toutes agences),
+  de préférence un agent venu en trajet seul pour ce train (« trajet seul » économisé) ou qui n'a rien fait d'autre
+  (« journée ») — tableau dans « Optimisation des plannings ».
 - Périmètre choisi par l'utilisateur : contrôle + équité + pistes sur les plannings importés (pas de génération automatique).
 
 ## Règles de calcul en vigueur (modifiables dans l'onglet Réglages, sans réimport)
