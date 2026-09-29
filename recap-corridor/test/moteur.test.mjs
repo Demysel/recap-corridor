@@ -797,21 +797,15 @@ test('Planification : même intitulé mais trajets différents = deux trains ré
   assert.equal(reg.map((t) => t.from + '>' + t.to).sort().join(), 'BAYONNE>HENDAYE,HENDAYE>IRUN');
 });
 
-test('Repos journaliers à résidence : réduits (sous 13 h) et sous le minimum (11 h conducteurs)', () => {
-  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '17:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '12:00'], ['T2B', 'HENDAYE', 'HENDAYE', 8, '15:00', 8, '20:00']),
+test('Repos journaliers à résidence : au minimum (13 h conducteurs) et sous le minimum', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '17:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '12:00'], ['T2B', 'HENDAYE', 'HENDAYE', 8, '15:00', 8, '20:00']),
     svc(['T3', 'HENDAYE', 'HENDAYE', 9, '05:00', 9, '10:00']), 'RP', 'RP', 'RP', 'RP'], {}, RES);
   a.weekId = '2026-S37';
   const r = E.reposJournaliersCourts([a], E.loadRules(RES));
-  assert.equal(r.reduits.length, 1);   // lundi 17:00 → mardi 05:00 : 12 h
+  assert.equal(r.minimum.length, 1);   // lundi 17:00 → mardi 06:00 : 13 h
   assert.equal(r.sous.length, 1);      // mardi 20:00 → mercredi 05:00 : 9 h
-  assert.equal(r.sous[0].h, 9);
-});
-
-test('Repos journalier égal au minimum (11 h conducteurs) : colonne « au minimum », pas « réduits »', () => {
-  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '18:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
-  a.weekId = '2026-S37';
-  const r = E.reposJournaliersCourts([a], E.loadRules(RES));
-  assert.equal(r.minimum.length, 1);
-  assert.equal(r.reduits.length, 0);
-  assert.equal(r.sous.length, 0);
+  assert.equal(r.sous[0].sousPlancher, true);
+  const b = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '18:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], { met: 'AFR' }, RES);
+  b.weekId = '2026-S37';
+  assert.equal(E.reposJournaliersCourts([b], E.loadRules(RES)).minimum.length, 1);   // AFR : 12 h
 });

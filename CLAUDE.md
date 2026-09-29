@@ -233,11 +233,12 @@ Seuil des trains réguliers réglable dans la page (1 à 4 fois sur 4 semaines, 
   fichier : par semaine, les jours absents et pourquoi (absent du fichier, autre agence hors du filtre, métier hors filtre,
   agence hors production, agent exclu avec motif, semaine non chargée) ; non classés : RP dont le numéro a déjà été lu (date
   et semaine de la première lecture), cases hors colonne (mission et date écrite).
-  Groupe « Temps de travail » : **« RJ réduits »**, **« RJ au minimum »** (égal au plancher à la minute près, ajouté à la
-  demande) et **« RJ sous le minimum »** (demandé par l'utilisateur ; RHR non comptés) — `reposJournaliersCourts` (moteur, testé) : repos à résidence entre deux jours de service qui
-  se suivent (journée précédente finie à la résidence ; AFR / coordo : toujours) ; réduit = sous la durée normale de l'accord
-  (13 h conducteurs, 12 h AFR) et au-dessus du plancher ; au minimum = égal au plancher ; sous le minimum = sous le plancher (11 h conducteurs, 12 h après
-  une journée de nuit ; 10 h AFR ; valeurs de Réglages → Accord). Cliquables : détail (fin, reprise, durée, normal, minimum). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
+  Groupe « Temps de travail » : **« RJ au minimum »** et **« RJ sous le minimum »** (demandé par l'utilisateur ; minimum
+  précisé par l'utilisateur = durée du repos journalier entre deux missions : **13 h conducteurs, 12 h AFR / coordo** ; RHR non
+  comptés) — `reposJournaliersCourts` (moteur, testé) : repos à résidence entre deux jours de service qui se suivent (journée
+  précédente finie à la résidence ; AFR / coordo : toujours) ; au minimum = égal à la minute près, sous le minimum = plus
+  court. Cliquables : détail (fin, reprise, durée), avec mention quand le repos passe aussi sous la réduction exceptionnelle
+  de l'accord (11 h conducteurs, 12 h après une journée de nuit ; 10 h AFR ; valeurs de Réglages → Accord). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
   clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
