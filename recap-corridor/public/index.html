@@ -3092,9 +3092,9 @@ const COLS=[
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
-  {g:'absences',k:'autresVides',l:'Autres cases vides',f:a=>a.autresVides?`<span title="Cases vides qui ne sont pas des journées blanches : avant le premier ou après le dernier service de la semaine, pendant un RHR…">${nf(a.autresVides)}</span>`:'<span class="z">0</span>',t:a=>a.autresVides},
-  {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<span title="Jours de la période où l’agent n’est dans aucun fichier importé (arrivée, départ, autre agence, agence hors production, semaine exclue)">${nf(a.horsFichier)}</span>`:'<span class="z">0</span>',t:a=>a.horsFichier},
-  {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<span title="Jours présents dans les fichiers mais rangés dans aucune colonne : RP dont le numéro a déjà été lu, cases « hors colonne »">${nf(a.nonClasses)}</span>`:'<span class="z">0</span>',t:a=>a.nonClasses},
+  {g:'absences',k:'autresVides',l:'Autres cases vides',f:a=>a.autresVides?`<button class="lk" data-cdet="autres|${esc(personKey(a))}" title="Cases vides qui ne sont pas des journées blanches : cliquez pour le détail jour par jour">${nf(a.autresVides)}</button>`:'<span class="z">0</span>',t:a=>a.autresVides},
+  {g:'absences',k:'horsFichier',l:'Hors fichier',f:a=>a.horsFichier?`<button class="lk" data-cdet="hors|${esc(personKey(a))}" title="Jours où l’agent n’est dans aucun fichier : cliquez pour le détail (arrivée, départ, autre agence, agence hors production, agent exclu)">${nf(a.horsFichier)}</button>`:'<span class="z">0</span>',t:a=>a.horsFichier},
+  {g:'absences',k:'nonClasses',l:'Non classés',f:a=>a.nonClasses?`<button class="lk" data-cdet="nonclasses|${esc(personKey(a))}" title="Jours présents dans les fichiers mais rangés dans aucune colonne : cliquez pour le détail">${nf(a.nonClasses)}</button>`:'<span class="z">0</span>',t:a=>a.nonClasses},
 ];
 const GRP={identite:'Identité',activite:'Activité',rhr:'Hors résidence',temps:'Temps de travail',paniers:'Paniers repas',absences:'Repos & absences'};
 const visCols=()=>COLS.filter(c=>S.cols[c.g]);
@@ -3115,6 +3115,39 @@ function sortAgents(list){
   return [...list].sort((a,b)=>{const x=val(a),y=val(b);
     const r=(typeof x==='number'&&typeof y==='number')?x-y:String(x??'').localeCompare(String(y??''),'fr');
     return dir==='asc'?r:-r;});
+}
+/** Détail des colonnes de contrôle du tableau des agents (demandé par l'utilisateur) : à quoi correspond chaque jour compté
+    dans « Autres cases vides », « Hors fichier » et « Non classés » */
+function detailControle(kind,pk){
+  const a=(S.rows_agents||[]).find(x=>personKey(x)===pk); if(!a) return;
+  const rows=(a.parSemaine||[a]), jr=[], W=id=>S.weeks.find(w=>w.weekId===id)||{week:'?',year:''};
+  const ligne=(date,id,txt)=>`<tr><td class="l mono">${JS[(new Date(date+'T00:00:00Z').getUTCDay()+6)%7]} ${dFull(date)}</td><td class="l mono">${esc(weekLabel(W(id)))}</td><td class="l">${txt}</td></tr>`;
+  if(kind==='autres'){
+    for(const x of rows) for(const j of x.jours) if(!j.horsPeriode&&j.kind==='VIDE'&&!j.blanche){
+      const cv=(x.casesVides||[]).find(c=>c.date===j.date), r=(cv&&cv.raison)||j.jbRaison||'';
+      jr.push(ligne(j.date,x.weekId,`Case vide dans le fichier — non comptée en journée blanche : ${r?esc(r):j.horsResidence?'agent hors résidence (pendant un RHR)':'non encadrée par deux services'}`)); } }
+  if(kind==='nonclasses'){
+    for(const x of rows) for(const j of x.jours){ if(j.horsPeriode) continue;
+      if(j.kind==='CODE'&&j.rpDouble) jr.push(ligne(j.date,x.weekId,`Code « ${esc(j.code)} » : numéro de RP déjà lu le ${dFull(j.rpDouble.date)} (${esc(weekLabel(W(j.rpDouble.weekId)))}), non recompté`));
+      else if(j.kind==='CODE'&&j.family==='HORS') jr.push(ligne(j.date,x.weekId,`Case « hors colonne » : ${(j.horsColonne||[]).map(m=>`${esc(m.label)} daté du ${dISO(m.start)}`).join(', ')||'mission datée d’un autre jour'} — ligne d’une autre semaine recopiée, non comptée`)); } }
+  if(kind==='hors'){
+    const r=periodRange(S.selWeek), pres=new Set(rows.flatMap(x=>x.jours.filter(j=>!j.horsPeriode).map(j=>j.date)));
+    for(const id of activeWeeks()){ const w=S.weeks.find(x=>x.weekId===id); if(!w) continue;
+      const jours=Array.from({length:7},(_,i)=>isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+i*DAY))).filter(d=>(!r||(d>=r[0]&&d<=r[1]))&&!pres.has(d)); if(!jours.length) continue;
+      const v=S.loaded.get(id), b=v&&v.agents.find(y=>personKey(y)===pk), brut=S.parsedCache.get(id), c=brut&&brut.agents.find(y=>personKey(y)===pk);
+      let pq;
+      if(!v) pq='semaine non chargée';
+      else if(b&&b.exclu) pq=`agent exclu des chiffres${b.exclu.motif?` : ${esc(b.exclu.motif)}`:''}`;
+      else if(b&&S.selAgences&&!S.selAgences.includes(b.agence)) pq=`dans le fichier, mais à l’agence ${esc(b.agence)} (hors du filtre d’agence)`;
+      else if(b&&S.selMetiers&&!S.selMetiers.includes(b.metier)) pq=`dans le fichier, mais en ${esc(b.metier)} (hors du filtre de métier)`;
+      else if(!b&&c) pq=`dans le fichier à l’agence ${esc(c.agence)}, retirée des chiffres (agence hors production, Réglages)`;
+      else if(!c) pq=`absent du fichier de cette semaine (arrivée, départ ou mutation)`;
+      else pq='non retrouvé';
+      jr.push(`<tr><td class="l mono">${jours.length===7?'toute la semaine':jours.map(d=>`${JS[(new Date(d+'T00:00:00Z').getUTCDay()+6)%7]} ${dISO(d)}`).join(', ')}</td><td class="l mono">${esc(weekLabel(w))}</td><td class="l">${pq}</td></tr>`); } }
+  const T={autres:'Autres cases vides',hors:'Hors fichier',nonclasses:'Non classés'}[kind];
+  openPanel(`${T} — ${a.nom} ${a.prenom}`,`${esc(periodLabel(S.selWeek,S.weeks))} · ${a[{autres:'autresVides',hors:'horsFichier',nonclasses:'nonClasses'}[kind]]} jour(s)`,
+    `<section class="card"><div class="card-b">${jr.length?`<div class="tw"><table><thead><tr><th class="l">Jour</th><th class="l">Semaine</th><th class="l">À quoi correspond la case</th></tr></thead><tbody>${jr.join('')}</tbody></table></div>`
+      :'<p class="mut">Aucun jour à détailler (écart de calcul : cases de service ou de code comptées ailleurs).</p>'}</div></section>`);
 }
 function viewAgents(){
   const sc=scopeAgents(); if(!sc.length) return emptyScope();
@@ -5525,7 +5558,7 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
-    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-cocow],[data-cocoadd],[data-cocodel],[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
+    '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-cdet],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-cocow],[data-cocoadd],[data-cocodel],[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
   if(S.tab==='planif'&&S.role==='admin'){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd')||{id:'',dataset:{}};
     const ch=e.target.closest('[data-pm]'), dz=e.target.closest('[data-pdrop]');
     if(ch&&!e.target.closest('select,button')){ S.plSel=S.plSel===ch.dataset.pm?null:ch.dataset.pm; render(); return; }
@@ -5636,6 +5669,7 @@ document.addEventListener('click',async e=>{
     if(!confirm(`${nmPk(pk)} : résidence ${l} à partir de ${w.replace(/^\d+-/,'')} et pour les semaines suivantes (mouvement d’agence) ?`)) return;
     const c=S.rules.corrections; c.residenceAgent=c.residenceAgent||{}; c.residenceAgent[pk+'|'+w]=l;
     return saveCorrection(`Résidence de l’agent : ${l} à partir de ${w}`,nmPk(pk)); }
+  if(t.dataset.cdet){ const [k,...pk]=t.dataset.cdet.split('|'); detailControle(k,pk.join('|')); return; }
   if(t.dataset.alhor!=null||t.dataset.alview!=null){ const i=+(t.dataset.alhor??t.dataset.alview), a=S.rows_al[i]; if(a) alertPanel(a,i); return; }
   if(t.dataset.horsave!=null&&admin()){ const a=S.rows_al[+t.dataset.horsave], h=a&&a.fix&&a.fix.hor; if(!h) return;
     const deb=el('hDeb').value, fin=el('hFin').value;

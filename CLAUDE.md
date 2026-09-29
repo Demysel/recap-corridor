@@ -228,7 +228,11 @@ Seuil des trains réguliers réglable dans la page (1 à 4 fois sur 4 semaines, 
   colonne à part demandée), « Hors fichier » (jours où l'agent n'est dans aucun fichier : arrivée, départ,
   autre agence, agence hors production, semaine exclue) et « Non classés » (cases vides qui ne sont pas des journées
   RP dont le numéro est déjà lu — non comptés, choix de l'utilisateur —, cases hors colonne) ; Total + Autres cases vides +
-  Hors fichier + Non classés = jours de la période. Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
+  Hors fichier + Non classés = jours de la période. Chacune de ces trois colonnes est cliquable (demandé par l'utilisateur,
+  `detailControle`) : panneau jour par jour — autres cases vides : raison de la non-comptée en journée blanche ; hors
+  fichier : par semaine, les jours absents et pourquoi (absent du fichier, autre agence hors du filtre, métier hors filtre,
+  agence hors production, agent exclu avec motif, semaine non chargée) ; non classés : RP dont le numéro a déjà été lu (date
+  et semaine de la première lecture), cases hors colonne (mission et date écrite). Tuile « Codes » de la fiche : chaque code s'ouvre (survol ou
   clic/toucher) sur la liste des jours décomptés avec le code écrit dans le fichier (utile pour « AUTRE »).
 - Codes (précisés par l'utilisateur) : RF repos férié, JF jour férié, RCL repos compensatoire légal,
   RCC repos compensateur conventionnel, CFAM congé familial, CPRCL non défini, AT accident du travail,
