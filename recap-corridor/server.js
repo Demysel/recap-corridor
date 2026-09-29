@@ -9,6 +9,8 @@
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
      CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
      CODE_COVOIT    code « Coco » (copain covoit) : missions de la semaine des seuls agents choisis par l'admin
+     CODES_ACCES    « oui » : accepte aussi les codes sur le site principal (secours ; par défaut, codes refusés sur le
+                    principal à la demande de l'utilisateur, acceptés sur le site de test)
      APP_URL        adresse du site (liens de mot de passe créés par l'admin), ex. https://recap-corridor.onrender.com
      PORT           fourni par Render
      DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
@@ -63,7 +65,10 @@ function same(a, b) {
   const x = Buffer.from(norm(a)), y = Buffer.from(norm(b));
   return x.length > 0 && x.length === y.length && crypto.timingSafeEqual(x, y);
 }
+/** Codes d'accès : retirés du site principal (demandé par l'utilisateur : connexion par compte seulement) ; gardés sur le test */
+const CODES = DEV || process.env.CODES_ACCES === 'oui';
 function role(req) {
+  if (!CODES) return null;
   const given = req.headers['x-acces'] || '';
   if (process.env.CODE_ADMIN && same(given, process.env.CODE_ADMIN)) return 'admin';
   if (process.env.CODE_LECTURE && same(given, process.env.CODE_LECTURE)) return 'lecture';
@@ -264,14 +269,14 @@ const MENTIONS = [['site', 300], ['editeur', 300], ['editeurAdresse', 300], ['co
 const ID = /^\d{4}-S\d{2}$/;
 async function api(req, res, url) {
   const route = url.pathname.replace(/^\/api\/?/, '');
-  if (route === 'ping') return json(req, res, 200, { ok: true });
+  if (route === 'ping') return json(req, res, 200, { ok: true, codes: CODES });
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   if (trop(ip)) return json(req, res, 429, { error: 'Trop d’essais. Réessayez dans quelques minutes.' });
   if (['auth/login', 'auth/inscription', 'auth/oubli', 'auth/reinit'].includes(route)) return authPublique(req, res, route, ip);
   const A = await acces(req);
   if (!A) {
-    if (req.headers['x-acces']) echec(ip); await new Promise((ok) => setTimeout(ok, 400));
-    return json(req, res, 401, { error: req.headers['x-session'] ? 'Session expirée : reconnectez-vous.' : 'Code d’accès non reconnu.' });
+    if (req.headers['x-acces'] && CODES) echec(ip); await new Promise((ok) => setTimeout(ok, 400));
+    return json(req, res, 401, { error: req.headers['x-session'] ? 'Session expirée : reconnectez-vous.' : CODES ? 'Code d’accès non reconnu.' : 'Connexion par code désactivée : connectez-vous avec votre e-mail.' });
   }
   const r = A.role, caps = A.caps;
   if (route === 'session') return json(req, res, 200, { role: r, caps, user: A.user });

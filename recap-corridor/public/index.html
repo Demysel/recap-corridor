@@ -5382,7 +5382,7 @@ function renderLogin(){
       <p>Repos hors résidence, journées blanches, heures et paniers — semaine par semaine, agent par agent.</p></div></div>
     ${lgForm()}
     ${S.err?`<div class="note c">${esc(S.err)}</div>`:''}${S.lgInfo?`<div class="note">${esc(S.lgInfo)}</div>`:''}
-    <p class="lg-n">Le code visiteur ouvre des statistiques anonymes : aucun nom ni matricule. Le détail nominatif reste réservé aux personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
+    <p class="lg-n">${S.codesOff?'Chaque compte ne voit que ce que l’administrateur lui a accordé.':'Le code visiteur ouvre des statistiques anonymes : aucun nom ni matricule.'} Le détail nominatif reste réservé aux personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
   </div>`;
   setTimeout(()=>el('login').querySelector('input:not([value]),input[value=""]')?.focus(),30);
 }
@@ -5392,8 +5392,9 @@ function lgForm(){
   const champ=(id,lab,type,ph,ac,val)=>`<label class="fld"><span class="flabel">${lab}</span><input type="${type}" id="${id}" class="${id==='codeIn'?'':'tx'}" placeholder="${ph}" autocomplete="${ac}"${val!=null?` value="${esc(val)}"`:''}></label>`;
   const go=(txt)=>`<button class="btn btn-pri lg-b" id="${m==='code'?'codeGo':'lgGo'}"${b?' disabled':''}>${b?'Patientez…':txt}</button>`;
   const lk=(k,txt)=>`<button class="lnk" data-lg="${k}">${txt}</button>`;
-  const tabs=`<div class="seg lg-t"><button class="sg" data-lg="mail" aria-pressed="${m!=='code'}">E-mail</button><button class="sg" data-lg="code" aria-pressed="${m==='code'}">Code d'accès</button></div>`;
-  if(m==='code') return `${tabs}${champ('codeIn',"Code d'accès",'password','XXXX-XXXX-XXXX','current-password')}${go('Entrer')}`;
+  if(m==='code'&&S.codesOff) S.lg='mail';
+  const tabs=S.codesOff?'':`<div class="seg lg-t"><button class="sg" data-lg="mail" aria-pressed="${m!=='code'}">E-mail</button><button class="sg" data-lg="code" aria-pressed="${m==='code'}">Code d'accès</button></div>`;
+  if(m==='code'&&!S.codesOff) return `${tabs}${champ('codeIn',"Code d'accès",'password','XXXX-XXXX-XXXX','current-password')}${go('Entrer')}`;
   if(m==='inscr') return `<h2 style="font-size:16px">Créer un compte</h2>${champ('lgNom','Nom et prénom','text','','name',S.lgNom||'')}${champ('lgMail','E-mail','email','prenom.nom@…','email',S.lgMail||'')}
     ${champ('lgMdp','Mot de passe (10 caractères au moins)','password','','new-password')}${champ('lgMdp2','Confirmer le mot de passe','password','','new-password')}
     <p class="lg-n">Le compte n’a aucun droit tant qu’un administrateur ne l’a pas validé.</p>${go('Créer le compte')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
@@ -6148,7 +6149,9 @@ setInterval(()=>{ if(!document.hidden&&S.role&&['coco','synthese'].includes(S.ta
   }
   const rj=new URLSearchParams(location.search).get('reinit');   // lien « mot de passe oublié » / invitation reçu par e-mail
   if(rj&&/^[A-Za-z0-9_-]{30,100}$/.test(rj)){ S.reinit=rj; S.lg='reinit'; render(); return; }
-  if(p.jeton) reprendre(p.jeton); else if(p.code) login(p.code); else render();
+  try{ const pg=await (await fetch(backend.url('ping'))).json(); S.codesOff=pg&&pg.codes===false; }catch(e){}   // codes d'accès retirés du principal
+  if(S.codesOff&&p.code){ try{ const q=prefs(); delete q.code; localStorage.setItem(LSK,JSON.stringify(q)); }catch(e){} }
+  if(p.jeton) reprendre(p.jeton); else if(p.code&&!S.codesOff) login(p.code); else render();
 })();
 
 /* ==========================================================================

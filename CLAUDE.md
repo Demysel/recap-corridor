@@ -67,8 +67,10 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 ## Comptes e-mail et droits (demandé par l'utilisateur)
 
-- Connexion par **e-mail + mot de passe** (écran par défaut) ; les **codes d'accès restent valables en parallèle** (onglet
-  « Code d'accès »). Choix de l'utilisateur : 5 droits séparés, inscription libre + validation, **aucun e-mail envoyé**
+- Connexion par **e-mail + mot de passe** (écran par défaut). **Codes d'accès retirés du site principal** (demandé par
+  l'utilisateur) : le serveur les refuse (`CODES` = site de test ou variable Render `CODES_ACCES=oui`, secours), `/api/ping`
+  renvoie `codes`, la page masque l'onglet « Code d'accès » (`S.codesOff`) et oublie un code mémorisé ; sur le site de test
+  les codes restent valables en parallèle. Choix de l'utilisateur : 5 droits séparés, inscription libre + validation, **aucun e-mail envoyé**
   (Brevo abandonné : SMS de confirmation jamais reçu ; l'admin transmet lui-même les liens par SMS, WhatsApp…).
 - **Droits** (`DROITS`, `capsDe`) : `vitrine` (statistiques anonymes), `coco` (vue covoiturage), `lecture` (consultation
   complète nominative, sans rien modifier), `modif` (import, réglages, corrections, planification, choix Coco ; comprend
