@@ -134,8 +134,14 @@ RCL, RCC, CP, MAL, AT, FORM ou rien) et une ligne « Réserve » par jour.
   planning type pour S+1 (vide au-delà). **Trains réguliers** (choix de l'utilisateur : même intitulé, même jour de semaine,
   au moins 2 fois sur les 4 semaines importées qui précèdent ; ATCMD et DISPO exclus, ce ne sont pas des trains) :
   `trainsReguliers` (horaire, trajet et pauses les plus fréquents ; agent habituel = celui qui l'a fait le plus) ; semaine à
-  venir : pré-placés chez l'agent habituel s'il est dans la grille, sans code ce jour-là et sans chevauchement, sinon en
-  réserve ; semaine importée : ceux absents de la semaine vont en réserve. Missions ajoutées à la main (formulaire : jour,
+  venir : **pré-remplissage par agence** (demandé par l'utilisateur : un agent de Hendaye ne fait pas une mission de
+  Vaires) — `planifPreremplir` (moteur, testé) : chaque train appartient à l'agence et à la famille de métier (AFR /
+  conducteurs) majoritaires chez les agents qui l'ont assuré, et ne va qu'à un agent de cette agence et de ce métier :
+  l'agent qui l'a fait le plus souvent, sinon un collègue libre ce jour-là (pas de code, pas de chevauchement, amplitude du
+  jour et repos avec la veille / le lendemain au-dessus des minimums de l'accord, fin de la semaine précédente comprise),
+  le moins chargé à égalité ; sinon réserve (étiquetée avec l'agence). Trains d'agences absentes de la grille : ignorés.
+  Semaine importée : les trains réguliers de ses agences absents de la semaine vont en réserve. La grille et la réserve
+  suivent le filtre agence / métier du haut de page ; une agence filtrée absente du brouillon est signalée (« Repartir »). Missions ajoutées à la main (formulaire : jour,
   intitulé, départ, arrivée, début, fin) dans la réserve.
 - Glisser-déposer (case ↔ case, case ↔ réserve ; sur téléphone : toucher la mission puis la case) ; une mission changée de
   jour garde son heure (`planifDeplacer`). À chaque changement, `planifAlertes` (moteur, testé) : semaine planifiée

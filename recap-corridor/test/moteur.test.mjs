@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -767,4 +767,24 @@ test('Planification : train régulier (2 semaines sur 4), mission posée qui cas
   pl.agents[0].jours[0].m.push(E.missionDuJour(reg[0], days[0], 'x1'));   // B finit dimanche 23:00, reprend lundi 06:00 : 7 h
   const al = E.planifAlertes(pl, [w2], E.loadRules(RES));
   assert.ok(al.some((x) => x.type === 'rj' && x.date === days[0]));
+});
+
+test('Planification : pré-remplissage par agence — le train de Hendaye va à un agent de Hendaye libre, celui de Vaires à personne', () => {
+  const t5 = (d) => svc(['T5', 'HENDAYE', 'IRUN', d, '06:00', d, '14:00']), t9 = (d) => svc(['T9', 'VAIRES', 'PARIS', d, '06:00', d, '12:00']);
+  const mk = (l) => E.parseWeek(week(l, [{ mat: '1', nom: 'A', j: [t5(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
+    { mat: '9', nom: 'V', ag: 'Vaires', j: [t9(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  const w1 = mk([2026, 9, 7]), w2 = mk([2026, 9, 14]);
+  const reg = E.trainsReguliers([w1, w2], 2);
+  assert.equal(reg.length, 2);
+  const info = new Map([['m:1', { agence: 'Hendaye', metier: 'CONDUCTEUR' }], ['m:9', { agence: 'Vaires', metier: 'CONDUCTEUR' }], ['m:2', { agence: 'Hendaye', metier: 'CONDUCTEUR' }]]);
+  const days = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
+  const vide = () => days.map(() => ({ c: '', m: [] }));
+  const pl = { meta: { weekId: '2026-S39', monday: days[0], sunday: days[6], days }, agents: [
+    { matricule: '1', nom: 'A', prenom: 'P', agence: 'Hendaye', metier: 'CONDUCTEUR', jours: vide() },
+    { matricule: '2', nom: 'B', prenom: 'P', agence: 'Hendaye', metier: 'CONDUCTEUR', jours: vide() }] };
+  pl.agents[0].jours[0].c = 'RP';                        // l'agent habituel est en repos lundi
+  const res = E.planifPreremplir(pl, reg, info, new Map(), E.loadRules(RES));
+  assert.equal(pl.agents[1].jours[0].m.map((m) => m.label).join(), 'T5');
+  assert.equal(pl.agents[0].jours[0].m.length, 0);
+  assert.equal(res.length, 0);                           // T9 (Vaires) : aucune agence Vaires dans la grille, ignoré
 });
