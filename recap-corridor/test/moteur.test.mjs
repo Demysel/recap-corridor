@@ -806,3 +806,12 @@ test('Repos journaliers à résidence : réduits (sous 13 h) et sous le minimum 
   assert.equal(r.sous.length, 1);      // mardi 20:00 → mercredi 05:00 : 9 h
   assert.equal(r.sous[0].h, 9);
 });
+
+test('Repos journalier égal au minimum (11 h conducteurs) : colonne « au minimum », pas « réduits »', () => {
+  const a = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '18:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '05:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], {}, RES);
+  a.weekId = '2026-S37';
+  const r = E.reposJournaliersCourts([a], E.loadRules(RES));
+  assert.equal(r.minimum.length, 1);
+  assert.equal(r.reduits.length, 0);
+  assert.equal(r.sous.length, 0);
+});
