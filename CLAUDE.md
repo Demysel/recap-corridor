@@ -22,7 +22,7 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
   aux mêmes adresses que l'ancienne fonction Netlify : `GET /api/session`, `GET /api/etat`,
   `GET|PUT|DELETE /api/semaine`, `PUT /api/regles` (avec `_journal` : ligne ajoutée au journal, clé `journal`),
   `PUT /api/suivi` (suivi des alertes « À vérifier », clé `suivi`), `GET|PUT /api/coco` (vue Coco, clé `coco`), `GET /api/source` (admin : fichier conservé d'une semaine), `GET|PUT /api/mentions` (mentions légales, clé `mentions` ;
-  lecture pour les deux codes, écriture admin, champs limités à la liste `MENTIONS`), `GET /api/ping`, `GET /api/vitrine`.
+  lecture pour les deux codes, écriture admin, champs limités à la liste `MENTIONS`), `GET /api/ping`, `GET /api/vitrine`, `/api/auth/…` et `/api/utilisateurs` (comptes e-mail, voir plus bas).
 - **Code visiteur (CODE_LECTURE) = vitrine RGPD** : le serveur ne lui envoie jamais de données
   nominatives (`/api/semaine` refusé, résumés sans nom de fichier ni anomalies, règles non envoyées).
   `/api/vitrine` renvoie des agrégats calculés sur le serveur par le moteur de la page
@@ -64,6 +64,30 @@ L'application reprend la structure du zip d'origine : **une seule page** qui con
 
 Quand l'utilisateur demande une modification : **garder l'affichage et les méthodes de calcul
 existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « moderniser ».
+
+## Comptes e-mail et droits (demandé par l'utilisateur)
+
+- Connexion par **e-mail + mot de passe** (écran par défaut) ; les **codes d'accès restent valables en parallèle** (onglet
+  « Code d'accès »). Choix de l'utilisateur : Brevo pour les e-mails, 5 droits séparés, inscription libre + validation.
+- **Droits** (`DROITS`, `capsDe`) : `vitrine` (statistiques anonymes), `coco` (vue covoiturage), `lecture` (consultation
+  complète nominative, sans rien modifier), `modif` (import, réglages, corrections, planification, choix Coco ; comprend
+  lecture), `admin` (gestion des comptes ; comprend tout). CODE_ADMIN = tous ; CODE_LECTURE = vitrine ; CODE_COVOIT = coco.
+  Rôle d'affichage (`roleDe`) : lecture ⇒ page complète (`admin`, écriture seulement si `peut('modif')`, `admin()` =
+  rôle admin + modif) ; vitrine + coco ⇒ `mixte` (Vitrine, Coco, Guide, Mentions) ; sinon comme les codes ; aucun droit ⇒
+  `aucun` (message d'attente). Les droits sont relus à chaque appel : un retrait prend effet tout de suite.
+- Serveur : tables `utilisateurs`, `sessions`, `jetons_mdp` (créées par `tablesAuth` ; `db/schema.sql`) ; mot de passe =
+  empreinte scrypt (`scrypt$sel$clé`) ; jeton de session 30 jours (en-tête `x-session`, empreinte SHA-256 en base) ;
+  routes publiques `POST /api/auth/login|inscription|oubli|reinit` (réponses identiques que l'adresse existe ou non ;
+  compteur d'essais `echec`) ; `POST /api/auth/logout|mdp` ; `GET|POST|PUT|DELETE /api/utilisateurs` (droit admin :
+  liste, invitation avec lien 3 jours, droits / validation / suspension, lien de mot de passe 24 h, suppression ; **le
+  dernier administrateur ne peut être ni retiré ni supprimé**). Lien « mot de passe oublié » valable 1 h (`/?reinit=…`),
+  toutes les sessions fermées après changement. E-mails Brevo (`mail`) : variables Render `BREVO_API_KEY`, `MAIL_FROM`,
+  `APP_URL` ; sans elles rien n'est envoyé et le lien s'affiche à l'administrateur. Les admins validés sont prévenus des
+  nouvelles inscriptions.
+- Page : `lgForm` / `lgValider` (connexion, inscription, oubli, nouveau mot de passe), `reprendre` (session mémorisée,
+  prefs `jeton`), onglets « Utilisateurs » (droit admin) et « Mon compte » (droits, changer de mot de passe).
+- **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
+  ont été ajoutés directement dans Supabase (`recap_dev`) ; à refaire dans `recap` lors du passage sur le principal.
 
 ## Onglet Production (demandé par l'utilisateur, admin seulement, groupe Pilotage)
 

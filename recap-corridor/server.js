@@ -9,6 +9,9 @@
      CODE_ADMIN     code d'accès complet (import, suppression, réglages)
      CODE_LECTURE   code visiteur : statistiques anonymes uniquement (aucun nom ni matricule)
      CODE_COVOIT    code « Coco » (copain covoit) : missions de la semaine des seuls agents choisis par l'admin
+     BREVO_API_KEY  clé de l'API Brevo (envoi des e-mails : mot de passe oublié, invitation, nouvelle inscription)
+     MAIL_FROM      adresse d'expédition validée dans Brevo
+     APP_URL        adresse du site (liens des e-mails), ex. https://recap-corridor.onrender.com
      PORT           fourni par Render
      DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
      APP_ENV        « dev » : site de test, couleurs différentes et bandeau « SITE DE TEST »
@@ -69,6 +72,147 @@ function role(req) {
   if (process.env.CODE_COVOIT && same(given, process.env.CODE_COVOIT)) return 'covoit';
   return null;
 }
+/* Comptes e-mail + mot de passe (en plus des codes, gardés en parallèle). Cinq droits séparés :
+   vitrine (statistiques anonymes), coco (vue covoiturage), lecture (consultation complète, nominative),
+   modif (import, réglages, corrections, planification) et admin (gestion des utilisateurs). admin ⇒ tous ; modif ⇒ lecture.
+   Mots de passe : empreinte scrypt seulement. Sessions et liens de réinitialisation : seule l'empreinte SHA-256 du jeton est gardée. */
+const DROITS = ['vitrine', 'coco', 'lecture', 'modif', 'admin'];
+function capsDe(d) {
+  const c = Object.fromEntries(DROITS.map((k) => [k, !!(d && d[k])]));
+  if (c.admin) for (const k of DROITS) c[k] = true;
+  if (c.modif) c.lecture = true;
+  return c;
+}
+/** Rôle d'affichage de la page : lecture ⇒ page complète ; vitrine + coco ⇒ « mixte » ; sinon comme les codes */
+const roleDe = (c) => c.lecture ? 'admin' : c.vitrine && c.coco ? 'mixte' : c.coco ? 'covoit' : c.vitrine ? 'lecture' : 'aucun';
+const sha = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
+const jetonNeuf = () => crypto.randomBytes(32).toString('base64url');
+const JETON = /^[A-Za-z0-9_-]{30,100}$/;
+const EMAIL = /^[^\s@<>"',;]{1,64}@[^\s@<>"',;]{1,190}\.[a-z]{2,}$/i;
+const scryptP = (mdp, sel) => new Promise((ok, ko) => crypto.scrypt(String(mdp).normalize('NFC'), sel, 64, { N: 16384, r: 8, p: 1 }, (e, k) => e ? ko(e) : ok(k)));
+async function hacher(mdp) { const sel = crypto.randomBytes(16); return 'scrypt$' + sel.toString('base64') + '$' + (await scryptP(mdp, sel)).toString('base64'); }
+async function verifier(mdp, h) {
+  const [algo, sel, k] = String(h || '').split('$');
+  if (algo !== 'scrypt' || !sel || !k) { await scryptP(mdp, 'x'); return false; }   // même durée que si le compte existait
+  const a = await scryptP(mdp, Buffer.from(sel, 'base64')), b = Buffer.from(k, 'base64');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+const mdpValide = (m) => typeof m === 'string' && m.length >= 10 && m.length <= 200;
+let tablesPretes = false;
+async function tablesAuth(p) {
+  if (tablesPretes) return;
+  await p.query(`create table if not exists ${SCHEMA}.utilisateurs (email text primary key, nom text not null default '', hash text not null,
+      droits jsonb not null default '{}'::jsonb, valide boolean not null default false, cree timestamptz not null default now(),
+      maj timestamptz not null default now(), derniere timestamptz);
+    create table if not exists ${SCHEMA}.sessions (jeton text primary key,
+      email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+    create table if not exists ${SCHEMA}.jetons_mdp (jeton text primary key,
+      email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+    alter table ${SCHEMA}.utilisateurs enable row level security;
+    alter table ${SCHEMA}.sessions enable row level security;
+    alter table ${SCHEMA}.jetons_mdp enable row level security;`);
+  tablesPretes = true;
+}
+/** Qui appelle : un code (x-acces) ou une session de compte (x-session) → { role, caps, user } ; null si inconnu */
+async function acces(req) {
+  const r = role(req);
+  if (r) { const caps = r === 'admin' ? capsDe({ admin: true }) : capsDe({ [r === 'covoit' ? 'coco' : 'vitrine']: true }); return { role: r, caps, user: null }; }
+  const s = req.headers['x-session'] || '';
+  if (!JETON.test(s)) return null;
+  const p = await db(); await tablesAuth(p);
+  const q = await p.query(`select u.email, u.nom, u.droits, u.valide from ${SCHEMA}.sessions s join ${SCHEMA}.utilisateurs u on u.email = s.email
+    where s.jeton = $1 and s.expire > now()`, [sha(s)]);
+  const u = q.rows[0];
+  if (!u) return null;
+  const caps = u.valide ? capsDe(u.droits) : capsDe({});   // droits relus à chaque appel : un retrait prend effet tout de suite
+  return { role: roleDe(caps), caps, user: { email: u.email, nom: u.nom } };
+}
+/** Adresse du site pour les liens des e-mails : APP_URL, sinon l'hôte Render de la requête (jamais un hôte arbitraire) */
+function base(req) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, '');
+  const h = String(req.headers.host || '');
+  return /^[a-z0-9-]+\.onrender\.com$/i.test(h) ? 'https://' + h : /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(h) ? 'http://' + h : null;
+}
+const escH = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** Envoi d'un e-mail par l'API Brevo ; sans clé configurée, rien n'est envoyé (renvoie false) */
+async function mail(to, sujet, html) {
+  if (!process.env.BREVO_API_KEY || !process.env.MAIL_FROM) { console.warn('E-mail non envoyé (BREVO_API_KEY ou MAIL_FROM absente) :', sujet); return false; }
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST',
+      headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + 'Récap Corridor' }, to: [{ email: to }], subject: (DEV ? '[TEST] ' : '') + sujet,
+        htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px">${html}<p style="color:#888;font-size:12px;margin-top:24px">Récap Corridor — message automatique, merci de ne pas y répondre.</p></div>` }) });
+    if (!r.ok) { console.error('Brevo a refusé l’envoi :', r.status, (await r.text()).slice(0, 300)); return false; }
+    return true;
+  } catch (e) { console.error('Brevo injoignable :', e.message); return false; }
+}
+const bouton = (href, txt) => `<p><a href="${escH(href)}" style="display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">${escH(txt)}</a></p><p style="font-size:12px;color:#666">Ou copiez ce lien : ${escH(href)}</p>`;
+/** Lien de réinitialisation (ou d'invitation) : jeton aléatoire, empreinte seule en base */
+async function lienMdp(p, req, email, heures) {
+  const j = jetonNeuf();
+  await p.query(`delete from ${SCHEMA}.jetons_mdp where expire < now() or email = $1`, [email]);
+  await p.query(`insert into ${SCHEMA}.jetons_mdp(jeton, email, expire) values ($1, $2, now() + make_interval(hours => $3))`, [sha(j), email, heures]);
+  const b = base(req);
+  return b ? `${b}/?reinit=${j}` : null;
+}
+const nbAdmins = async (p, sauf) => (await p.query(`select count(*)::int n from ${SCHEMA}.utilisateurs where valide and (droits->>'admin')::boolean is true and email <> $1`, [sauf || ''])).rows[0].n;
+const droitsPropres = (d) => Object.fromEntries(DROITS.filter((k) => d && d[k]).map((k) => [k, true]));
+const emailNorm = (e) => String(e || '').trim().toLowerCase().slice(0, 254);
+
+/** Routes des comptes accessibles sans être connecté : connexion, inscription, mot de passe oublié, nouveau mot de passe */
+async function authPublique(req, res, route, ip) {
+  if (req.method !== 'POST') return json(req, res, 405, { error: 'Méthode non permise.' });
+  const body = await readBody(req);
+  const p = await db(); await tablesAuth(p);
+  const email = emailNorm(body.email);
+  if (route === 'auth/login') {
+    const u = (await p.query(`select email, nom, hash, droits, valide from ${SCHEMA}.utilisateurs where email = $1`, [email])).rows[0];
+    const ok = await verifier(String(body.mdp || ''), u?.hash);
+    if (!u || !ok) { echec(ip); await new Promise((r) => setTimeout(r, 400)); return json(req, res, 401, { error: 'E-mail ou mot de passe incorrect.' }); }
+    if (!u.valide) return json(req, res, 403, { error: 'Votre compte attend la validation d’un administrateur.' });
+    const j = jetonNeuf();
+    await p.query(`delete from ${SCHEMA}.sessions where expire < now()`);
+    await p.query(`insert into ${SCHEMA}.sessions(jeton, email, expire) values ($1, $2, now() + interval '30 days')`, [sha(j), u.email]);
+    await p.query(`update ${SCHEMA}.utilisateurs set derniere = now() where email = $1`, [u.email]);
+    const caps = capsDe(u.droits);
+    return json(req, res, 200, { jeton: j, role: roleDe(caps), caps, user: { email: u.email, nom: u.nom } });
+  }
+  if (route === 'auth/inscription') {   // inscription libre, sans aucun droit tant qu'un administrateur ne l'a pas validée
+    echec(ip);   // limite les inscriptions en rafale (même compteur que les essais de connexion)
+    const nom = String(body.nom || '').trim().slice(0, 120);
+    if (!EMAIL.test(email)) return json(req, res, 400, { error: 'Adresse e-mail invalide.' });
+    if (!nom) return json(req, res, 400, { error: 'Indiquez votre nom.' });
+    if (!mdpValide(body.mdp)) return json(req, res, 400, { error: 'Le mot de passe doit faire au moins 10 caractères.' });
+    const ins = await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash) values ($1, $2, $3) on conflict (email) do nothing returning email`, [email, nom, await hacher(body.mdp)]);
+    if (ins.rowCount) {   // prévient les administrateurs
+      const adm = (await p.query(`select email from ${SCHEMA}.utilisateurs where valide and (droits->>'admin')::boolean is true`)).rows;
+      const b = base(req);
+      for (const a of adm) await mail(a.email, 'Nouvelle inscription à valider', `<p>${escH(nom)} (${escH(email)}) a créé un compte sur Récap Corridor.</p><p>Il n’a aucun droit tant que vous ne l’avez pas validé dans Administration → Utilisateurs.</p>${b ? bouton(b + '/', 'Ouvrir Récap Corridor') : ''}`);
+    }
+    // même réponse si l'adresse existe déjà : on ne révèle pas qui est inscrit
+    return json(req, res, 200, { ok: true });
+  }
+  if (route === 'auth/oubli') {
+    echec(ip);
+    const u = EMAIL.test(email) && (await p.query(`select email, nom from ${SCHEMA}.utilisateurs where email = $1 and valide`, [email])).rows[0];
+    if (u) {
+      const lien = await lienMdp(p, req, u.email, 1);
+      if (lien) await mail(u.email, 'Réinitialisation de votre mot de passe', `<p>Bonjour${u.nom ? ' ' + escH(u.nom) : ''},</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :</p>${bouton(lien, 'Choisir un nouveau mot de passe')}<p>Si vous n’avez rien demandé, ignorez ce message.</p>`);
+    }
+    return json(req, res, 200, { ok: true });   // même réponse que l'adresse existe ou non
+  }
+  if (route === 'auth/reinit') {
+    const j = String(body.jeton || '');
+    if (!mdpValide(body.mdp)) return json(req, res, 400, { error: 'Le mot de passe doit faire au moins 10 caractères.' });
+    const t = JETON.test(j) && (await p.query(`delete from ${SCHEMA}.jetons_mdp where jeton = $1 and expire > now() returning email`, [sha(j)])).rows[0];
+    if (!t) { echec(ip); return json(req, res, 400, { error: 'Lien expiré ou déjà utilisé. Refaites « Mot de passe oublié ».' }); }
+    await p.query(`update ${SCHEMA}.utilisateurs set hash = $2, maj = now() where email = $1`, [t.email, await hacher(body.mdp)]);
+    await p.query(`delete from ${SCHEMA}.sessions where email = $1`, [t.email]);   // toutes les sessions ouvertes sont fermées
+    return json(req, res, 200, { ok: true, email: t.email });
+  }
+  return json(req, res, 404, { error: 'Adresse inconnue.' });
+}
+
 const echecs = new Map();   // ralentit les essais de code répétés
 function trop(ip) {
   const e = echecs.get(ip); const now = Date.now();
@@ -144,15 +288,80 @@ async function api(req, res, url) {
   if (route === 'ping') return json(req, res, 200, { ok: true });
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   if (trop(ip)) return json(req, res, 429, { error: 'Trop d’essais. Réessayez dans quelques minutes.' });
-  const r = role(req);
-  if (!r) { if (req.headers['x-acces']) echec(ip); await new Promise((ok) => setTimeout(ok, 400)); return json(req, res, 401, { error: 'Code d’accès non reconnu.' }); }
-  if (route === 'session') return json(req, res, 200, { role: r });
-  const admin = r === 'admin';
+  if (['auth/login', 'auth/inscription', 'auth/oubli', 'auth/reinit'].includes(route)) return authPublique(req, res, route, ip);
+  const A = await acces(req);
+  if (!A) {
+    if (req.headers['x-acces']) echec(ip); await new Promise((ok) => setTimeout(ok, 400));
+    return json(req, res, 401, { error: req.headers['x-session'] ? 'Session expirée : reconnectez-vous.' : 'Code d’accès non reconnu.' });
+  }
+  const r = A.role, caps = A.caps;
+  if (route === 'session') return json(req, res, 200, { role: r, caps, user: A.user });
   const p = await db();
+  if (route === 'auth/logout' && req.method === 'POST') {
+    if (A.user) await p.query(`delete from ${SCHEMA}.sessions where jeton = $1`, [sha(req.headers['x-session'])]);
+    return json(req, res, 200, { ok: true });
+  }
+  if (route === 'auth/mdp' && req.method === 'POST') {   // changer son propre mot de passe
+    if (!A.user) return json(req, res, 400, { error: 'Réservé aux comptes e-mail.' });
+    const body = await readBody(req);
+    const u = (await p.query(`select hash from ${SCHEMA}.utilisateurs where email = $1`, [A.user.email])).rows[0];
+    if (!u || !(await verifier(String(body.ancien || ''), u.hash))) { echec(ip); return json(req, res, 400, { error: 'Mot de passe actuel incorrect.' }); }
+    if (!mdpValide(body.nouveau)) return json(req, res, 400, { error: 'Le nouveau mot de passe doit faire au moins 10 caractères.' });
+    await p.query(`update ${SCHEMA}.utilisateurs set hash = $2, maj = now() where email = $1`, [A.user.email, await hacher(body.nouveau)]);
+    await p.query(`delete from ${SCHEMA}.sessions where email = $1 and jeton <> $2`, [A.user.email, sha(req.headers['x-session'])]);   // les autres appareils sont déconnectés
+    return json(req, res, 200, { ok: true });
+  }
+  if (route === 'utilisateurs') {   // gestion des comptes : droit « admin » seulement
+    if (!caps.admin) return json(req, res, 403, { error: 'Réservé aux administrateurs.' });
+    await tablesAuth(p);
+    const moi = A.user ? A.user.email : '';
+    if (req.method === 'GET') {
+      const q = await p.query(`select email, nom, droits, valide, cree, derniere from ${SCHEMA}.utilisateurs order by valide, lower(nom), email`);
+      return json(req, res, 200, { utilisateurs: q.rows, moi, mail: !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM) });
+    }
+    if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
+      const body = await readBody(req), email = emailNorm(body.email), nom = String(body.nom || '').trim().slice(0, 120);
+      if (!EMAIL.test(email)) return json(req, res, 400, { error: 'Adresse e-mail invalide.' });
+      const ins = await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash, droits, valide) values ($1, $2, 'aucun', $3, true) on conflict (email) do nothing`, [email, nom, droitsPropres(body.droits)]);
+      if (!ins.rowCount) return json(req, res, 409, { error: 'Cette adresse a déjà un compte.' });
+      const lien = await lienMdp(p, req, email, 72);
+      const envoye = lien ? await mail(email, 'Invitation à Récap Corridor', `<p>Bonjour${nom ? ' ' + escH(nom) : ''},</p><p>Un compte Récap Corridor a été créé pour vous. Choisissez votre mot de passe avec ce lien (valable 3 jours) :</p>${bouton(lien, 'Choisir mon mot de passe')}`) : false;
+      return json(req, res, 200, { ok: true, lien, envoye });
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req), email = emailNorm(body.email);
+      const u = (await p.query(`select email, nom, droits, valide from ${SCHEMA}.utilisateurs where email = $1`, [email])).rows[0];
+      if (!u) return json(req, res, 404, { error: 'Compte introuvable.' });
+      if (body.action === 'reinit') {   // lien de réinitialisation envoyé par e-mail et affiché à l'administrateur
+        const lien = await lienMdp(p, req, email, 24);
+        const envoye = lien ? await mail(email, 'Réinitialisation de votre mot de passe', `<p>Un administrateur vous a envoyé un lien pour choisir un nouveau mot de passe (valable 24 heures) :</p>${bouton(lien, 'Choisir un nouveau mot de passe')}`) : false;
+        return json(req, res, 200, { ok: true, lien, envoye });
+      }
+      const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;
+      const restaitAdmin = valide && !!droits.admin;
+      if (u.valide && u.droits && u.droits.admin && !restaitAdmin && !(await nbAdmins(p, email)))
+        return json(req, res, 409, { error: 'Impossible : ce compte est le dernier administrateur.' });
+      const nom = body.nom != null ? String(body.nom).trim().slice(0, 120) : u.nom;
+      await p.query(`update ${SCHEMA}.utilisateurs set droits = $2, valide = $3, nom = $4, maj = now() where email = $1`, [email, droits, valide, nom]);
+      if (!valide) await p.query(`delete from ${SCHEMA}.sessions where email = $1`, [email]);
+      if (valide && !u.valide) { const b = base(req); await mail(email, 'Votre compte est validé', `<p>Votre compte Récap Corridor a été validé par un administrateur.</p>${b ? bouton(b + '/', 'Se connecter') : ''}`); }
+      return json(req, res, 200, { ok: true });
+    }
+    if (req.method === 'DELETE') {
+      const email = emailNorm(url.searchParams.get('email'));
+      const u = (await p.query(`select droits, valide from ${SCHEMA}.utilisateurs where email = $1`, [email])).rows[0];
+      if (!u) return json(req, res, 404, { error: 'Compte introuvable.' });
+      if (u.valide && u.droits && u.droits.admin && !(await nbAdmins(p, email))) return json(req, res, 409, { error: 'Impossible : ce compte est le dernier administrateur.' });
+      await p.query(`delete from ${SCHEMA}.utilisateurs where email = $1`, [email]);   // sessions et liens suivent (cascade)
+      return json(req, res, 200, { ok: true });
+    }
+  }
+  if (!DROITS.some((k) => caps[k])) return json(req, res, 403, { error: 'Votre compte n’a encore aucun droit : un administrateur doit vous en accorder.' });
+  const voir = caps.lecture, modif = caps.modif;
 
   if (route === 'etat' && req.method === 'GET') {
     const w = await p.query(`select resume from ${SCHEMA}.semaines order by week_id desc`);
-    if (!admin) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
+    if (!voir) return json(req, res, 200, { role: r, weeks: w.rows.map((x) => resumePublic(x.resume)), regles: null });
     const c = await p.query(`select cle, valeur from ${SCHEMA}.config where cle in ('regles', 'suivi', 'journal', 'coco')`);
     const cfg = Object.fromEntries(c.rows.map((x) => [x.cle, x.valeur]));
     return json(req, res, 200, { role: r, weeks: w.rows.map((x) => x.resume), regles: cfg.regles || null,
@@ -160,14 +369,14 @@ async function api(req, res, url) {
   }
   if (route === 'vitrine' && req.method === 'GET') return json(req, res, 200, await vitrine(p));
   if (route === 'semaine' && req.method === 'GET') {
-    if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
+    if (!voir) return json(req, res, 403, { error: 'Accès limité aux statistiques anonymes.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug <> '~source' order by agence_slug`, [id]);
     return json(req, res, 200, { docs: d.rows.map((x) => x.data) });
   }
   if (route === 'coco' && req.method === 'GET') {   // vue Coco : missions de la semaine des agents choisis, rien d'autre
-    if (!admin && r !== 'covoit') return json(req, res, 403, { error: 'Ce code ne donne pas accès à la vue Coco.' });
+    if (!voir && !caps.coco) return json(req, res, 403, { error: 'Ce code ne donne pas accès à la vue Coco.' });
     const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'coco'`);
     const sel = (c.rows[0]?.valeur?.agents || []).filter((x) => x && x.pk);
     const id = url.searchParams.get('id') || '';
@@ -188,7 +397,7 @@ async function api(req, res, url) {
     return json(req, res, 200, { agents: sel, semaine });
   }
   if (route === 'coco' && req.method === 'PUT') {
-    if (!admin) return json(req, res, 403, { error: 'Seul le code administrateur choisit les agents de la vue Coco.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire pour choisir les agents de la vue Coco.' });
     const body = await readBody(req);
     const agents = (Array.isArray(body.agents) ? body.agents : []).slice(0, 60)
       .map((x) => ({ pk: String(x.pk || '').slice(0, 200), nom: String(x.nom || '').slice(0, 120), metier: String(x.metier || '').slice(0, 60), couleur: /^#[0-9a-f]{6}$/i.test(x.couleur || '') ? x.couleur : '#1F77B4' }))
@@ -198,13 +407,14 @@ async function api(req, res, url) {
     return json(req, res, 200, { ok: true });
   }
   if (route === 'planif') {   // planification : brouillon d'une semaine, partagé entre admins, jamais envoyé aux autres codes
-    if (!admin) return json(req, res, 403, { error: 'Réservé au code administrateur.' });
+    if (!voir) return json(req, res, 403, { error: 'Accès limité aux statistiques anonymes.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'planif'`);
     const tout = c.rows[0]?.valeur || {};
     if (req.method === 'GET') return json(req, res, 200, { planif: tout[id] || null });
     if (req.method === 'PUT' || req.method === 'DELETE') {
+      if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire pour planifier.' });
       if (req.method === 'PUT') { const body = await readBody(req); if (!body || !Array.isArray(body.agents)) return json(req, res, 400, { error: 'Planning incomplet.' });
         tout[id] = { ...body, majLe: new Date().toISOString() }; } else delete tout[id];
       const garder = Object.keys(tout).sort().slice(-30);   // 30 semaines au plus
@@ -214,14 +424,14 @@ async function api(req, res, url) {
     }
   }
   if (route === 'source' && req.method === 'GET') {   // fichier conservé avec la semaine (feuille lue + Extract), pour « Relire »
-    if (!admin) return json(req, res, 403, { error: 'Le code visiteur donne accès aux statistiques anonymes uniquement.' });
+    if (!voir) return json(req, res, 403, { error: 'Accès limité aux statistiques anonymes.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     const d = await p.query(`select data from ${SCHEMA}.details where week_id = $1 and agence_slug = '~source'`, [id]);
     return json(req, res, 200, { source: d.rows[0]?.data?.source || null });
   }
   if (route === 'semaine' && req.method === 'PUT') {
-    if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas d’importer.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire.' });
     const { resume, details } = await readBody(req);
     if (!resume || !ID.test(resume.weekId || '') || !Array.isArray(details) || !details.length) return json(req, res, 400, { error: 'Données d’import incomplètes.' });
     if (!resume.importedAt) resume.importedAt = new Date().toISOString();
@@ -241,7 +451,7 @@ async function api(req, res, url) {
     return json(req, res, 200, { ok: true, weekId: resume.weekId });
   }
   if (route === 'semaine' && req.method === 'DELETE') {
-    if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de supprimer.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire.' });
     const id = url.searchParams.get('id') || '';
     if (!ID.test(id)) return json(req, res, 400, { error: 'Semaine non précisée.' });
     await p.query(`delete from ${SCHEMA}.semaines where week_id = $1`, [id]);   // les détails suivent (cascade)
@@ -249,7 +459,7 @@ async function api(req, res, url) {
     return json(req, res, 200, { ok: true });
   }
   if (route === 'regles' && req.method === 'PUT') {
-    if (!admin) return json(req, res, 403, { error: 'Le code de lecture ne permet pas de modifier les règles.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire.' });
     const { _journal, ...body } = await readBody(req);
     const le = new Date().toISOString();
     await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('regles', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [{ ...body, majLe: le }]);
@@ -266,7 +476,7 @@ async function api(req, res, url) {
     return json(req, res, 200, m.rows[0]?.valeur || {});
   }
   if (route === 'mentions' && req.method === 'PUT') {
-    if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier les mentions légales.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire.' });
     const body = await readBody(req);
     const m = Object.fromEntries(MENTIONS.map(([k, max]) => [k, String(body[k] ?? '').trim().slice(0, max)]));
     m.majLe = new Date().toISOString();
@@ -274,7 +484,7 @@ async function api(req, res, url) {
     return json(req, res, 200, { ok: true, mentions: m });
   }
   if (route === 'suivi' && req.method === 'PUT') {   // suivi des alertes « À vérifier » : vu, corrigé, note
-    if (!admin) return json(req, res, 403, { error: 'Le code visiteur ne permet pas de modifier le suivi.' });
+    if (!modif) return json(req, res, 403, { error: 'Le droit « Modification » est nécessaire.' });
     const body = await readBody(req);
     await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('suivi', $1) on conflict (cle) do update set valeur = excluded.valeur, maj = now()`, [{ alertes: body.alertes || {}, majLe: new Date().toISOString() }]);
     return json(req, res, 200, { ok: true });

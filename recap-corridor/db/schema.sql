@@ -54,3 +54,22 @@ revoke all on schema recap from public, anon, authenticated;
 -- Rôle dédié (aucun droit sur « recap ») : create role recap_dev_app with login password '…' noinherit;
 -- grant recap_dev_app to postgres; alter schema recap_dev owner to recap_dev_app; puis alter table … owner to recap_dev_app;
 -- DATABASE_URL du site de test : postgresql://recap_dev_app.<ref-projet>:…@aws-1-<region>.pooler.supabase.com:5432/postgres
+
+-- ---------------------------------------------------------------------------
+-- Comptes e-mail + mot de passe (créées aussi automatiquement par le serveur au premier appel).
+-- Mots de passe : empreinte scrypt seulement ; sessions et liens de réinitialisation : empreinte SHA-256 du jeton.
+-- Aucun e-mail ni mot de passe dans ce fichier : le premier administrateur est ajouté à la main dans Supabase
+-- (empreinte calculée hors du dépôt), les suivants depuis Administration → Utilisateurs.
+-- Remplacer « recap » par « recap_dev » (et recap_app par recap_dev_app) pour le site de test.
+-- set role recap_app;
+-- create table if not exists recap.utilisateurs (email text primary key, nom text not null default '', hash text not null,
+--   droits jsonb not null default '{}'::jsonb,          -- {vitrine, coco, lecture, modif, admin}
+--   valide boolean not null default false, cree timestamptz not null default now(), maj timestamptz not null default now(), derniere timestamptz);
+-- create table if not exists recap.sessions (jeton text primary key,
+--   email text not null references recap.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+-- create table if not exists recap.jetons_mdp (jeton text primary key,
+--   email text not null references recap.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+-- alter table recap.utilisateurs enable row level security;
+-- alter table recap.sessions     enable row level security;
+-- alter table recap.jetons_mdp   enable row level security;
+-- reset role;

@@ -166,7 +166,7 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line-2);bord
 .fld{display:flex;flex-direction:column;gap:5px;min-width:0}
 .fld.grow{flex:1}
 .flabel{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
-select,input[type=text],input[type=search],input[type=password]{font:inherit;font-size:13.5px;background:var(--surface);color:var(--ink);
+select,input[type=text],input[type=search],input[type=password],input[type=email]{font:inherit;font-size:13.5px;background:var(--surface);color:var(--ink);
   border:1px solid var(--line-2);border-radius:10px;padding:7px 11px;max-width:100%;transition:border-color .15s,box-shadow .15s}
 select:hover,input:hover{border-color:var(--ink-3)}
 select:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
@@ -654,6 +654,10 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .lg-card input{width:100%;font-family:var(--mono);letter-spacing:.08em;padding:11px 13px;font-size:15px}
 .lg-b{justify-content:center;padding:11px;font-size:14.5px}
 .lg-n{font-size:12px;color:var(--ink-3);line-height:1.5}
+.lg-card input.tx{font-family:inherit;letter-spacing:0}
+.lg-l{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
+.lg-t{display:flex;gap:6px}.lg-t .sg{flex:1}
+.ut td input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 
 /* ---------- petits écrans : menu en tiroir sous une barre fixe ---------- */
 @media (max-width:1080px){
@@ -2544,7 +2548,7 @@ const LSK='recap-corridor';
    - « web »      : API du site Netlify, protégée par code d'accès        */
 let ADB=null;
 const backend={
-  mode:'web', code:'',
+  mode:'web', code:'', jeton:'',
   async detect(){
     try{ ADB = await window.claude?.use?.('db'); }catch(e){ ADB=null; }
     backend.mode = ADB ? 'artifact' : 'web';
@@ -2555,7 +2559,7 @@ const backend={
     return window.__API__ ? window.__API__+route+(qs?'&'+qs:'') : '/api/'+p;
   },
   async call(path,opt={}){
-    const r=await fetch(backend.url(path),{...opt,headers:{...(opt.headers||{}),'x-acces':backend.code,
+    const r=await fetch(backend.url(path),{...opt,headers:{...(opt.headers||{}),...(backend.code?{'x-acces':backend.code}:{}),...(backend.jeton?{'x-session':backend.jeton}:{}),
       ...(opt.body?{'content-type':'application/json'}:{})}});
     let d=null; try{ d=await r.json(); }catch(e){}
     if(!r.ok) throw Object.assign(new Error((d&&d.error)||`Erreur ${r.status}`),{status:r.status});
@@ -2637,6 +2641,12 @@ const backend={
     if(backend.mode!=='artifact') return backend.call('mentions',{method:'PUT',body:JSON.stringify(m)});
     const x={...m,majLe:new Date().toISOString()}; await ADB.doc('config/mentions').set(x); return {ok:true,mentions:x};
   },
+  /** Comptes e-mail : connexion, inscription, mot de passe oublié, déconnexion ; gestion des utilisateurs (droit admin) */
+  post(route,body){ return backend.call(route,{method:'POST',body:JSON.stringify(body||{})}); },
+  users(){ return backend.call('utilisateurs'); },
+  userInvite(b){ return backend.call('utilisateurs',{method:'POST',body:JSON.stringify(b)}); },
+  userSet(b){ return backend.call('utilisateurs',{method:'PUT',body:JSON.stringify(b)}); },
+  userDel(email){ return backend.call('utilisateurs?email='+encodeURIComponent(email),{method:'DELETE'}); },
   async saveSuivi(su){
     if(backend.mode!=='artifact') return backend.call('suivi',{method:'PUT',body:JSON.stringify(su)});
     await ADB.doc('config/suivi').set({alertes:su.alertes||{},majLe:new Date().toISOString()}); return {ok:true};
@@ -2662,7 +2672,7 @@ const S={
 const menuClose=()=>{ el('side').classList.remove('open'); document.querySelector('[data-act=menu]')?.setAttribute('aria-expanded','false'); };
 function prefs(){ try{return JSON.parse(localStorage.getItem(LSK)||'{}');}catch(e){return {};} }
 function savePrefs(){ try{ localStorage.setItem(LSK,JSON.stringify({
-  code:api.code, selAgences:S.selAgences, agDefHE:S.agDefHE||prefs().agDefHE||false, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
+  code:api.code, jeton:api.jeton, selAgences:S.selAgences, agDefHE:S.agDefHE||prefs().agDefHE||false, selMetiers:S.selMetiers, tab:S.tab, mode:S.mode,
   theme:document.documentElement.dataset.theme||'', mini:el('shell').classList.contains('mini'), cols:S.cols, chart:S.chart, st:S.st, auteur:S.auteur}));}catch(e){} }
 
 /** Anciens fichiers : « Agence Bordeaux » est rattachée automatiquement à « Bordeaux-St-Jean » quand un seul nom
@@ -2845,7 +2855,7 @@ function barChart(items,opts={}){
    11. VUES
    ========================================================================== */
 const el=id=>document.getElementById(id);
-const TI={planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2',production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
+const TI={compte:'M8 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4',utilisateurs:'M8 1.8 13.5 4v4c0 3-2.3 5.2-5.5 6.2C4.8 13.2 2.5 11 2.5 8V4zM5.8 8l1.6 1.6L10.5 6.5',planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2',production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
   agents:'M6 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1.8 13.5c.5-2.4 2.2-3.8 4.2-3.8s3.7 1.4 4.2 3.8M10.5 2.8a2.3 2.3 0 0 1 0 4.4M12 9.9c1.2.5 2 1.7 2.3 3.6',
   rhr:'M13 9.5A5.5 5.5 0 1 1 6.5 3a4.3 4.3 0 0 0 6.5 6.5z',blanches:'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3',
   graphiques:'M3 13.5V8M6.5 13.5V3.5M10 13.5V6.5M13.5 13.5V10',stats:'M2 12l3.5-4 3 2.5L14 4M10.5 4H14v3.5',
@@ -2856,16 +2866,23 @@ const TI={planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 
   exports:'M8 10V2.5M5 5.5l3-3 3 3M2.5 10v3.5h11V10',import:'M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10',
   reglages:'M2.5 4.5h7M12 4.5h1.5M2.5 11.5h2M7 11.5h6.5M10.5 3v3M5.5 10v3'};
 /** Mentions légales : uniquement dans la vue visiteur (l'admin les rédige et les prévisualise dans Réglages) */
-const tabVisible=t=>S.role==='admin'?t.k!=='mentions':S.role==='covoit'?t.k==='coco':['vitrine','lecture','mentions'].includes(t.k);
+/** Droits (comptes e-mail et codes) : vitrine, coco, lecture (consultation complète), modif, admin (utilisateurs).
+    Sans serveur (artifact) : tous. Le serveur revérifie chaque appel. */
+const peut=k=>backend.mode==='artifact'||!!(S.caps&&S.caps[k]);
+const DROITS_L=[['vitrine','Vitrine'],['coco','Coco'],['lecture','Consultation complète'],['modif','Modification'],['admin','Administration']];
+const tabVisible=t=>t.k==='compte'?!!S.user:t.k==='utilisateurs'?backend.mode==='web'&&peut('admin'):S.role==='aucun'?false
+  :S.role==='admin'?t.k!=='mentions'&&(peut('modif')||!['import','reglages','planif'].includes(t.k))
+  :S.role==='covoit'?t.k==='coco':S.role==='mixte'?['vitrine','coco','lecture','mentions'].includes(t.k):['vitrine','lecture','mentions'].includes(t.k);
 const TABS=[
   {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'production',l:'Production',g:'Pilotage'},{k:'planif',l:'Planification',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
   {k:'agents',l:'Agents',g:'Détail'},{k:'rhr',l:'RHR',g:'Détail'},{k:'blanches',l:'Journées blanches',g:'Détail'},
   {k:'graphiques',l:'Graphiques',g:'Analyse'},{k:'stats',l:'Statistiques',g:'Analyse'},{k:'comparer',l:'Comparer',g:'Analyse'},
   {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},{k:'coco',l:'Coco',g:'Diffusion'},
-  {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'}
+  {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'},
+  {k:'utilisateurs',l:'Utilisateurs',g:'Administration'},{k:'compte',l:'Mon compte',g:'Administration'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
-const TAB_CTX={planif:'missions de la semaine, trains réguliers, glisser-déposer et alertes de l’accord',production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
+const TAB_CTX={utilisateurs:'comptes e-mail : validation des inscriptions, droits, mots de passe',compte:'vos droits et votre mot de passe',planif:'missions de la semaine, trains réguliers, glisser-déposer et alertes de l’accord',production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
   comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',coco:'copain covoit — missions de la semaine des agents choisis',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
@@ -2909,8 +2926,9 @@ function renderTabs(){
       cnt[t.k]!=null&&S.weeks.length?`<span class="cnt${t.k==='verifier'&&cnt[t.k]?' hot':''}">${nf(cnt[t.k])}</span>`:''}</button>`).join('')}</div>`).join('');
   const T=TABS.find(t=>t.k===S.tab);
   el('ttl').textContent=T?T.l:''; el('ttlctx').textContent=(TAB_CTX[S.tab]||'')+(S.role==='admin'&&S.weeks.length&&!['import','reglages','vitrine','lecture','mentions'].includes(S.tab)?` · ${periodLabel(S.selWeek,S.weeks)}`:'');
-  { const rl=S.role==='admin'?'Accès complet':S.role==='covoit'?'Coco · covoiturage':'Visiteur · anonyme';
-    el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}" title="${rl}"><span class="bl-t">${rl}</span></span>`:''; }
+  { const rl=S.role==='admin'?(peut('modif')?'Accès complet':'Consultation'):S.role==='covoit'?'Coco · covoiturage':S.role==='mixte'?'Vitrine + Coco':S.role==='aucun'?'En attente de droits':'Visiteur · anonyme';
+    const tt=S.user?`${S.user.email} · ${rl}`:rl, tx=S.user?(S.user.nom||S.user.email):rl;
+    el('rolebadge').innerHTML=backend.mode==='web'&&S.role?`<span class="badge${S.role==='admin'?'':' ro'}" title="${esc(tt)}"><span class="bl-t">${esc(tx)}</span></span>`:''; }
 }
 function renderFilters(){
   if(!S.weeks.length||S.role!=='admin'||S.tab==='vitrine'){ el('filters').innerHTML=''; return; }
@@ -2925,7 +2943,7 @@ function renderFilters(){
         <button class="sel" id="scopeBtn" aria-expanded="${S.scopeOpen}">${esc(resume)}<span class="car">▾</span></button></div>
       ${agentPicker()}
       <div class="fld grow"></div>
-      ${S.role==='admin'&&S.tab!=='import'?`<div class="fld"><button class="btn" data-goto="import"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Importer</button></div>`:''}
+      ${admin()&&S.tab!=='import'?`<div class="fld"><button class="btn" data-goto="import"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Importer</button></div>`:''}
     </div>
     ${S.agtOpen?agentPanel():''}
     ${S.scopeOpen?`<div class="scope">
@@ -3722,7 +3740,7 @@ function viewGraphiques(){
 /* ---------- corrections : coupures entre missions, cases vides, missions liées ---------- */
 const ST_COUP={rhr:['RHR','pill-w'],force:['RHR (à la main)','pill-w'],lien:['RHR (missions liées)','pill-w'],ouvert:['RHR ouvert','pill-w'],
   residence:['à la résidence','pill-n'],court:['arrêt trop court','pill-n'],repos:['repos pendant l’arrêt','pill-n'],ecarte:['écarté à la main','pill-c']};
-const admin=()=>S.role==='admin';
+const admin=()=>S.role==='admin'&&peut('modif');   // modifier (import, réglages, corrections) : droit « Modification »
 const hmD=s=>{const d=new Date(s);return `${JS[(d.getUTCDay()+6)%7]} ${hm(s)}`;};
 /** Tableau des coupures d'une semaine d'agent, avec les boutons de correction */
 function coupuresView(x){
@@ -5100,7 +5118,7 @@ function viewCoco(){
           .map(([p0,p1])=>`<i class="cc-p" style="left:${((p0-x.s)/L0*100).toFixed(2)}%;width:${((p1-p0)/L0*100).toFixed(2)}%"></i>`).join('');
         return `<span class="cc-b${avec?' cov':''}" style="${pos(x.s,x.e)}${avec?`;--cg:${grp.get(ai+'|'+x.i)};background:${grp.get(ai+'|'+x.i)}`:''}" data-tip="${esc(tip)}">${pz}<span class="cc-tx">${avec?'⇄ ':''}${x.suite?'… ':''}${esc(m.label)}</span></span>`;}).join('')}</div></div>`).join('')
       :'<p class="mut sm" style="margin:4px 0 8px">Aucune mission pour ces agents.</p>'}</div>`; }).join('');
-  const choix=S.role==='admin'?cocoChoix():'';
+  const choix=admin()?cocoChoix():'';
   return `<section class="card"><div class="card-h"><div><h2>Coco — copain covoit</h2><p class="card-s">${C?`${esc(weekLabel(W[i]||{week:'?',year:''}))} · du ${dFull(C.monday)} au ${dFull(C.sunday)} · `:''}une ligne par agent · missions en gris, covoiturages possibles en couleur · touchez une mission pour son détail</p></div></div>
     <div class="card-b stack">${nav}${leg}${corps}</div></section>${choix}`;
 }
@@ -5294,7 +5312,7 @@ function emptyScope(){
     <p>${S.role==='admin'
       ? "Déposez un ou plusieurs fichiers « Récap National Corridor » dans l'onglet Import : les RHR, les journées blanches et toutes les données par agent, métier et agence sont calculés automatiquement."
       : "Aucune donnée n'a encore été importée. Contactez l'administrateur de l'outil."}</p>
-    ${S.role==='admin'?'<p class="mt"><button class="btn btn-pri" data-goto="import">Importer une semaine</button></p>':''}</div></section>`;
+    ${admin()?'<p class="mt"><button class="btn btn-pri" data-goto="import">Importer une semaine</button></p>':''}</div></section>`;
   return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Aucun agent sur ce périmètre</h3>
     <p>Élargissez le filtre agence ou métier, ou changez de semaine.</p>
     <p class="mt"><button class="btn btn-sm" id="agAll">Toutes les agences</button> <button class="btn btn-sm" id="meAll">Tous les métiers</button></p></div></section>`;
@@ -5310,13 +5328,13 @@ function render(){
   el('shell').hidden=false; el('login').hidden=true;
   renderFilters(); renderTabs();
   const v=el('view');
-  const body = S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='planif'?viewPlanif(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
+  const body = S.tab==='compte'&&S.user?viewCompte(): S.tab==='utilisateurs'&&peut('admin')?viewUtilisateurs(): S.role==='aucun'?viewAttente(): S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='planif'?viewPlanif(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
     S.role==='covoit'||S.tab==='coco'?viewCoco(): S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
   const sc=[...v.querySelectorAll('.tw')].map(t=>[t.scrollTop,t.scrollLeft]);
   const entering=lastTab!==S.tab; lastTab=S.tab;
-  v.innerHTML=body+(S.role==='lecture'&&S.tab!=='mentions'?`<p class="mnfoot"><button class="lnk" data-tab="mentions">Mentions légales</button></p>`:'');
+  v.innerHTML=body+((S.role==='lecture'||S.role==='mixte')&&!['mentions','compte'].includes(S.tab)?`<p class="mnfoot"><button class="lnk" data-tab="mentions">Mentions légales</button></p>`:'');
   v.classList.toggle('enter',entering);
   addPngButtons(v);
   if(entering){ countUp(v); }
@@ -5360,13 +5378,94 @@ function renderLogin(){
     </svg></div>
     <div class="lg-h"><span class="mark">${MARK}</span><div><h1>Récap Corridor</h1>
       <p>Repos hors résidence, journées blanches, heures et paniers — semaine par semaine, agent par agent.</p></div></div>
-    <label class="fld"><span class="flabel">Code d'accès</span>
-      <input type="password" id="codeIn" placeholder="XXXX-XXXX-XXXX" autocomplete="current-password" autofocus></label>
-    ${S.err?`<div class="note c">${esc(S.err)}</div>`:''}
-    <button class="btn btn-pri lg-b" id="codeGo"${S.busy?' disabled':''}>${S.busy?'Vérification…':'Entrer'}</button>
-    <p class="lg-n">Le code visiteur ouvre des statistiques anonymes : aucun nom ni matricule. Le code administrateur donne accès au détail nominatif et reste réservé aux personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
+    ${lgForm()}
+    ${S.err?`<div class="note c">${esc(S.err)}</div>`:''}${S.lgInfo?`<div class="note">${esc(S.lgInfo)}</div>`:''}
+    <p class="lg-n">Le code visiteur ouvre des statistiques anonymes : aucun nom ni matricule. Le détail nominatif reste réservé aux personnes habilitées. Le serveur peut mettre une minute à se réveiller.</p>
   </div>`;
-  setTimeout(()=>el('codeIn')?.focus(),30);
+  setTimeout(()=>el('login').querySelector('input:not([value]),input[value=""]')?.focus(),30);
+}
+/** Formulaire de l'écran de connexion : e-mail + mot de passe (défaut), code d'accès, inscription, mot de passe oublié, nouveau mot de passe */
+function lgForm(){
+  const m=S.lg||'mail', b=S.busy;
+  const champ=(id,lab,type,ph,ac,val)=>`<label class="fld"><span class="flabel">${lab}</span><input type="${type}" id="${id}" class="${id==='codeIn'?'':'tx'}" placeholder="${ph}" autocomplete="${ac}"${val!=null?` value="${esc(val)}"`:''}></label>`;
+  const go=(txt)=>`<button class="btn btn-pri lg-b" id="${m==='code'?'codeGo':'lgGo'}"${b?' disabled':''}>${b?'Patientez…':txt}</button>`;
+  const lk=(k,txt)=>`<button class="lnk" data-lg="${k}">${txt}</button>`;
+  const tabs=`<div class="seg lg-t"><button class="sg" data-lg="mail" aria-pressed="${m!=='code'}">E-mail</button><button class="sg" data-lg="code" aria-pressed="${m==='code'}">Code d'accès</button></div>`;
+  if(m==='code') return `${tabs}${champ('codeIn',"Code d'accès",'password','XXXX-XXXX-XXXX','current-password')}${go('Entrer')}`;
+  if(m==='inscr') return `<h2 style="font-size:16px">Créer un compte</h2>${champ('lgNom','Nom et prénom','text','','name',S.lgNom||'')}${champ('lgMail','E-mail','email','prenom.nom@…','email',S.lgMail||'')}
+    ${champ('lgMdp','Mot de passe (10 caractères au moins)','password','','new-password')}${champ('lgMdp2','Confirmer le mot de passe','password','','new-password')}
+    <p class="lg-n">Le compte n’a aucun droit tant qu’un administrateur ne l’a pas validé.</p>${go('Créer le compte')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
+  if(m==='oubli') return `<h2 style="font-size:16px">Mot de passe oublié</h2>${champ('lgMail','E-mail du compte','email','prenom.nom@…','email',S.lgMail||'')}
+    ${go('Recevoir un lien')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
+  if(m==='reinit') return `<h2 style="font-size:16px">Nouveau mot de passe</h2>${champ('lgMdp','Nouveau mot de passe (10 caractères au moins)','password','','new-password')}${champ('lgMdp2','Confirmer','password','','new-password')}
+    ${go('Enregistrer')}<p class="lg-l">${lk('mail','← Retour à la connexion')}</p>`;
+  return `${tabs}${champ('lgMail','E-mail','email','prenom.nom@…','username',S.lgMail||'')}${champ('lgMdp','Mot de passe','password','','current-password')}
+    ${go('Se connecter')}<p class="lg-l">${lk('oubli','Mot de passe oublié ?')}${lk('inscr','Créer un compte')}</p>`;
+}
+async function lgValider(){
+  const m=S.lg||'mail', v=id=>el(id)?.value||'';
+  if(m==='code') return login();
+  if(el('lgMail')) S.lgMail=v('lgMail').trim(); if(el('lgNom')) S.lgNom=v('lgNom').trim();
+  if(m==='mail') return loginMail();
+  const mdp=v('lgMdp'), mdp2=v('lgMdp2');   // lus avant le rendu, qui vide les champs
+  S.busy=true; S.err=null; S.lgInfo=null; render();
+  try{
+    if((m==='inscr'||m==='reinit')&&mdp!==mdp2) throw new Error('Les deux mots de passe ne correspondent pas.');
+    if(m==='inscr'){ await withLoad(api.post('auth/inscription',{email:S.lgMail,nom:S.lgNom,mdp}));
+      S.lg='mail'; S.lgInfo='Demande enregistrée. Un administrateur doit valider le compte et vous accorder des droits ; vous serez prévenu par e-mail.'; }
+    if(m==='oubli'){ await withLoad(api.post('auth/oubli',{email:S.lgMail}));
+      S.lgInfo='Si cette adresse a un compte validé, un e-mail avec un lien (valable 1 heure) vient d’être envoyé. Pensez aux indésirables.'; }
+    if(m==='reinit'){ const r=await withLoad(api.post('auth/reinit',{jeton:S.reinit,mdp}));
+      S.reinit=null; try{ history.replaceState(null,'',location.pathname); }catch(_){}
+      S.lg='mail'; S.lgMail=r.email||S.lgMail||''; S.lgInfo='Mot de passe enregistré : vous pouvez vous connecter.'; }
+  }catch(e){ S.err=e.message; }
+  S.busy=false; render();
+}
+/** Compte sans aucun droit (inscription pas encore validée, ou droits retirés) */
+function viewAttente(){
+  return `<section class="card"><div class="empty">${EMPTY_IC}<h3>Votre compte n’a encore aucun droit</h3>
+    <p>Un administrateur doit vous accorder l’accès (vitrine, Coco, consultation…). Reconnectez-vous ensuite.</p>
+    <p class="mt"><button class="btn btn-sm" data-tab="compte">Mon compte</button></p></div></section>`;
+}
+function viewCompte(){
+  const u=S.user||{}, c=S.caps||{};
+  const pw=(id,l,ac)=>`<label class="fld"><span class="flabel">${l}</span><input type="password" id="${id}" autocomplete="${ac}" style="width:220px"></label>`;
+  return `<section class="card"><div class="card-h"><div><h2>Mon compte</h2><p class="card-s">${esc(u.email||'')}</p></div></div>
+    <div class="card-b"><p>Nom : <b>${esc(u.nom||'—')}</b></p>
+    <p class="mt">Droits : ${DROITS_L.filter(([k])=>c[k]).map(([,l])=>`<span class="pill pill-a">${l}</span>`).join(' ')||'<span class="pill pill-w">aucun pour l’instant — un administrateur doit vous en accorder</span>'}</p></div></section>
+  <section class="card"><div class="card-h"><div><h2>Changer de mot de passe</h2><p class="card-s">10 caractères au moins ; vos autres appareils seront déconnectés</p></div></div>
+    <div class="card-b"><div class="frow">${pw('cpA','Mot de passe actuel','current-password')}${pw('cpN','Nouveau mot de passe','new-password')}${pw('cpN2','Confirmer','new-password')}
+    <div class="fld"><button class="btn btn-pri" id="cpGo">Enregistrer</button></div></div></div></section>`;
+}
+async function loadUsers(){ try{ S.users=await withLoad(api.users()); }catch(e){ S.msg={m:'Utilisateurs : '+e.message,t:'c'}; } render(); }
+const fmtDH=x=>x?new Date(x).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'—';
+/** Administration → Utilisateurs : valider les inscriptions, accorder / retirer les droits, lien de mot de passe, suppression */
+function viewUtilisateurs(){
+  const U=S.users;
+  if(!U) return `<section class="card"><div class="card-b"><p class="mut">Chargement des comptes…</p></div></section>`;
+  const L=U.utilisateurs||[], att=L.filter(u=>!u.valide);
+  const ligne=u=>{ const d=u.droits||{};
+    return `<tr><td class="l nm">${esc(u.nom||'—')}${u.email===U.moi?' <span class="pill pill-n">vous</span>':''}</td><td class="l mono">${esc(u.email)}</td>
+      <td class="l">${u.valide?'<span class="pill pill-g">validé</span>':'<span class="pill pill-w">en attente</span>'}</td>
+      ${DROITS_L.map(([k,l])=>{ const impl=(k!=='admin'&&d.admin)||(k==='lecture'&&d.modif);
+        return `<td><input type="checkbox" data-udr="${esc(u.email)}|${k}"${d[k]||impl?' checked':''}${impl?' disabled':''} title="${l}${impl?' (compris dans un droit supérieur)':''}" aria-label="${l}"></td>`; }).join('')}
+      <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.valide?`<button class="btn btn-sm" data-uval="${esc(u.email)}" data-v="">Suspendre</button>`:`<button class="btn btn-sm btn-pri" data-uval="${esc(u.email)}" data-v="1">Valider</button>`}
+        <button class="btn btn-sm" data-ureinit="${esc(u.email)}" title="Envoie un lien pour choisir un nouveau mot de passe (valable 24 h)">Lien mot de passe</button>
+        <button class="btn btn-sm dgr" data-udel="${esc(u.email)}">Supprimer</button></span></td>
+      <td class="l mono">${fmtDH(u.derniere)}</td></tr>`; };
+  const cases=DROITS_L.map(([k,l])=>`<label style="display:inline-flex;gap:6px;align-items:center;margin-right:12px"><input type="checkbox" data-uinv="${k}"${k==='vitrine'?' checked':''}> ${l}</label>`).join(' ');
+  return `${U.mail?'':`<div class="note w"><b>Envoi d’e-mails non configuré</b> : ajoutez BREVO_API_KEY et MAIL_FROM dans les variables Render. En attendant, les liens de mot de passe s’affichent ici pour être transmis à la main.</div>`}
+  ${S.uLien?`<div class="note"><b>Lien${S.uLien.envoye?' envoyé par e-mail à':' à transmettre à'} ${esc(S.uLien.email)}</b>${S.uLien.lien?` : <span class="mono" style="word-break:break-all">${esc(S.uLien.lien)}</span>`:' (adresse du site inconnue : renseignez APP_URL dans Render)'}</div>`:''}
+  <section class="card"><div class="card-h"><div><h2>Comptes</h2><p class="card-s">${nf(L.length)} compte${L.length>1?'s':''}${att.length?` · <b>${nf(att.length)} en attente de validation</b>`:''} · les codes d’accès restent valables en parallèle</p></div></div>
+    <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
+      <tbody>${L.map(ligne).join('')}</tbody></table></div>`:'<p class="mut">Aucun compte.</p>'}
+    <p class="lg-n mt"><b>Vitrine</b> : statistiques anonymes · <b>Coco</b> : vue covoiturage · <b>Consultation complète</b> : tous les onglets nominatifs, sans rien modifier ·
+      <b>Modification</b> : import, réglages, corrections, planification (comprend la consultation) · <b>Administration</b> : gestion des comptes (comprend tout).
+      Un changement de droits prend effet tout de suite. Le dernier administrateur ne peut être ni retiré ni supprimé.</p></div></section>
+  <section class="card"><div class="card-h"><div><h2>Inviter une personne</h2><p class="card-s">compte validé avec les droits cochés ; la personne choisit son mot de passe avec le lien reçu (valable 3 jours)</p></div></div>
+    <div class="card-b"><div class="frow"><label class="fld"><span class="flabel">E-mail</span><input type="email" id="uiMail" style="width:240px"></label>
+      <label class="fld"><span class="flabel">Nom</span><input type="text" id="uiNom" style="width:200px"></label></div>
+      <div class="frow mt">${cases}</div><p class="mt"><button class="btn btn-pri" id="uiGo">Inviter</button></p></div></section>`;
 }
 function closeDrawer(){
   S.drawer=null; S.dwPer=null; S.dwCode=null; document.body.style.overflow='';   // à la fermeture, le filtre principal reprend la main
@@ -5586,12 +5685,35 @@ async function saveAll(){
 /* ==========================================================================
    14. ÉVÉNEMENTS
    ========================================================================== */
+async function actionComptes(b){
+  const v=id=>el(id)?.value||'';
+  try{
+    if(b.id==='cpGo'){ if(v('cpN')!==v('cpN2')) throw new Error('Les deux nouveaux mots de passe ne correspondent pas.');
+      await withLoad(api.post('auth/mdp',{ancien:v('cpA'),nouveau:v('cpN')})); S.msg={m:'Mot de passe changé.'}; render(); return; }
+    if(b.dataset.uval!=null){ const email=b.dataset.uval, on=!!b.dataset.v;
+      if(!on&&!confirm(`Suspendre le compte ${email} ? La personne est déconnectée et ne peut plus se connecter.`)) return;
+      await withLoad(api.userSet({email,valide:on})); S.msg={m:on?`Compte ${email} validé${Object.keys((S.users.utilisateurs.find(u=>u.email===email)||{}).droits||{}).length?'':' — cochez maintenant ses droits'}.`:`Compte ${email} suspendu.`}; }
+    if(b.dataset.ureinit!=null){ const email=b.dataset.ureinit;
+      const r=await withLoad(api.userSet({email,action:'reinit'})); S.uLien={email,lien:r.lien,envoye:r.envoye}; }
+    if(b.dataset.udel!=null){ const email=b.dataset.udel; if(!confirm(`Supprimer définitivement le compte ${email} ?`)) return;
+      await withLoad(api.userDel(email)); S.msg={m:`Compte ${email} supprimé.`}; }
+    if(b.id==='uiGo'){ const email=v('uiMail').trim(), nom=v('uiNom').trim(), droits={};
+      document.querySelectorAll('[data-uinv]').forEach(c=>{ if(c.checked) droits[c.dataset.uinv]=true; });
+      if(!email) throw new Error('Indiquez l’e-mail de la personne à inviter.');
+      const r=await withLoad(api.userInvite({email,nom,droits})); S.uLien={email,lien:r.lien,envoye:r.envoye}; }
+    await loadUsers();
+  }catch(e){ S.msg={m:e.message,t:'c'}; render(); }
+}
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-goto],[data-xlsx],[data-csv],[data-sort],[data-tsort],[data-agent],[data-trow],[data-ag],[data-me],'+
     '[data-del],[data-delok],[data-delno],[data-col],[data-vmode],[data-cm],[data-qdel],#btnImport,#btnTheme,#agAll,#agHeBx,#meAll,'+
     '#btnPal,#agtBtn,#agtClr,#agtAll,[data-agsel],#pick,#saveAll,#clearQ,#saveRules,#codeGo,#scopeBtn,#btnPrint,#btnOut,#btnReport,[data-act],'+
     '[data-png],#btnSlides,#slX,#slPdf,#slPptx,#rapCopy,#rapMsg,[data-cmpm],[data-cmpv],[data-flieu],[data-explain],[data-pnag],[data-cdet],[data-alst],[data-alty],[data-alopen],[data-alset],[data-alnote],[data-alhor],[data-alview],[data-horsave],[data-horign],[data-hcgarde],[data-ign],#histClr,#alAllVu,[data-cocow],[data-cocoadd],[data-cocodel],[data-relire],#relireAll,#mnSave,#mnUndo,[data-resagv],[data-agexcl],[data-dwreset],[data-dwcode],[data-metag],[data-metagdel],#bkSave,#bkLoad,[data-vdd],[data-vheat],[data-vag],[data-vme],[data-stmode],[data-stgrp],[data-stech],[data-stheat],[data-stm],[data-crhr],[data-cjb],[data-lieures],[data-lien],[data-lien-del],[data-jbf],[data-jbl],[data-corrdel],[data-aliasdel],[data-ratt],[data-excl],[data-resag],[data-resagdel]');
-  if(S.tab==='planif'&&S.role==='admin'){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd')||{id:'',dataset:{}};
+  if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
+    if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
+  { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
+    if(b){ await actionComptes(b); return; } }
+  if(S.tab==='planif'&&admin()){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd')||{id:'',dataset:{}};
     const ch=e.target.closest('[data-pm]'), dz=e.target.closest('[data-pdrop]');
     if(ch&&!e.target.closest('select,button')){ S.plSel=S.plSel===ch.dataset.pm?null:ch.dataset.pm; render(); return; }
     if(dz&&S.plSel&&!e.target.closest('select,button,input,details')){ const s=S.plSel; S.plSel=null; planifDeplacer(s,dz.dataset.pdrop); return; }
@@ -5736,12 +5858,12 @@ document.addEventListener('click',async e=>{
     lr[ag]=(lr[ag]||[]).filter(x=>x!==l); if(!lr[ag].length) delete lr[ag];
     return saveCorrection(`« ${l} » n’est plus reconnu comme résidence de ${ag}`); }
   if(t.dataset.act==='out'){ el('btnOut').click(); return; }
-  if(t.id==='btnOut'){ api.code=''; S.role=null; S.weeks=[]; S.loaded.clear(); S.parsedCache.clear(); savePrefs(); render(); return; }
+  if(t.id==='btnOut'){ if(['compte','utilisateurs'].includes(S.tab)) S.tab='synthese'; if(api.jeton) api.post('auth/logout').catch(()=>{}); api.code=''; api.jeton=''; S.role=null; S.caps=null; S.user=null; S.users=null; S.uLien=null; S.weeks=[]; S.loaded.clear(); S.parsedCache.clear(); savePrefs(); render(); return; }
   if(t.id==='btnTheme'){ const cur=document.documentElement.dataset.theme
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs(); menuClose();
-    if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.tab==='planif'){ render(); await loadPlanif(); } else if(S.role==='admin') await ensureLoaded(toLoad());
+    if(S.tab==='utilisateurs'){ S.uLien=null; render(); await loadUsers(); } else if(S.tab==='compte'){ render(); } else if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.tab==='planif'){ render(); await loadPlanif(); } else if(S.role==='admin') await ensureLoaded(toLoad());
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; S.agtOpen=false; render(); return; }
   if(t.id==='agtBtn'){ S.agtOpen=!S.agtOpen; S.scopeOpen=false; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
@@ -5827,6 +5949,12 @@ document.addEventListener('click',async e=>{
     render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
 });
 document.addEventListener('change',async e=>{
+  if(e.target.dataset&&e.target.dataset.udr){ const [email,k]=e.target.dataset.udr.split('|'), u=(S.users?.utilisateurs||[]).find(x=>x.email===email);
+    if(!u) return; const d={...(u.droits||{})}, on=e.target.checked;
+    if(k==='admin'&&on&&!confirm(`Donner le droit Administration à ${email} ? Il pourra gérer tous les comptes, y compris le vôtre.`)){ e.target.checked=false; return; }
+    if(on) d[k]=true; else delete d[k];
+    try{ await withLoad(api.userSet({email,droits:d})); S.msg={m:`Droits de ${email} enregistrés.`}; }catch(err){ S.msg={m:err.message,t:'c'}; }
+    await loadUsers(); return; }
   if(e.target.id==='plW'){ S.plW=e.target.value; S.pl=null; S.plSave=null; render(); await loadPlanif(); return; }
   if(e.target.dataset&&e.target.dataset.plf){ const f=plFiltres(), k=e.target.dataset.plf;
     if(k==='pAg'&&f.mAg===f.pAg) f.mAg=e.target.value; if(k==='pMet'&&f.mMet===f.pMet) f.mMet=e.target.value;
@@ -5879,17 +6007,17 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&document.querySelector('.ov.pn')){ closePanel(); return; }
   if(e.key==='Escape'&&document.querySelector('.ov.pres')){ closeSlides(); return; }
   if(S.role&&((e.key==='/'&&!typing)||(e.key.toLowerCase()==='k'&&(e.ctrlKey||e.metaKey)))){ e.preventDefault(); openPalette(); }
-  if(e.key==='Enter'&&el('codeIn')&&document.activeElement===el('codeIn')) login();
+  if(e.key==='Enter'&&!S.role&&document.activeElement?.tagName==='INPUT'&&el('login')?.contains(document.activeElement)){ e.preventDefault(); lgValider(); }
 });
 // planification : glisser-déposer des missions (distinct du dépôt de fichiers)
 document.addEventListener('dragstart',e=>{ const c=e.target.closest&&e.target.closest('[data-pm]'); if(!c) return; S.plDrag=c.dataset.pm; e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain',c.dataset.pm); }catch(_){} });
 document.addEventListener('dragend',()=>{ S.plDrag=null; document.querySelectorAll('.pl-over').forEach(x=>x.classList.remove('pl-over')); });
-document.addEventListener('dragover',e=>{ if(S.role!=='admin')return; e.preventDefault();
+document.addEventListener('dragover',e=>{ if(!admin())return; e.preventDefault();
   if(S.plDrag){ document.querySelectorAll('.pl-over').forEach(x=>x.classList.remove('pl-over')); e.target.closest&&e.target.closest('[data-pdrop]')?.classList.add('pl-over'); return; }
   el('drop')?.classList.add('on'); });
 document.addEventListener('dragleave',e=>{ const d=el('drop'); if(d&&!d.contains(e.relatedTarget)) d.classList.remove('on'); });
 document.addEventListener('drop',e=>{
-  if(S.role!=='admin') return;
+  if(!admin()) return;
   if(S.plDrag){ e.preventDefault(); const z=e.target.closest&&e.target.closest('[data-pdrop]'), s=S.plDrag; S.plDrag=null; if(z) planifDeplacer(s,z.dataset.pdrop); return; }
   if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return;
   e.preventDefault(); el('drop')?.classList.remove('on');
@@ -5907,10 +6035,9 @@ async function login(code){
   const v=code||el('codeIn')?.value||'';
   if(!v.trim()) return;
   S.busy=true; S.err=null; render();
-  api.code=v.trim();
+  api.code=v.trim(); api.jeton='';
   try{
-    const {role}=await withLoad(api.session());
-    S.role=role; S.busy=false; S.err=null;
+    ouvrir(await withLoad(api.session()));
     savePrefs(); await boot();
   }catch(e){
     S.busy=false; api.code=''; S.role=null;
@@ -5918,7 +6045,27 @@ async function login(code){
     render();
   }
 }
+/** Session ouverte (code ou compte) : rôle d'affichage, droits, utilisateur */
+function ouvrir(s){ S.role=s.role; S.caps=s.caps||null; S.user=s.user||null; S.busy=false; S.err=null; S.lgInfo=null; }
+async function loginMail(){
+  const mdp=el('lgMdp')?.value||'';
+  if(!S.lgMail||!mdp){ S.err='Indiquez votre e-mail et votre mot de passe.'; render(); return; }
+  S.busy=true; S.err=null; S.lgInfo=null; render();
+  try{ const r=await withLoad(api.post('auth/login',{email:S.lgMail,mdp}));
+    api.jeton=r.jeton; api.code=''; ouvrir(r); savePrefs(); await boot(); }
+  catch(e){ S.busy=false; S.err=e.message; render(); }
+}
+/** Reprise d'une session de compte mémorisée (30 jours) */
+async function reprendre(j){
+  api.jeton=j; api.code='';
+  try{ ouvrir(await withLoad(api.session())); await boot(); }
+  catch(e){ S.role=null; S.busy=false;
+    if(e.status===401){ api.jeton=''; savePrefs(); S.err='Session expirée : reconnectez-vous.'; } else S.err='Connexion impossible : '+e.message;
+    render(); }
+}
 async function boot(){
+  if(S.role==='aucun'){ S.tab='compte'; render(); return; }
+  if(!TABS.some(t=>t.k===S.tab&&tabVisible(t))) S.tab=S.role==='admin'?'synthese':S.role==='covoit'?'coco':'vitrine';
   try{
     const et=await withLoad(api.etat()), {weeks,regles,suivi,journal,coco}=et; S.sig=sigEtat(et);
     S.coco=coco&&Array.isArray(coco.agents)?coco:{agents:[]};
@@ -5934,7 +6081,10 @@ async function boot(){
     if(!S.selAgences){ const pr=['Hendaye'].filter(a=>allAgences().includes(a)); if(pr.length) S.selAgences=pr; }
     if(S.weeks.length&&S.selWeek==='__all__') S.selWeek=S.weeks[0].weekId;
     S.mentions=await api.mentions().catch(()=>({}))||{}; S.mnDraft=null;
-    if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
+    if(S.tab==='compte'){ render(); if(S.role==='admin') await ensureLoaded(toLoad()); }
+    else if(S.tab==='utilisateurs'){ render(); await loadUsers(); }
+    else if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
+    else if(S.role==='mixte'&&S.tab==='coco'){ render(); await loadCoco(); }
     else if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
     else if(S.tab==='coco'){ render(); await loadCoco(); }
     else if(S.tab==='planif'){ await ensureLoaded(toLoad()); render(); await loadPlanif(); }
@@ -5953,10 +6103,10 @@ const saisieEnCours=()=>{ const a=document.activeElement; return !!(a&&/^(INPUT|
 let rafEnCours=false;
 async function rafraichir(){
   if(rafEnCours||document.hidden||!S.role||S.busy||S.queue.length||saisieEnCours()) return;
-  if(S.role==='admin'&&['reglages','import','planif'].includes(S.tab)) return;
+  if(S.role==='admin'&&['reglages','import','planif'].includes(S.tab)||['compte','utilisateurs'].includes(S.tab)||S.role==='aucun') return;
   rafEnCours=true;
   try{
-    if(S.role==='covoit'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }
+    if(S.role==='covoit'||S.role==='mixte'&&S.tab==='coco'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }
     const et=await api.etat(), sig=sigEtat(et);
     if(sig===S.sig||saisieEnCours()||S.busy||S.queue.length) return;
     S.sig=sig; S.weeks=et.weeks||[];
@@ -5990,7 +6140,9 @@ setInterval(()=>{ if(!document.hidden&&S.role&&['coco','synthese'].includes(S.ta
     document.getElementById('btnOut')?.remove();
     S.role='admin'; await boot(); return;
   }
-  if(p.code) login(p.code); else render();
+  const rj=new URLSearchParams(location.search).get('reinit');   // lien « mot de passe oublié » / invitation reçu par e-mail
+  if(rj&&/^[A-Za-z0-9_-]{30,100}$/.test(rj)){ S.reinit=rj; S.lg='reinit'; render(); return; }
+  if(p.jeton) reprendre(p.jeton); else if(p.code) login(p.code); else render();
 })();
 
 /* ==========================================================================
