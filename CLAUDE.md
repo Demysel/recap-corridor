@@ -178,15 +178,38 @@ Seuil des trains réguliers réglable dans la page (1 à 4 fois sur 4 semaines, 
   `trainsReguliers` (horaire, trajet et pauses les plus fréquents ; agent habituel = celui qui l'a fait le plus) ; semaine à
   venir : **pré-remplissage par agence** (demandé par l'utilisateur : un agent de Hendaye ne fait pas une mission de
   Vaires) — `planifPreremplir` (moteur, testé) : chaque train appartient à l'agence et à la famille de métier (AFR /
-  conducteurs) majoritaires chez les agents qui l'ont assuré, et ne va qu'à un agent de cette agence et de ce métier :
-  l'agent qui l'a fait le plus souvent, sinon un collègue libre ce jour-là (pas de code, pas de chevauchement, amplitude du
-  jour et repos avec la veille / le lendemain au-dessus des minimums de l'accord, fin de la semaine précédente comprise),
-  le moins chargé à égalité ; sinon réserve (étiquetée avec l'agence). Trains d'agences absentes de la grille : ignorés.
+  conducteurs) majoritaires chez les agents qui l'ont assuré, et ne va qu'à un agent de cette agence et de ce métier,
+  choisi par `planifAuto` (lieu, trajets seuls, règles de l'accord, priorité 35 h puis agent habituel ; voir plus bas) ;
+  sinon réserve (étiquetée avec l'agence, avec les raisons). Trains d'agences absentes de la grille : ignorés.
   Semaine importée : les trains réguliers de ses agences absents de la semaine vont en réserve. La grille et la réserve
-  suivent leurs filtres propres. « Remplir automatiquement » : `planifPlacer` (moteur) sur les missions à placer du filtre
-  missions (agent habituel d'abord, sinon le moins chargé de l'agence et du métier, libre et dans les minimums de
-  l'accord ; fin de la semaine précédente prise en compte, `fins`) ; message : combien placées, combien restent.
+  suivent leurs filtres propres. « Remplir automatiquement » : `planifAuto` (voir plus bas) sur les missions à placer du filtre
+  missions ; message : combien placées, trajets seuls ajoutés, combien restent et pourquoi (raisons les plus fréquentes).
   Missions ajoutées à la main (formulaire : jour, intitulé, départ, arrivée, début, fin, agence, métier) dans « à placer ».
+- **Moteur de planification automatique** (demandé par l'utilisateur : « vrai outil de planification automatisé » ; remplace
+  `planifPlacer`) — `planifAuto(pl, items, ctx, rules)` (moteur, testé) ; choix de l'utilisateur : **lieu suivi** (une
+  mission part de là où est l'agent : fin de la veille, RHR, résidence ; `ctx.lieux` / `ctx.fins` = fin de S-1) ; **trajet
+  seul ajouté en dernier recours** sur un horaire déjà vu dans les fichiers entre les deux lieux (`planifTrajets` : tous les
+  trains vus, durée + heure de départ ; libellé « VOY (ajouté) », `ajout:true`) ; **30 min** au moins entre deux missions
+  (`PL_BAT`) ; **AFR / coordo rentrent chaque soir**, conducteurs en RHR possible (pas la veille d'un repos, ni le dimanche,
+  ni une 3e nuit ; un jour sans mission n'est jamais passé dehors) ; **priorité 35 h** (candidats classés : rester sous 35 h,
+  pas de trajet seul, le moins d'heures, l'agent habituel) ; **repos placés avec les missions** : RP posés par le planning
+  type (`cAuto`) déplacés si tous les agents sont en repos, GPT ≤ 6 et 3 RP d'affilée respectés (`plReposOk`) sans nouvel
+  écart pour ce qui est déjà placé. Essai (`plEssai`) : semaine de l'agent refaite avec la mission (`plRelierAgent` : trajets
+  seuls aller / retour) et comparée à la semaine sans elle (`plEcarts`) : liaison impossible, chevauchement, amplitude / TTE
+  (temps réel, comme la conformité) et pause de 20 min au-delà de 6 h (`plJourRaison`), repos journalier à résidence
+  (13 h / 12 h) ou RHR ≥ 9 h, repos périodiques (24 h × jours + RJ, veille 22 h / 23 h, lendemain 5 h / 3 h, repos de fin
+  de S-1 compris), 48 h. Raisons (`PL_RAISONS`) gardées par mission non placée (`raisons`), explication du choix
+  (`pourquoi`). `planifRelier` refait tous les trajets seuls après chaque changement (y compris à la main) ; liaison
+  impossible → alerte « retour à organiser » (une fois, l'agent est ensuite compté rentré). Contexte (`planifContexte`) :
+  résidences de l'agent (règles du site, résidence propre de la fiche comprise), état de fin de S-1, horaires observés sur
+  toutes les semaines chargées. Résidence inconnue ⇒ aucun contrôle de retour. Remarque données S35 : une AFR de Hendaye
+  finit toutes ses journées à BYE → alerte, à corriger dans sa fiche (résidence propre) si c'est sa résidence (non déduit).
+- Interface : bandeau de synthèse (`plSynthese` : missions placées, à placer, TTE moyen, sous / au-dessus de 35 h, nuits en
+  RHR, trajets seuls ajoutés, alertes) ; sous chaque nom, heures / 35 h avec barre (ambre sous, rouge au-dessus), RHR et
+  trajets ajoutés (`plStats`) ; dans les cases « depuis X (RHR) » et « ☾ RHR · X » ; trajets ajoutés en pointillé (non
+  déplaçables, refaits seuls) ; bouton « ? » sur chaque mission (`planifPourquoi` : pourquoi cet agent, autres possibles,
+  écartés ; pour une mission à placer, chaque agent et sa raison) ; raison résumée sous chaque mission à placer
+  (`plResume`) ; filtre « seulement les agents en RHR » ; « Annuler » (30 derniers changements, `planifMemo` / `S.plHist`).
 - Glisser-déposer (liste → case, case ↔ case, case → liste pour retirer une mission d'un agent ; sur téléphone : toucher la mission puis la case) ; une mission changée de
   jour garde son heure (`planifDeplacer`). À chaque changement, `planifAlertes` (moteur, testé) : semaine planifiée
   convertie en semaine lue (`planifVersSemaine`) + 2 semaines importées précédentes → `conformiteData` (toutes les règles de

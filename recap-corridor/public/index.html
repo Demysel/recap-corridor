@@ -280,6 +280,16 @@ select{appearance:none;-webkit-appearance:none;padding-right:30px;
 .pl-m{overflow:hidden}.pl-m b{display:block;overflow-wrap:anywhere}.pl-m small{display:block;color:var(--ink-3);font-size:10.5px;white-space:normal;overflow-wrap:anywhere}.pl-m.reg{border-left-color:var(--signal)}.pl-m.sel{outline:2px solid var(--accent)}
 .pl-c{display:block;font-size:11px;padding:1px 4px;width:auto;margin:0 0 2px auto}.planif td.pl-code{background:color-mix(in srgb,var(--accent) 8%,var(--surface))!important}
 .planif td.pl-al{box-shadow:inset 0 0 0 2px var(--crit,#D00)}.pl-a{font-size:10.5px;line-height:1.3;margin-top:3px;color:var(--crit,#B00);white-space:normal;overflow-wrap:anywhere}.pl-a.info{color:var(--ink-3)}
+.pl-m.ajout{border-style:dashed;border-left-style:dashed;border-left-color:var(--ink-3);background:transparent;opacity:.85;cursor:default}
+.pl-m{position:relative}.pl-q{position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:10.5px;font-weight:700;line-height:15px;padding:0;cursor:pointer}
+.pl-row .pl-q{position:static;margin-left:4px}.pl-m b{padding-right:16px}
+.pl-rhrc{margin-top:4px;font-size:10.5px;border:1.5px dashed var(--ink-3);border-radius:6px;padding:2px 5px;color:var(--ink-2)}
+.pl-dep{font-size:10.5px;color:var(--ink-3);margin-bottom:2px}
+.pl-h35{display:block;margin-top:3px;font-size:10.5px;color:var(--ink-3)}.pl-bar{display:block;height:4px;border-radius:2px;background:var(--surface-3);margin-top:2px;overflow:hidden}
+.pl-bar i{display:block;height:100%;background:var(--good)}.pl-bar i.sous{background:var(--signal)}.pl-bar i.sur{background:var(--crit,#D00)}
+.pl-kpi{display:flex;flex-wrap:wrap;gap:8px}.pl-kpi>div{border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:110px;background:var(--surface)}
+.pl-kpi b{display:block;font-size:17px}.pl-kpi span{font-size:11px;color:var(--ink-3)}
+.pl-why{grid-column:1/4;font-size:11px;color:var(--crit,#B00)}
 .pl-res td{background:color-mix(in srgb,var(--signal) 10%,var(--surface))!important}
 .prod-h3{font-size:14px;margin:6px 0 0}
 .prod-pts{margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45}.warn{color:var(--amber,#B45309)}
@@ -2089,37 +2099,197 @@ function planifRattacher(reg,info){
     const top=[...c.entries()].sort((a,b)=>b[1]-a[1])[0]; t.agence=top?top[0].split('|')[0]:null; t.fam=top?top[0].split('|')[1]:null; }
   return reg;
 }
-/** Place des missions (chacune {…mission, d, agence, fam, pks?}) chez un agent de leur agence et de leur métier : l'agent
-    habituel d'abord (pks), sinon le moins chargé ; libre ce jour-là (pas de code, pas de chevauchement), amplitude du jour
-    et repos avec la veille / le lendemain (fin de la semaine précédente comprise) au-dessus des minimums de l'accord.
-    Renvoie les missions non placées. */
-function planifPlacer(pl,items,finsAvant,rulesIn){
-  const A=accordOf({...DEFAULT_RULES,...(rulesIn||{})}), Tm=x=>Date.parse(x), reste=[], fa=finsAvant instanceof Map?finsAvant:new Map(Object.entries(finsAvant||{}));
-  const charge=a=>a.jours.reduce((s,j)=>s+j.m.length,0);
-  const ok=(a,m,d)=>{ const C=isAFR(a.metier)?A.continuite:A.roulant, j=a.jours[d]; if(j.c) return false;
-    if(j.m.some(x=>x.start<m.end&&m.start<x.end)) return false;
-    const jour=[...j.m,m], s0=Math.min(...jour.map(x=>Tm(x.start))), e0=Math.max(...jour.map(x=>Tm(x.end)));
-    if((e0-s0)/H>C.ampMax) return false;
-    const autres=a.jours.flatMap((x,k)=>k===d?[]:x.m), fins=autres.map(x=>Tm(x.end)).filter(x=>x<=s0), debuts=autres.map(x=>Tm(x.start)).filter(x=>x>=e0);
-    const f=fa.get(personKey(a)); if(f!=null&&f<=s0) fins.push(f);
-    if(fins.length&&(s0-Math.max(...fins))/H<C.rjReduit) return false;
-    if(debuts.length&&(Math.min(...debuts)-e0)/H<C.rjReduit) return false;
-    return true; };
-  for(const it of [...items].sort((a,b)=>a.d-b.d||a.start.localeCompare(b.start))){
-    const pks=it.pks||{}, {pks:_,d,...m}=it;
-    const c=pl.agents.filter(a=>a.agence===it.agence&&famMetier(a.metier)===it.fam&&ok(a,m,d))
-      .sort((x,y)=>((pks[personKey(y)]||0)-(pks[personKey(x)]||0))||(charge(x)-charge(y)));
-    if(c.length) c[0].jours[d].m.push(m); else reste.push(it);
-  }
-  return reste;
-}
-/** Pré-remplissage d'une semaine à venir : trains réguliers rattachés à leur agence, placés par planifPlacer ; les trains
+/** Pré-remplissage d'une semaine à venir : trains réguliers rattachés à leur agence, placés par planifAuto ; les trains
     d'agences absentes de la grille sont ignorés */
-function planifPreremplir(pl,reg,info,finsAvant,rulesIn){
+function planifPreremplir(pl,reg,info,finsAvant,rulesIn,ctx){
   planifRattacher(reg,info); const ag=new Set(pl.agents.map(a=>a.agence)); let n=0;
   const items=reg.filter(t=>t.agence&&ag.has(t.agence)).map(t=>({...missionDuJour(t,pl.meta.days[t.d],'p'+Date.now().toString(36)+(n++)),d:t.d,agence:t.agence,fam:t.fam,pks:t.pks,semaines:t.semaines}));
-  return planifPlacer(pl,items,finsAvant,rulesIn).map(({pks,...m})=>m);
+  const fa=finsAvant instanceof Map?Object.fromEntries(finsAvant):(finsAvant||{});
+  const r=planifAuto(pl,items,{...(ctx||{}),fins:{...fa,...((ctx||{}).fins||{})}},rulesIn); pl.manque=r.manque;
+  return r.reste.map(({pks,...m})=>m);
 }
+/* ---------- Planification automatique (demandée par l'utilisateur : « un vrai outil de planification automatisé ») ----------
+   Choix de l'utilisateur : le lieu de chaque agent est suivi (une mission part de là où il se trouve : fin de la veille, RHR
+   ou résidence) ; un trajet seul n'est ajouté qu'en dernier recours, sur un horaire déjà vu dans les fichiers (même départ →
+   arrivée) ; 30 min au moins entre deux missions (ou entre l'arrivée d'un trajet et la mission) ; les AFR et coordo rentrent
+   toujours le soir, les conducteurs peuvent faire un RHR ; priorité : rapprocher chaque agent de 35 h dans la semaine ; les
+   repos (RP) du planning type se déplacent si cela permet de placer une mission (GPT et repos d'affilée respectés).
+   Règles de l'accord contrôlées au placement : repos journalier à résidence (13 h / 12 h), RHR ≥ 9 h, amplitude et TTE de la
+   journée (valeurs de nuit si plus de 2 h 30 dans la plage de nuit), 48 h dans la semaine, GPT ≤ 6 jours, 3 RP d'affilée. */
+let plSeqT=0;
+const PL_BAT=30*6e4;                     // battement entre deux missions (choix de l'utilisateur : 30 min)
+const PL_RAISONS={repos:'en repos ou code ce jour-là',occupe:'déjà en mission à cette heure',lieu:'pas sur place et aucun trajet connu pour y être à temps',
+  rj:'repos journalier à résidence trop court',rhr:'RHR trop court',suite:'ne s’enchaîne pas avec sa mission suivante',amp:'amplitude de la journée dépassée',
+  tte:'TTE de la journée dépassé',pause:'plus de 6 h de travail sans pause de 20 min',hebdo:'dépasserait 48 h dans la semaine',retour:'ne pourrait pas rentrer à sa résidence',
+  rp:'repos périodique non respecté (fin la veille d’un repos, reprise le lendemain, ou durée du repos)',
+  rhrNon:'devrait découcher alors que ce n’est pas possible (AFR, veille de repos, fin de semaine ou 3e nuit dehors)'};
+const plNuitMin=(s,e,[a,b])=>{ let n=0; for(let d=Math.floor(s/DAY)-1;d<=Math.floor(e/DAY);d++){ const x=d*DAY+a*H, y=d*DAY+(b<a?24+b:b)*H;
+  n+=Math.max(0,Math.min(e,y)-Math.max(s,x)); } return n/6e4; };
+/** Horaires observés dans les fichiers entre deux lieux (tous les trains vus, trajets seuls compris) : durée la plus fréquente
+    et heures de départ (minutes dans la journée) */
+function planifTrajets(weeks){
+  const G=new Map();
+  for(const w of weeks||[]) for(const a of w.agents||[]) for(const j of a.jours||[]) for(const m of j.missions||[]){
+    if(!m.start||!m.end||!m.from||!m.to||isATCMD(m)||/DISPO/i.test(m.label||'')) continue;
+    const f=normLieu(m.from), t=normLieu(m.to); if(!f||!t||f===t) continue;
+    const s=Date.parse(m.start), dur=Math.round((Date.parse(m.end)-s)/6e4); if(dur<=0||dur>12*60) continue;
+    const k=f+'>'+t; if(!G.has(k)) G.set(k,[]); G.get(k).push({dep:Math.round((s%DAY)/6e4),dur}); }
+  const out={};
+  for(const [k,l] of G){ const c=new Map(); for(const x of l){ const key=x.dep+'|'+x.dur; c.set(key,x); }
+    out[k]=[...c.values()].sort((a,b)=>a.dep-b.dep); }
+  return out;
+}
+/** Contexte de la planification : état de chaque agent à la fin de la semaine précédente et résidences */
+function planifEtat(pl,ctx){
+  const C=ctx||{}, res=a=>{ const l=(C.res||{})[personKey(a)]||(C.resAg||{})[a.agence]||[]; return new Set(l.map(normLieu).filter(Boolean)); };
+  return {res,fin:a=>(C.fins||{})[personKey(a)]??null,lieu:a=>(C.lieux||{})[personKey(a)]||null,gpt:a=>(C.gpt||{})[personKey(a)]||0,
+    rpFin:a=>(C.rpFin||{})[personKey(a)]||0,trajets:C.trajets||{}};
+}
+const plEstMaison=(E,a,l)=>{ const r=E.res(a); return !r.size||!l||r.has(normLieu(l)); };
+/** Trajet seul entre deux lieux sur un horaire observé : départ au plus tôt `tMin`, arrivée au plus tard `tMax` ;
+    le plus tard possible (le plus tôt si `tot`) ; null sinon */
+function plTrajet(E,de,a,tMin,tMax,tot){
+  const l=E.trajets[normLieu(de)+'>'+normLieu(a)]; if(!l) return null; let best=null;
+  for(let d=Math.floor(tMin/DAY);d<=Math.floor(tMax/DAY);d++) for(const x of l){ const s=d*DAY+x.dep*6e4, e=s+x.dur*6e4;
+    if(s<tMin||e>tMax) continue; if(!best||(tot?s<best.s:s>best.s)) best={s,e}; }
+  return best&&{id:'t'+Date.now().toString(36)+(plSeqT++),label:'VOY (ajouté)',from:de,to:a,start:new Date(best.s).toISOString(),end:new Date(best.e).toISOString(),pauses:[],ajout:true};
+}
+const plTl=a=>a.jours.flatMap((j,d)=>(j.m||[]).map(m=>({m,d,s:Date.parse(m.start),e:Date.parse(m.end)}))).sort((x,y)=>x.s-y.s);
+/** Amplitude et TTE d'une journée dans les maximums de l'accord (valeurs de nuit si plus de 2 h 30 dans la plage de nuit) */
+function plJourRaison(jour,C,R){ const ss=jour.map(x=>Date.parse(x.start)), ee=jour.map(x=>Date.parse(x.end));
+  const nuit=jour.reduce((n,x)=>n+plNuitMin(Date.parse(x.start),Date.parse(x.end),C.nuit),0)/60>C.nuitSeuil;
+  if((Math.max(...ee)-Math.min(...ss))/H>(nuit?C.ampMaxNuit:C.ampMax)+1e-9) return 'amp';
+  // TTE et pause comptés comme le contrôle de conformité : temps réel (amplitude − pauses ; ATCMD = heures fixes)
+  const reel=jour.reduce((n,x)=>{ const k=missionMinutes(x); return n+(isATCMD(x)?R.heuresATCMD*60:k.amp-k.pause); },0)/60;
+  if(reel>(nuit?C.tteMaxNuit:C.tteMax)+1e-9) return 'tte';
+  const A=accordOf(R);
+  if(reel>A.pauseSeuil&&!jour.some(x=>(x.pauses||[]).some(p=>Array.isArray(p)&&(Date.parse(p[1])-Date.parse(p[0]))/6e4>=A.pauseMin))
+    &&!jour.every(x=>isATCMD(x)||x.ajout||isTrajetSeul(x.label,R.trajetTypes))) return 'pause';
+  return null; }
+const plJourOk=(jour,C,R)=>!plJourRaison(jour,C,R);
+/** Trajets seuls d'un agent, refaits de zéro dans l'ordre des jours : aller vers une mission qui ne part pas de là où il est ;
+    retour à la résidence le soir (AFR toujours ; conducteur la veille d'un repos, le dimanche, après 2 nuits dehors, ou quand
+    sa journée suivante ne part pas d'ici et que le retour tient dans la journée), sinon le lendemain ; un jour sans mission
+    n'est jamais passé hors résidence : l'agent rentre ce jour-là. */
+function plRelierAgent(pl,a,E,R,A){
+  const pk=personKey(a), C=isAFR(a.metier)?A.continuite:A.roulant, manque=[], home=[...E.res(a)][0]||null, maison=l=>plEstMaison(E,a,l);
+  a.jours.forEach(j=>{ j.m=(j.m||[]).filter(m=>!m.ajout); });
+  const tl=plTl(a), j0=d=>Date.parse(pl.meta.days[d]+'T00:00:00Z');
+  let lieu=E.lieu(a)||home, fin=E.fin(a), dFin=-1, dehors=lieu&&!maison(lieu)?1:0;
+  for(let d=0;d<7;d++){ const ms=tl.filter(x=>x.d===d);
+    if(!ms.length){ if(lieu&&!maison(lieu)){ const t=home&&plTrajet(E,lieu,home,Math.max(j0(d),(fin??0)+A.rhrMin*H),j0(d)+DAY,true);
+        if(t){ a.jours[d].m.push(t); lieu=home; fin=Date.parse(t.end); dFin=d; dehors=0; }
+        else { manque.push({pk,date:pl.meta.days[d],type:'retour',texte:`retour à organiser : aucun trajet connu de ${lieu} à ${home}${isAFR(a.metier)?` (si ${lieu} est en fait sa résidence : fiche de l’agent → résidence propre)`:''}`}); lieu=home; dehors=0; } }
+      continue; }
+    for(const x of ms){ const m=x.m;
+      if(lieu&&m.from&&normLieu(lieu)!==normLieu(m.from)){ const rest=dFin===d?PL_BAT:(maison(lieu)?C.rj*H:A.rhrMin*H);
+        const t=plTrajet(E,lieu,m.from,fin!=null?fin+rest:j0(d),x.s-PL_BAT);
+        if(t) a.jours[d].m.push(t); else manque.push({pk,date:pl.meta.days[d],type:'lieu',texte:`pas de trajet connu pour aller de ${lieu} à ${m.from} avant « ${m.label} »`}); }
+      lieu=m.to||lieu; fin=x.e; dFin=d; }
+    if(lieu&&!maison(lieu)){ const next=a.jours[d+1], suite=tl.find(x=>x.d===d+1), doit=isAFR(a.metier)||d===6||!next||next.c||dehors>=2;
+      if(!doit&&suite&&normLieu(suite.m.from)===normLieu(lieu)){ dehors++; continue; }
+      const t=home&&plTrajet(E,lieu,home,fin+PL_BAT,fin+20*H,true);
+      if(t&&(doit||plJourOk(a.jours[d].m.concat(t),C,R))){ a.jours[d].m.push(t); lieu=home; fin=Date.parse(t.end); dehors=0; continue; }
+      if(doit){ manque.push({pk,date:pl.meta.days[d],type:'retour',texte:`retour à organiser : aucun trajet connu de ${lieu} à ${home}${isAFR(a.metier)?` (si ${lieu} est en fait sa résidence : fiche de l’agent → résidence propre)`:''}`}); lieu=home; dehors=0; continue; }   // compté rentré ensuite, pour ne pas bloquer la semaine
+      dehors++; }
+    else dehors=0; }
+  return manque;
+}
+function planifRelier(pl,ctx,rulesIn){
+  const R={...DEFAULT_RULES,...(rulesIn||{})}, A=accordOf(R), E=planifEtat(pl,ctx);
+  return pl.agents.flatMap(a=>plRelierAgent(pl,a,E,R,A));
+}
+/** Écarts d'une semaine d'agent (trajets seuls déjà refaits) : liaisons impossibles, chevauchements (30 min de battement),
+    amplitude / TTE de chaque journée, repos entre deux journées (repos journalier à résidence ou RHR), repos périodiques
+    (durée, veille, lendemain ; repos de fin de semaine précédente compris), AFR hors résidence la nuit, 48 h.
+    Renvoie des clés « type|jour ». */
+function plEcarts(pl,a,E,R,A,manque){
+  const C=isAFR(a.metier)?A.continuite:A.roulant, D=pl.meta.days, out=new Set((manque||[]).map(x=>x.type+'|'+x.date)), tl=plTl(a), j0=d=>Date.parse(D[d]+'T00:00:00Z');
+  for(let i=1;i<tl.length;i++) if(tl[i].s<tl[i-1].e+(tl[i].m.ajout||tl[i-1].m.ajout?0:PL_BAT)) out.add('occupe|'+D[tl[i].d]);
+  const estRepos=k=>k>=0&&k<7&&FAM_REPOS.includes(codeFam(a.jours[k].c||''));
+  const duties=[];
+  for(let d=0;d<7;d++){ const l=tl.filter(x=>x.d===d); if(!l.length) continue; const r=plJourRaison(l.map(x=>x.m),C,R); if(r) out.add(r+'|'+D[d]);
+    const der=l.reduce((p,x)=>x.e>=p.e?x:p); duties.push({d,s:Math.min(...l.map(x=>x.s)),e:der.e,to:der.m.to}); }
+  const seq=[E.fin(a)!=null?{d:-1,e:E.fin(a),to:E.lieu(a)}:null,...duties].filter(Boolean);
+  for(let i=0;i+1<seq.length;i++){ const x=seq[i], y=seq[i+1];
+    let nb=x.d<0?E.rpFin(a):0; for(let k=Math.max(0,x.d+1);k<y.d;k++) if(estRepos(k)) nb++;
+    if(nb){ if(y.s-x.e<(24*nb+C.rj)*H) out.add('rp|'+D[y.d]); }
+    else { const maison=plEstMaison(E,a,x.to); if(y.s-x.e<(maison?C.rj:A.rhrMin)*H) out.add((maison?'rj':'rhr')+'|'+D[y.d]); } }
+  for(const x of duties){
+    let lb=0; for(let k=x.d-1;estRepos(k);k--) lb++; if(x.d-lb===0) lb+=E.rpFin(a);
+    if(lb&&(x.s-j0(x.d))/H<(lb>=2?A.lendemainDouble:A.lendemainSimple)) out.add('rp|'+D[x.d]);
+    let lf=0; for(let k=x.d+1;estRepos(k);k++) lf++;
+    if(lf&&(x.e-j0(x.d))/H>(lf>=2?A.veilleDouble:A.veilleSimple)) out.add('rp|'+D[x.d]);
+    if(isAFR(a.metier)&&!plEstMaison(E,a,x.to)) out.add('retour|'+D[x.d]); }
+  if(plTTE(a,R)>A.hebdoMax+1e-9) out.add('hebdo|');
+  return out;
+}
+const plCopie=a=>({...a,jours:a.jours.map(x=>({...x,m:[...(x.m||[])]}))});
+const plTTE=(a,R)=>a.jours.reduce((n,x)=>n+(x.m||[]).reduce((k,y)=>k+missionTTE(y,R),0),0);
+/** Essai d'une mission chez un agent : sa semaine est refaite avec la mission (trajets seuls compris) et comparée à la semaine
+    sans elle ; refus si un nouvel écart apparaît. {ok, raison} ; ok → trajets seuls en plus, heures avant / après, lieu de départ */
+function plEssai(pl,a,m,d,E,R,A){
+  if(a.jours[d].c) return {ok:false,raison:'repos'};
+  const s=Date.parse(m.start), e=Date.parse(m.end);
+  if(plTl(a).some(x=>!x.m.ajout&&x.s<e+PL_BAT&&s<x.e+PL_BAT)) return {ok:false,raison:'occupe'};
+  const b=plCopie(a), mb=plRelierAgent(pl,b,E,R,A), ecB=plEcarts(pl,b,E,R,A,mb), ajB=b.jours.reduce((n,x)=>n+x.m.filter(y=>y.ajout).length,0);
+  const c=plCopie(a); c.jours[d].m.push(m);
+  const mc=plRelierAgent(pl,c,E,R,A), nv=[...plEcarts(pl,c,E,R,A,mc)].filter(k=>!ecB.has(k));
+  if(nv.length){ const ordre=['lieu','retour','rp','rj','rhr','occupe','amp','tte','pause','hebdo']; nv.sort((x,y)=>ordre.indexOf(x.split('|')[0])-ordre.indexOf(y.split('|')[0])); return {ok:false,raison:nv[0].split('|')[0]}; }
+  const tl=plTl(c), i=tl.findIndex(x=>x.m===m), av=i>0?tl[i-1]:null;
+  return {ok:true,trajets:c.jours.reduce((n,x)=>n+x.m.filter(y=>y.ajout).length,0)-ajB,avant:plTTE(b,R),apres:plTTE(c,R),
+    lieu:av?(av.m.ajout&&av.d===d?av.m.from:av.m.to):(E.lieu(a)||[...E.res(a)][0])};
+}
+/** GPT et repos d'affilée d'une semaine (avec la fin de la semaine précédente) respectés ? */
+function plReposOk(a,E,A){
+  const rep=a.jours.map(j=>FAM_REPOS.includes(codeFam(j.c||''))||j.c==='RP');
+  let g=E.gpt(a), r=E.rpFin(a);
+  for(const x of rep){ if(x){ g=0; r++; if(r>A.rpConsecMax) return false; } else { r=0; g++; if(g>A.gptMax) return false; } }
+  return true;
+}
+/** Remplissage automatique : place les missions `items` ({…mission, d, agence, fam, pks?}) chez un agent de leur agence et
+    de leur métier, jour par jour et dans l'ordre des heures. Candidats classés : ne pas dépasser 35 h, pas de trajet seul à
+    ajouter, le moins d'heures dans la semaine (rapprocher chacun de 35 h), l'agent habituel, le moins de missions. Si aucun
+    agent ne convient parce qu'il est en repos (RP posés par le planning type), le bloc de repos est déplacé quand la GPT et
+    les repos d'affilée le permettent. Chaque mission garde l'explication du choix (`pourquoi`) ; chaque mission non placée,
+    la raison pour chaque agent (`raisons`). Les trajets seuls sont ensuite refaits (planifRelier). */
+function planifAuto(pl,items,ctx,rulesIn){
+  const R={...DEFAULT_RULES,...(rulesIn||{})}, A=accordOf(R), E=planifEtat(pl,ctx), seuil=(R.seuilHebdo||35), reste=[];
+  pl.agents.forEach(a=>a.jours.forEach(j=>{ j.m=(j.m||[]).filter(m=>!m.ajout); }));
+  const nom=a=>`${a.nom} ${a.prenom||''}`.trim();
+  const choisir=(it,m,d)=>{ const pks=it.pks||{}, ess=[], refus=[];
+    for(const a of pl.agents){ if(a.agence!==it.agence||famMetier(a.metier)!==it.fam) continue;
+      const r=plEssai(pl,a,m,d,E,R,A); if(r.ok) ess.push({a,r}); else refus.push({a,raison:r.raison}); }
+    ess.sort((x,y)=>((x.r.apres>seuil)-(y.r.apres>seuil))||(x.r.trajets-y.r.trajets)||(x.r.avant-y.r.avant)||((pks[personKey(y.a)]||0)-(pks[personKey(x.a)]||0)));
+    return {ess,refus}; };
+  for(const it of [...items].sort((a,b)=>a.d-b.d||a.start.localeCompare(b.start))){
+    const {pks:_k,d,raisons:_r,pourquoi:_p,...m}=it, pks=it.pks||{}; let {ess,refus}=choisir(it,m,d);
+    if(!ess.length){   // repos déplaçables (posés par le planning type) : on essaie de les décaler
+      for(const {a} of refus.filter(x=>x.raison==='repos'&&a_cAuto(x.a,d))){ const bloc=[]; for(let k=d;k>=0&&a.jours[k].cAuto;k--) bloc.unshift(k); for(let k=d+1;k<7&&a.jours[k].cAuto;k++) bloc.push(k);
+        const L=bloc.length, sauve=a.jours.map(j=>({c:j.c,cAuto:j.cAuto})), ecarts=()=>{ const c=plCopie(a); return plEcarts(pl,c,E,R,A,plRelierAgent(pl,c,E,R,A)); }, ec0=ecarts();   // ce qui est déjà placé ne doit pas en souffrir
+        for(let s0=0;s0+L<=7;s0++){ if(s0<=d&&d<s0+L) continue; const cible=[...Array(L)].map((_,i)=>s0+i);
+          if(cible.some(k=>!bloc.includes(k)&&((a.jours[k].m||[]).length||a.jours[k].c))) continue;
+          bloc.forEach(k=>{ a.jours[k].c=''; a.jours[k].cAuto=false; }); cible.forEach(k=>{ a.jours[k].c='RP'; a.jours[k].cAuto=true; });
+          if(plReposOk(a,E,A)&&[...ecarts()].every(k=>ec0.has(k))&&plEssai(pl,a,m,d,E,R,A).ok){ a.reposDeplace=`repos déplacé du ${JS[bloc[0]]} au ${JS[cible[0]]} pour placer « ${m.label} »`; break; }
+          a.jours.forEach((j,k)=>{ j.c=sauve[k].c; j.cAuto=sauve[k].cAuto; }); }
+        if(!a.jours[d].c) break; }
+      ({ess,refus}=choisir(it,m,d)); }
+    if(ess.length){ const {a,r}=ess[0], h=x=>fmtH(x);
+      m.pourquoi=[`Placée chez ${nom(a)} : ${h(r.avant)} → ${h(r.apres)} dans la semaine au moment du choix (objectif ${seuil} h)`,
+        r.trajets?`trajet seul ajouté pour être à ${m.from} à l’heure (aucun agent déjà sur place ne convenait)`:`déjà sur place à ${r.lieu||m.from||'?'}`,
+        pks[personKey(a)]?`fait ce train ${pks[personKey(a)]} fois sur les semaines précédentes`:'',
+        a.reposDeplace&&a.reposDeplace.includes(m.label)?a.reposDeplace:'',
+        ess.length>1?`autres possibles : ${ess.slice(1,4).map(x=>`${nom(x.a)} (${h(x.r.avant)}${x.r.trajets?', trajet seul':''})`).join(', ')}${ess.length>4?'…':''}`:'seul agent possible',
+        refus.length?`écartés : ${Object.entries(refus.reduce((o,x)=>(o[x.raison]=(o[x.raison]||0)+1,o),{})).map(([k,n])=>`${n} ${PL_RAISONS[k]}`).join(' ; ')}`:''].filter(Boolean);
+      a.jours[d].m.push(m); }
+    else reste.push({...it,raisons:refus.map(x=>({pk:personKey(x.a),nom:nom(x.a),raison:x.raison,texte:PL_RAISONS[x.raison]})),
+      pourquoi:[refus.length?`Aucun agent ${it.fam==='AFR'?'AFR':'conducteur'} de ${it.agence} ne convient`:`Aucun agent ${it.fam==='AFR'?'AFR':'conducteur'} de ${it.agence} dans le planning`]});
+  }
+  const manque=planifRelier(pl,ctx,R);
+  return {reste,manque};
+}
+const a_cAuto=(a,d)=>!!a.jours[d].cAuto;
+
 /** Semaine planifiée → semaine lue (même forme que parseWeek), pour réutiliser tous les calculs */
 function planifVersSemaine(pl){
   return {meta:{...pl.meta},anomalies:[],agents:pl.agents.map(a=>({matricule:a.matricule||'',nom:a.nom,prenom:a.prenom||'',agence:a.agence,metier:a.metier,
@@ -3524,6 +3694,22 @@ function planifSemaines(){ const ids=S.weeks.map(w=>w.weekId).sort(); if(!ids.le
   return out; }
 let plSeq=0; const plId=()=>'m'+Date.now().toString(36)+(plSeq++);
 const plMission=m=>({id:plId(),label:m.label,from:m.from||'',to:m.to||'',start:m.start,end:m.end,pauses:(m.pauses||[]).filter(Array.isArray),...(m.regulier?{regulier:true}:{})});
+/** Contexte de la planification automatique : résidences (règles du site), état de chaque agent à la fin de la semaine
+    précédente (lieu, heure de fin, GPT en cours, repos d'affilée) et horaires observés entre deux lieux (toutes les semaines chargées) */
+async function planifContexte(id){
+  const ids=S.weeks.map(w=>w.weekId).sort(), avant=ids.filter(x=>x<id), prevId=avant[avant.length-1], refId=ids.includes(id)?id:prevId;
+  await ensureLoaded(ids);
+  const ctx={res:{},resAg:{},fins:{},lieux:{},gpt:{},rpFin:{},trajets:planifTrajets(ids.map(x=>S.parsedCache.get(x)).filter(Boolean))}, R=effRules();
+  for(const x of [prevId,refId].filter(Boolean)) for(const a of (S.loaded.get(x)||{agents:[]}).agents){
+    const l=[a.residence,...(a.rattachement||a.residencePerso?[]:((R.lieuxResidence||{})[a.agence]||[]))].filter(Boolean).map(normLieu);
+    if(l.length) ctx.res[personKey(a)]=l; if(a.residence&&!ctx.resAg[a.agence]) ctx.resAg[a.agence]=[normLieu(a.residence)]; }
+  const prec=prevId&&S.parsedCache.get(prevId);
+  if(prec) for(const b of prec.agents){ const pk=personKey(b), ms=b.jours.flatMap(j=>j.missions||[]).filter(m=>m.end).sort((x,y)=>x.end.localeCompare(y.end));
+    if(ms.length){ const l=ms[ms.length-1]; ctx.fins[pk]=Date.parse(l.end); if(l.to) ctx.lieux[pk]=normLieu(l.to); }
+    const rep=b.jours.map(j=>j.kind==='CODE'&&FAM_REPOS.includes(codeFam(j.code||'')));
+    let g=0, r=0; for(const x of rep){ if(x){ g=0; r++; } else { r=0; g++; } } ctx.gpt[pk]=g; ctx.rpFin[pk]=r; }
+  return ctx;
+}
 /** Premier brouillon d'une semaine : missions du fichier si la semaine est importée, sinon planning type (S+1) ;
     trains réguliers des 4 semaines importées précédentes posés chez leur agent habituel, sinon en réserve */
 async function construirePlanif(id,seuil){
@@ -3541,7 +3727,7 @@ async function construirePlanif(id,seuil){
   // semaine qui suit la dernière importée : jours de repos du planning type
   if(!importee&&id===planifSemaines()[ids.length]){ const rowsAll=[...S.loaded.entries()].flatMap(([w,v])=>v.agents.filter(a=>!a.exclu).map(a=>{ a.weekId=a.weekId||w; return a; }));
     const t=trameSemaine(rowsAll,refId,new Set(agents.map(personKey)),S.rules);
-    if(t) for(const x of t.agents){ const a=agents.find(y=>personKey(y)===x.pk); if(a) x.cases.forEach((c,d)=>{ if(c.t==='RP') a.jours[d].c='RP'; }); } }
+    if(t) for(const x of t.agents){ const a=agents.find(y=>personKey(y)===x.pk); if(a) x.cases.forEach((c,d)=>{ if(c.t==='RP'){ a.jours[d].c='RP'; a.jours[d].cAuto=true; } }); } }
   const reg=trainsReguliers(avant.map(x=>S.parsedCache.get(x)).filter(Boolean),seuil);
   const info=new Map(); for(const x of avant) for(const a of (S.loaded.get(x)||{agents:[]}).agents) info.set(personKey(a),{agence:a.agence,metier:a.metier});
   const prec=S.parsedCache.get(importee?ids[ids.indexOf(id)-1]:avant[avant.length-1]), fins={};
@@ -3551,20 +3737,30 @@ async function construirePlanif(id,seuil){
     for(const t of reg){ if(!t.agence||!ags.has(t.agence)) continue;
       const deja=brut.agents.some(b=>(b.jours[t.d].missions||[]).some(x=>normLieu(x.label)===normLieu(t.label)&&normLieu(x.from)===normLieu(t.from)&&normLieu(x.to)===normLieu(t.to)));
       if(!deja) reserve.push({...missionDuJour(t,meta.days[t.d],plId()),d:t.d,agence:t.agence,fam:t.fam,pks:t.pks,semaines:t.semaines}); } }
-  else reserve=planifPreremplir({meta,agents},reg,info,new Map(Object.entries(fins)),S.rules);
-  return {meta,agents,reserve,fins,seuil,source:importee?'fichier':'planning type',nbReguliers:reg.length};
+  const tmp={meta,agents};
+  if(!importee){ S.plCtx=await planifContexte(id); reserve=planifPreremplir(tmp,reg,info,new Map(Object.entries(fins)),S.rules,S.plCtx); }
+  return {meta,agents,reserve,fins,seuil,source:importee?'fichier':'planning type',nbReguliers:reg.length,v:2,manque:tmp.manque||[]};
 }
 async function loadPlanif(){
   const opts=planifSemaines(); if(!opts.length) return;
   if(!S.plW||!opts.includes(S.plW)) S.plW=opts[S.weeks.length]||opts[opts.length-1];
   const ids=S.weeks.map(w=>w.weekId).sort(); await ensureLoaded(ids.filter(x=>x<S.plW).slice(-4));
   let pl=null; try{ pl=(await withLoad(api.planif(S.plW))).planif; }catch(e){ S.msg={m:'Planification : '+e.message,t:'c'}; }
+  S.plCtx=await withLoad(planifContexte(S.plW)); S.plHist=[];
   S.pl=pl||await construirePlanif(S.plW); planifCalcul(); render();
 }
 /** Alertes de la semaine planifiée (avec les 2 semaines importées qui précèdent) */
 function planifCalcul(){ if(!S.pl){ S.plAl=[]; return; }
   const avant=S.weeks.map(w=>w.weekId).sort().filter(x=>x<S.pl.meta.weekId).slice(-2).map(x=>S.parsedCache.get(x)).filter(Boolean);
-  try{ S.plAl=planifAlertes(S.pl,avant,S.rules); }catch(e){ S.plAl=[]; console.error(e); } }
+  try{ S.plAl=planifAlertes(S.pl,avant,S.rules).concat((S.pl.manque||[]).map(x=>({...x,type:'liaison',niveau:'nc'}))); }catch(e){ S.plAl=[]; console.error(e); } }
+/** Après chaque changement : trajets seuls refaits (planifRelier), copie pour « Annuler » prise avant par planifMemo */
+function planifRelie(){ if(S.pl&&S.plCtx) S.pl.manque=planifRelier(S.pl,S.plCtx,S.rules); }
+function planifMemo(){ if(!S.pl) return; (S.plHist=S.plHist||[]).push(JSON.stringify(S.pl)); if(S.plHist.length>30) S.plHist.shift(); }
+/** Heures et nuits dehors d'un agent dans la semaine planifiée */
+function plStats(a){ const tte=a.jours.reduce((n,j)=>n+(j.m||[]).reduce((k,m)=>k+missionTTE(m,{...DEFAULT_RULES,...S.rules}),0),0);
+  const E=planifEtat(S.pl,S.plCtx), fins=a.jours.map(j=>{ const l=[...(j.m||[])].sort((x,y)=>x.end.localeCompare(y.end)); return l.length?l[l.length-1].to:null; });
+  const dehors=fins.map(l=>l&&!plEstMaison(E,a,l)?l:null);
+  return {tte,dehors,nuits:dehors.filter(Boolean).length,ajouts:a.jours.reduce((n,j)=>n+(j.m||[]).filter(m=>m.ajout).length,0)}; }
 let plTimer=null;
 function planifSauver(){ clearTimeout(plTimer); plTimer=setTimeout(async()=>{ try{ await api.savePlanif(S.pl.meta.weekId,S.pl); S.plSave=new Date().toISOString(); render(); }catch(e){ S.msg={m:'Planning non enregistré : '+e.message,t:'c'}; render(); } },700); }
 const plDecale=(m,n)=>{ if(!n) return m; const f=x=>new Date(Date.parse(x)+n*DAY).toISOString(); return {...m,start:f(m.start),end:f(m.end),pauses:(m.pauses||[]).map(([p,q])=>[f(p),f(q)])}; };
@@ -3575,10 +3771,13 @@ function planifDeplacer(src,dest){
   else { m=P.agents[+s0].jours[+s1].m[+s2]; if(!m) return; dSrc=+s1; }
   const dDest=d1==='x'?dSrc:+d1; if(s0!=='R'&&s0===d0&&dSrc===dDest) return; if(s0==='R'&&d0==='R') return;
   const avant=new Set(S.plAl.map(x=>x.pk+'|'+x.date+'|'+x.texte));
+  if(m.ajout){ S.msg={m:'Ce trajet seul a été ajouté automatiquement : il suit les missions de l’agent et se refait tout seul.',t:'c'}; render(); return; }
+  planifMemo();
   if(s0==='R') P.reserve.splice(+s1,1); else P.agents[+s0].jours[+s1].m.splice(+s2,1);
   const n={...plDecale(m,dDest-dSrc)}; delete n.d;
-  if(d0==='R') P.reserve.push({...n,d:dDest,agence:n.agence||P.agents[+s0]?.agence,fam:n.fam||famMetier(P.agents[+s0]?.metier||'')}); else P.agents[+d0].jours[dDest].m.push(n);
-  planifCalcul(); planifSauver();
+  delete n.pourquoi; delete n.raisons;
+  if(d0==='R') P.reserve.push({...n,d:dDest,agence:n.agence||P.agents[+s0]?.agence,fam:n.fam||famMetier(P.agents[+s0]?.metier||'')}); else { n.pourquoi=['Placée à la main']; P.agents[+d0].jours[dDest].m.push(n); }
+  planifRelie(); planifCalcul(); planifSauver();
   if(d0!=='R'){ const a=P.agents[+d0], pk=personKey(a), nv=S.plAl.filter(x=>x.pk===pk&&!avant.has(x.pk+'|'+x.date+'|'+x.texte));
     S.msg=nv.length?{m:`« ${n.label} » chez ${a.nom} ${a.prenom} : ${nv.map(x=>x.texte).join(' · ')}`,t:'c'}:null; }
   render();
@@ -3588,6 +3787,40 @@ function planifDeplacer(src,dest){
     planning tant qu'on ne les a pas changées. */
 function plFiltres(){ const f=S.plF||(S.plF={}); if(f.pAg===undefined) f.pAg=(S.selAgences&&S.selAgences[0])||'Hendaye';
   if(f.pMet===undefined) f.pMet=''; if(f.mAg===undefined) f.mAg=f.pAg; if(f.mMet===undefined) f.mMet=''; if(f.mStat===undefined) f.mStat='aplacer'; if(f.mJour===undefined) f.mJour=''; return f; }
+/** Raisons pour lesquelles aucun agent ne convient, résumées (« 4 en repos, 2 pas sur place… ») */
+const plResume=r=>{ if(!r.length) return 'aucun agent de cette agence et de ce métier dans le planning';
+  return 'personne : '+Object.entries(r.reduce((o,x)=>(o[x.texte]=(o[x.texte]||0)+1,o),{})).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${n} ${t}`).join(' · '); };
+/** Bandeau de synthèse de la semaine planifiée (agents affichés) */
+function plSynthese(P,ags,toutes,ST,alV){
+  const seuil=S.rules.seuilHebdo||35, st=ags.map(a=>ST.get(a)), pk=new Set(ags.map(personKey));
+  const mis=toutes.filter(x=>x.agent?pk.has(personKey(x.agent)):true), pla=mis.filter(x=>x.agent).length, apl=toutes.filter(x=>!x.agent).length;
+  const moy=st.length?st.reduce((n,x)=>n+x.tte,0)/st.length:0, sous=st.filter(x=>x.tte<seuil-1e-9).length, sur=st.filter(x=>x.tte>seuil+1e-9).length;
+  const k=(v,l,t)=>`<div title="${esc(t||'')}"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="pl-kpi">${k(nf(pla),'missions placées','Missions placées chez les agents affichés (trajets seuls ajoutés non comptés)')}${k(nf(apl),'à placer','Toutes agences')}
+    ${k(fmtH(moy),'TTE moyen / agent',`Objectif ${seuil} h par agent (priorité du remplissage automatique)`)}${k(`${nf(sous)} · ${nf(sur)}`,`sous · au-dessus de ${seuil} h`)}
+    ${k(nf(st.reduce((n,x)=>n+x.nuits,0)),'nuits en RHR')}${k(nf(st.reduce((n,x)=>n+x.ajouts,0)),'trajets seuls ajoutés','Ajoutés automatiquement pour amener un agent au départ d’une mission ou le ramener chez lui, sur des horaires déjà vus dans les fichiers')}
+    ${k(nf(alV.filter(x=>x.niveau==='nc').length),'alertes')}</div>`;
+}
+/** « Pourquoi ? » : explication du choix d'un agent, d'un trajet seul ajouté, ou des raisons pour lesquelles personne ne convient */
+function planifPourquoi(key){
+  const P=S.pl, JC=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'], p=key.split('|'); let m, a=null, d;
+  if(p[0]==='R'){ m=P.reserve[+p[1]]; d=m&&m.d; } else { a=P.agents[+p[0]]; d=+p[1]; m=a&&a.jours[d].m[+p[2]]; }
+  if(!m) return;
+  const h=`${JC[d]} ${dISO(P.meta.days[d])} · ${hm(m.start)}–${hm(m.end)} · ${m.from||'?'} → ${m.to||'?'}`;
+  let html='';
+  if(m.ajout) html=`<div class="note">Trajet seul ajouté automatiquement pour ${esc(a.nom)} ${esc(a.prenom)} : l’agent se trouvait à <b>${esc(m.from)}</b> et devait être à <b>${esc(m.to)}</b> (départ de sa mission suivante, ou retour à sa résidence). Horaire choisi parmi les trains déjà vus dans les fichiers entre ces deux lieux, en laissant 30 min avant la mission et le repos voulu depuis la veille. Il se refait tout seul à chaque changement.</div>`;
+  else if(a){ const st=plStats(a), l=m.pourquoi||[P.source==='fichier'?'Mission du fichier importé (placée par le fichier, pas par l’outil)':'Placée à la main'];
+    const al=(S.plAl||[]).filter(x=>x.pk===personKey(a)&&x.date===P.meta.days[d]);
+    html=`<ul class="stack" style="padding-left:18px">${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+      <p class="mt"><b>${esc(a.nom)} ${esc(a.prenom)}</b> · ${esc(a.agence)} · ${esc(a.metier)} · ${fmtH(st.tte)} dans la semaine${st.nuits?` · ${st.nuits} nuit${st.nuits>1?'s':''} en RHR`:''}</p>
+      ${al.length?`<div class="note c">${al.map(x=>esc(x.texte)).join('<br>')}</div>`:'<p class="mut sm">Aucune alerte ce jour-là.</p>'}`; }
+  else { const r=m.raisons||[];
+    html=`${(m.pourquoi||[]).map(x=>`<p>${esc(x)}</p>`).join('')}${r.length?`<div class="tw"><table><thead><tr><th class="l">Agent</th><th class="l">Pourquoi pas</th></tr></thead><tbody>
+      ${[...r].sort((x,y)=>x.texte.localeCompare(y.texte)||x.nom.localeCompare(y.nom)).map(x=>`<tr><td class="l nm">${esc(x.nom)}</td><td class="l">${esc(x.texte)}</td></tr>`).join('')}</tbody></table></div>`
+      :`<p class="mut">${m.pourquoi?'':'Pas encore essayée : cliquez « Remplir automatiquement ».'}</p>`}
+      <p class="mut sm mt">Vous pouvez la placer à la main (glisser vers une case) : les alertes de l’accord s’afficheront si une règle n’est pas tenue.</p>`; }
+  openPanel(m.ajout?'Trajet seul ajouté':`« ${m.label} »`,h,html);
+}
 function viewPlanif(){
   const opts=planifSemaines(); if(!opts.length) return emptyScope();
   const P=S.pl, JC=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'], f=plFiltres();
@@ -3601,9 +3834,10 @@ function viewPlanif(){
   const agences=[...new Set([...P.agents.map(a=>a.agence),...P.reserve.map(m=>m.agence).filter(Boolean)])].sort();
   const optAg=v=>`<option value=""${!v?' selected':''}>Toutes les agences</option>${agences.map(a=>`<option${a===v?' selected':''}>${esc(a)}</option>`).join('')}`;
   const optMet=v=>[['','Tous métiers'],['CDR','Conducteurs'],['AFR','AFR et coordo']].map(([k,l])=>`<option value="${k}"${k===v?' selected':''}>${l}</option>`).join('');
-  const visA=a=>(!f.pAg||a.agence===f.pAg)&&(!f.pMet||famMetier(a.metier)===f.pMet);
+  const ST=new Map(P.agents.map(a=>[a,plStats(a)])), E=planifEtat(P,S.plCtx);
+  const visA=a=>(!f.pAg||a.agence===f.pAg)&&(!f.pMet||famMetier(a.metier)===f.pMet)&&(!f.pRhr||ST.get(a).nuits>0);
   // tableau des missions : placées (chez un agent) et à placer (réserve)
-  const toutes=[...P.agents.flatMap((a,ai)=>a.jours.flatMap((j,d)=>j.m.map((m,i)=>({m,d,key:`${ai}|${d}|${i}`,agent:a,agence:m.agence||a.agence,fam:m.fam||famMetier(a.metier)})))),
+  const toutes=[...P.agents.flatMap((a,ai)=>a.jours.flatMap((j,d)=>j.m.map((m,i)=>({m,d,key:`${ai}|${d}|${i}`,agent:a,agence:m.agence||a.agence,fam:m.fam||famMetier(a.metier)})).filter(x=>!x.m.ajout))),
     ...P.reserve.map((m,i)=>({m,d:m.d,key:'R|'+i,agent:null,agence:m.agence||'',fam:m.fam||''}))];
   const visM=x=>(!f.mAg||x.agence===f.mAg)&&(!f.mMet||x.fam===f.mMet)&&(f.mStat==='toutes'||(f.mStat==='aplacer')===!x.agent)&&(f.mJour===''||x.d===+f.mJour);
   const lm=toutes.filter(visM).sort((a,b)=>a.d-b.d||a.m.start.localeCompare(b.m.start));
@@ -3612,11 +3846,12 @@ function viewPlanif(){
     <div class="pl-f"><select data-plf="mAg">${optAg(f.mAg)}</select><select data-plf="mMet">${optMet(f.mMet)}</select>
       <select data-plf="mStat">${[['aplacer','À placer'],['placees','Placées'],['toutes','Toutes']].map(([k,l])=>`<option value="${k}"${k===f.mStat?' selected':''}>${l}</option>`).join('')}</select>
       <select data-plf="mJour"><option value="">Tous les jours</option>${P.meta.days.map((d,i)=>`<option value="${i}"${String(i)===f.mJour?' selected':''}>${JC[i]} ${dISO(d)}</option>`).join('')}</select></div>
-    <div class="pl-f"><button class="btn btn-pri btn-sm" id="plAuto"${nAPl?'':' disabled'}>Remplir automatiquement (${nf(nAPl)})</button><button class="btn btn-sm" id="plVider">Tout remettre à placer</button></div>
+    <div class="pl-f"><button class="btn btn-pri btn-sm" id="plAuto"${nAPl?'':' disabled'}>Remplir automatiquement (${nf(nAPl)})</button><button class="btn btn-sm" id="plVider">Tout remettre à placer</button><button class="btn btn-sm" id="plUndo"${(S.plHist||[]).length?'':' disabled'} title="Annule le dernier changement (remplissage, déplacement, code…)">Annuler${(S.plHist||[]).length?` (${S.plHist.length})`:''}</button></div>
     <div class="pl-list">${lm.length?lm.map(x=>`<div class="pl-row${S.plSel===x.key?' sel':''}${x.m.regulier?' reg':''}" draggable="true" data-pm="${x.key}">
         <span class="pl-d">${JC[x.d]} ${dISO(P.meta.days[x.d])}</span><b>${esc(x.m.label)}</b><span class="pl-h">${hm(x.m.start)}–${hm(x.m.end)}</span>
         <span class="pl-od">${esc(x.m.from||'?')} → ${esc(x.m.to||'?')}</span>
-        <span class="pl-st">${x.agent?`<span class="pill">${esc(x.agent.nom)} ${esc(x.agent.prenom)}</span>`:'<span class="pill pill-w">à placer</span>'} <span class="mut">${esc(x.agence)} · ${x.fam==='AFR'?'AFR':x.fam==='CDR'?'CDR':''}${x.m.semaines?` · ${x.m.semaines}/4 sem.`:''}</span></span></div>`).join('')
+        <span class="pl-st">${x.agent?`<span class="pill">${esc(x.agent.nom)} ${esc(x.agent.prenom)}</span>`:'<span class="pill pill-w">à placer</span>'} <span class="mut">${esc(x.agence)} · ${x.fam==='AFR'?'AFR':x.fam==='CDR'?'CDR':''}${x.m.semaines?` · ${x.m.semaines}/4 sem.`:''}</span><button class="pl-q" data-plwhy="${x.key}" title="Pourquoi ? (choix de l’agent, ou raisons pour lesquelles personne ne convient)">?</button></span>
+        ${!x.agent&&x.m.raisons?`<span class="pl-why">${esc(plResume(x.m.raisons))}</span>`:''}</div>`).join('')
       :'<p class="mut sm">Aucune mission pour ce filtre.</p>'}</div>
     <details class="qd"><summary>Ajouter une mission</summary><div class="pl-f" style="margin-top:8px">
       <select id="plNd">${P.meta.days.map((d,i)=>`<option value="${i}">${JC[i]} ${dISO(d)}</option>`).join('')}</select>
@@ -3628,19 +3863,24 @@ function viewPlanif(){
   // tableau de planification
   const al=S.plAl||[], parCase=new Map(); for(const x of al){ const k=x.pk+'|'+x.date; if(!parCase.has(k)) parCase.set(k,[]); parCase.get(k).push(x); }
   const ags=P.agents.map((a,ai)=>({a,ai})).filter(({a})=>visA(a));
-  const chip=(m,key)=>`<div class="pl-m${m.regulier?' reg':''}${S.plSel===key?' sel':''}" draggable="true" data-pm="${key}" title="${esc(`${m.label} · ${m.from||'?'} → ${m.to||'?'} · ${hm(m.start)}–${hm(m.end)}${m.regulier?' · train régulier':''}`)}"><b>${esc(m.label)}</b><small>${hm(m.start)}–${hm(m.end)} · ${esc(m.from||'?')} → ${esc(m.to||'?')}</small></div>`;
+  const chip=(m,key)=>m.ajout?`<div class="pl-m ajout" title="${esc(`Trajet seul ajouté automatiquement (horaire déjà vu dans les fichiers) · ${m.from} → ${m.to}`)}"><b>Trajet seul</b><small>${hm(m.start)}–${hm(m.end)} · ${esc(m.from)} → ${esc(m.to)}</small><button class="pl-q" data-plwhy="${key}" title="Pourquoi ?">?</button></div>`
+    :`<div class="pl-m${m.regulier?' reg':''}${S.plSel===key?' sel':''}" draggable="true" data-pm="${key}" title="${esc(`${m.label} · ${m.from||'?'} → ${m.to||'?'} · ${hm(m.start)}–${hm(m.end)}${m.regulier?' · train régulier':''}`)}"><b>${esc(m.label)}</b><small>${hm(m.start)}–${hm(m.end)} · ${esc(m.from||'?')} → ${esc(m.to||'?')}</small><button class="pl-q" data-plwhy="${key}" title="Pourquoi cet agent ?">?</button></div>`;
+  const seuilH=S.rules.seuilHebdo||35, barre=st=>{ const k=Math.min(100,st.tte/seuilH*100), c=st.tte>seuilH+1e-9?'sur':st.tte<seuilH-1e-9?'sous':'';
+    return `<span class="pl-h35">${fmtH(st.tte)} / ${seuilH} h${st.nuits?` · ${st.nuits} RHR`:''}${st.ajouts?` · ${st.ajouts} trajet${st.ajouts>1?'s':''} seul${st.ajouts>1?'s':''} ajouté${st.ajouts>1?'s':''}`:''}<span class="pl-bar"><i class="${c}" style="width:${k}%"></i></span></span>`; };
   const grps=[...new Set(ags.map(({a})=>a.agence+'|'+a.metier))].sort();
-  const lignes=grps.map(g=>`<tr class="tr-g"><td class="l" colspan="8"><b>${esc(g.split('|')[0])}</b> · ${esc(g.split('|')[1])}</td></tr>`+ags.filter(({a})=>a.agence+'|'+a.metier===g).map(({a,ai})=>`<tr><td class="l"><span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}<br><span class="mut sm">${nf(a.jours.reduce((s,j)=>s+j.m.length,0))} mission${a.jours.reduce((s,j)=>s+j.m.length,0)>1?'s':''}</span></td>${a.jours.map((j,d)=>{
+  const lignes=grps.map(g=>`<tr class="tr-g"><td class="l" colspan="8"><b>${esc(g.split('|')[0])}</b> · ${esc(g.split('|')[1])}</td></tr>`+ags.filter(({a})=>a.agence+'|'+a.metier===g).map(({a,ai})=>`<tr><td class="l"><span class="nm">${esc(a.nom)}</span> ${esc(a.prenom)}${barre(ST.get(a))}</td>${a.jours.map((j,d)=>{ const st=ST.get(a), veille=d?st.dehors[d-1]:(E.lieu(a)&&!plEstMaison(E,a,E.lieu(a))?E.lieu(a):null);
       const l=parCase.get(personKey(a)+'|'+P.meta.days[d])||[], nc=l.filter(x=>x.niveau==='nc');
       return `<td data-pdrop="${ai}|${d}" class="${nc.length?'pl-al':l.length?'pl-info':''}${j.c?' pl-code':''}"><select class="pl-c" data-plc="${ai}|${d}">${[...new Set([...PL_CODES,j.c])].map(c=>`<option value="${esc(c)}"${c===j.c?' selected':''}>${c||'—'}</option>`).join('')}</select>
-        ${j.m.map((m,i)=>chip(m,`${ai}|${d}|${i}`)).join('')}${l.map(x=>`<div class="pl-a ${x.niveau}">${esc(x.texte)}</div>`).join('')}</td>`; }).join('')}</tr>`).join('')).join('');
+        ${veille?`<div class="pl-dep">depuis ${esc(veille)} (RHR)</div>`:''}${j.m.map((m,i)=>[m,i]).sort((x,y)=>x[0].start.localeCompare(y[0].start)).map(([m,i])=>chip(m,`${ai}|${d}|${i}`)).join('')}
+        ${st.dehors[d]?`<div class="pl-rhrc" title="L’agent finit la journée à ${esc(st.dehors[d])}, hors de sa résidence : repos hors résidence (RHR)">☾ RHR · ${esc(st.dehors[d])}</div>`:''}${l.map(x=>`<div class="pl-a ${x.niveau}">${esc(x.texte)}</div>`).join('')}</td>`; }).join('')}</tr>`).join('')).join('');
   const visPk=new Set(ags.map(({a})=>personKey(a))), alV=al.filter(x=>visPk.has(x.pk)), nNc=alV.filter(x=>x.niveau==='nc').length;
   const planning=`<div class="pl-pane"><div class="pl-ph"><h3>Planning</h3><span class="mut sm">${nf(ags.length)} agent${ags.length>1?'s':''} · <b class="${nNc?'warn':''}">${nf(nNc)} alerte${nNc>1?'s':''}</b></span></div>
-    <div class="pl-f"><select data-plf="pAg">${optAg(f.pAg)}</select><select data-plf="pMet">${optMet(f.pMet)}</select></div>
+    <div class="pl-f"><select data-plf="pAg">${optAg(f.pAg)}</select><select data-plf="pMet">${optMet(f.pMet)}</select><label class="mut sm" style="display:inline-flex;gap:5px;align-items:center;flex:0 0 auto"><input type="checkbox" data-plrhr${f.pRhr?' checked':''}> seulement les agents en RHR</label></div>
     <div class="tw tall"><table class="planif"><thead><tr><th class="l">Agent</th>${P.meta.days.map((d,i)=>`<th>${JC[i]} ${dISO(d)}</th>`).join('')}</tr></thead><tbody>${lignes||'<tr><td colspan="8" class="mut">Aucun agent pour ce filtre.</td></tr>'}</tbody></table></div></div>`;
   return `<section class="card"><div class="card-h"><div><h2>Planification — ${weekLabel(P.meta)}</h2><p class="card-s">${dFull(P.meta.monday)} au ${dFull(P.meta.sunday)} · départ : ${P.source==='fichier'?'missions du fichier importé':'planning type'} · ${nf(P.nbReguliers||0)} trains réguliers repérés (toutes agences)</p></div></div>
     <div class="card-b stack">${sel}
-      <details class="qd"><summary>Mode d’emploi</summary><div class="note">À gauche les missions, à droite le planning, chacun avec ses filtres (agence, métier ; pour les missions aussi « à placer / placées » et le jour). Glissez une mission de la liste vers une case, d’une case à l’autre, ou vers la liste pour la retirer ; sur téléphone : touchez la mission puis la case. Pré-remplissage à partir des 4 semaines précédentes : chaque train régulier (même intitulé, même trajet, même jour ; ATCMD et DISPO exclus) appartient à l’agence et au métier des agents qui l’ont assuré et ne va qu’à eux — l’agent qui le fait le plus souvent, sinon un collègue libre ce jour-là (repos et amplitude dans les minimums de l’accord), le moins chargé à égalité. « Remplir automatiquement » refait ce placement pour les missions à placer du filtre. Chaque changement est contrôlé avec toutes les règles de l’accord (avec les semaines précédentes) ; alerte dans la case et message immédiat. Brouillon enregistré sur le serveur (admins seulement).</div></details>
+      <details class="qd"><summary>Mode d’emploi</summary><div class="note">À gauche les missions, à droite le planning, chacun avec ses filtres (agence, métier ; pour les missions aussi « à placer / placées » et le jour ; pour le planning, « seulement les agents en RHR »). Glissez une mission de la liste vers une case, d’une case à l’autre, ou vers la liste pour la retirer ; sur téléphone : touchez la mission puis la case. Le bouton « ? » de chaque mission explique le choix de l’agent, ou pourquoi personne ne convient. « Annuler » défait le dernier changement.<br><br><b>Remplissage automatique</b> (trains réguliers des 4 semaines précédentes pour une semaine à venir, puis « Remplir automatiquement » pour les missions à placer du filtre) : une mission ne va qu’à un agent de son agence et de son métier, <b>déjà sur place</b> (fin de la veille, RHR ou résidence) ; sinon un <b>trajet seul</b> est ajouté en dernier recours, sur un horaire déjà vu dans les fichiers entre ces deux lieux ; 30 min au moins entre deux missions. Contrôlés : repos journalier à résidence (13 h conducteurs, 12 h AFR), RHR de 9 h au moins, amplitude et TTE de la journée, 48 h dans la semaine. Les <b>AFR rentrent chaque soir</b> ; un conducteur peut découcher (☾ RHR dans la case), sauf la veille d’un repos, le dimanche ou pour une 3e nuit. Parmi les agents possibles : d’abord ceux qui restent sous 35 h, puis ceux qui n’ont pas besoin de trajet seul, puis le moins d’heures dans la semaine (objectif 35 h), puis l’agent habituel. Si tous sont en repos, le repos posé par le planning type est déplacé quand la GPT (6 jours) et les repos d’affilée (3) le permettent. La barre sous chaque nom montre ses heures face aux 35 h (ambre : en dessous, rouge : au-dessus). Chaque changement est contrôlé avec toutes les règles de l’accord (avec les semaines précédentes) ; alerte dans la case et message immédiat. Brouillon enregistré sur le serveur (admins seulement).</div></details>
+      ${plSynthese(P,ags.map(x=>x.a),toutes,ST,alV)}
       <div class="pl-2c">${missions}${planning}</div>
     </div></section>`;
 }
@@ -5722,24 +5962,29 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
   { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
     if(b){ await actionComptes(b); return; } }
-  if(S.tab==='planif'&&admin()){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd')||{id:'',dataset:{}};
+  if(S.tab==='planif'&&admin()){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd,#plUndo')||{id:'',dataset:{}};
+    const why=e.target.closest('[data-plwhy]'); if(why){ planifPourquoi(why.dataset.plwhy); return; }
     const ch=e.target.closest('[data-pm]'), dz=e.target.closest('[data-pdrop]');
     if(ch&&!e.target.closest('select,button')){ S.plSel=S.plSel===ch.dataset.pm?null:ch.dataset.pm; render(); return; }
     if(dz&&S.plSel&&!e.target.closest('select,button,input,details')){ const s=S.plSel; S.plSel=null; planifDeplacer(s,dz.dataset.pdrop); return; }
-    if(t.id==='plAuto'){ const f=plFiltres(), P=S.pl, garde=[], items=[];
+    if(t.id==='plAuto'){ const f=plFiltres(), P=S.pl, garde=[], items=[]; planifMemo();
+      if(!S.plCtx) S.plCtx=await withLoad(planifContexte(P.meta.weekId));
       P.reserve.forEach(m=>((!f.mAg||m.agence===f.mAg)&&(!f.mMet||m.fam===f.mMet)?items:garde).push(m));
-      const reste=planifPlacer(P,items,P.fins,S.rules); P.reserve=[...garde,...reste];
-      planifCalcul(); planifSauver(); S.msg={m:`${items.length-reste.length} mission${items.length-reste.length>1?'s':''} placée${items.length-reste.length>1?'s':''} ${reste.length?` · ${reste.length} reste${reste.length>1?'nt':''} à placer : aucun agent de l’agence et du métier libre ce jour-là et dans les règles`:''}.`}; render(); return; }
-    if(t.id==='plVider'){ const f=plFiltres(); if(!confirm('Remettre à placer toutes les missions des agents affichés dans le planning ?')) return;
+      const av=P.agents.reduce((n,a)=>n+plStats(a).ajouts,0), r=planifAuto(P,items,S.plCtx,S.rules); P.reserve=[...garde,...r.reste]; P.manque=r.manque;
+      const ap=P.agents.reduce((n,a)=>n+plStats(a).ajouts,0), n=items.length-r.reste.length;
+      const top=Object.entries(r.reste.flatMap(x=>x.raisons||[]).reduce((o,x)=>(o[x.texte]=(o[x.texte]||0)+1,o),{})).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]);
+      planifCalcul(); planifSauver(); S.msg={m:`${nf(n)} mission${n>1?'s':''} placée${n>1?'s':''}${ap>av?` · ${nf(ap-av)} trajet${ap-av>1?'s':''} seul${ap-av>1?'s':''} ajouté${ap-av>1?'s':''}`:''}${r.reste.length?` · ${nf(r.reste.length)} reste${r.reste.length>1?'nt':''} à placer (surtout : ${top.join(' ; ')}) — bouton « ? » sur chaque mission pour le détail`:''}.`}; render(); return; }
+    if(t.id==='plUndo'){ const x=(S.plHist||[]).pop(); if(!x) return; S.pl=JSON.parse(x); planifCalcul(); planifSauver(); S.msg={m:'Dernier changement annulé.'}; render(); return; }
+    if(t.id==='plVider'){ const f=plFiltres(); if(!confirm('Remettre à placer toutes les missions des agents affichés dans le planning ?')) return; planifMemo();
       S.pl.agents.forEach(a=>{ if((f.pAg&&a.agence!==f.pAg)||(f.pMet&&famMetier(a.metier)!==f.pMet)) return;
-        a.jours.forEach((j,d)=>{ j.m.forEach(m=>S.pl.reserve.push({...m,d,agence:m.agence||a.agence,fam:m.fam||famMetier(a.metier)})); j.m=[]; }); });
-      planifCalcul(); planifSauver(); render(); return; }
+        a.jours.forEach((j,d)=>{ j.m.filter(m=>!m.ajout).forEach(({pourquoi,...m})=>S.pl.reserve.push({...m,d,agence:m.agence||a.agence,fam:m.fam||famMetier(a.metier)})); j.m=[]; }); });
+      planifRelie(); planifCalcul(); planifSauver(); render(); return; }
     if(t.id==='plReset'){ if(!confirm('Effacer le brouillon de cette semaine et repartir '+(S.pl&&S.pl.source==='fichier'?'du fichier importé':'du planning type')+' ?')) return;
       try{ await api.delPlanif(S.plW); }catch(err){} S.pl=await construirePlanif(S.plW,+(el('plSeuil')?.value||2)); planifCalcul(); planifSauver(); render(); return; }
     if(t.id==='plAdd'){ const d=+el('plNd').value, l=el('plNl').value.trim(), s=el('plNs').value, f=el('plNe').value;
       if(!l||!s||!f){ S.msg={m:'Intitulé, début et fin obligatoires.',t:'c'}; render(); return; }
       const date=S.pl.meta.days[d], st=Date.parse(date+'T'+s+':00Z'); let en=Date.parse(date+'T'+f+':00Z'); if(en<=st) en+=DAY;
-      S.pl.reserve.push({id:plId(),label:l,from:el('plNf').value.trim().toUpperCase(),to:el('plNt').value.trim().toUpperCase(),start:new Date(st).toISOString(),end:new Date(en).toISOString(),pauses:[],d,agence:el('plNa')?.value||'',fam:el('plNm')?.value||'CDR'});
+      planifMemo(); S.pl.reserve.push({id:plId(),label:l,from:el('plNf').value.trim().toUpperCase(),to:el('plNt').value.trim().toUpperCase(),start:new Date(st).toISOString(),end:new Date(en).toISOString(),pauses:[],d,agence:el('plNa')?.value||'',fam:el('plNm')?.value||'CDR'});
       planifSauver(); render(); return; }
   }
   if(!t) return;
@@ -5970,7 +6215,8 @@ document.addEventListener('change',async e=>{
     f[k]=e.target.value; render(); return; }
   if(e.target.id==='plSeuil'){ if(!confirm('Refaire le brouillon avec ce seuil de trains réguliers ? Les changements faits à la main sur cette semaine seront perdus.')){ render(); return; }
     try{ await api.delPlanif(S.plW); }catch(err){} S.pl=await construirePlanif(S.plW,+e.target.value); planifCalcul(); planifSauver(); render(); return; }
-  if(e.target.dataset&&e.target.dataset.plc){ const [a,d]=e.target.dataset.plc.split('|').map(Number); S.pl.agents[a].jours[d].c=e.target.value; planifCalcul(); planifSauver(); render(); return; }
+  if(e.target.dataset&&e.target.dataset.plc){ const [a,d]=e.target.dataset.plc.split('|').map(Number); planifMemo(); S.pl.agents[a].jours[d].c=e.target.value; S.pl.agents[a].jours[d].cAuto=false; planifRelie(); planifCalcul(); planifSauver(); render(); return; }
+  if(e.target.dataset&&e.target.dataset.plrhr!=null){ plFiltres().pRhr=e.target.checked; render(); return; }
   if(e.target.id==='fWeek'){ S.selWeek=e.target.value; await ensureLoaded(toLoad()); render(); return; }
   if(e.target.id==='dwPer'){ S.dwPer=e.target.value; await ensureLoaded(periodWeeks(S.dwPer,S.weeks)); renderDrawer(); return; }
   if(e.target.id==='file'){ handleFiles(e.target.files); e.target.value=''; return; }

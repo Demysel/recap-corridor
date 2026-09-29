@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -770,7 +770,7 @@ test('Planification : train régulier (2 semaines sur 4), mission posée qui cas
 });
 
 test('Planification : pré-remplissage par agence — le train de Hendaye va à un agent de Hendaye libre, celui de Vaires à personne', () => {
-  const t5 = (d) => svc(['T5', 'HENDAYE', 'IRUN', d, '06:00', d, '14:00']), t9 = (d) => svc(['T9', 'VAIRES', 'PARIS', d, '06:00', d, '12:00']);
+  const t5 = (d) => svc(['T5', 'HENDAYE', 'HENDAYE', d, '06:00', d, '11:00']), t9 = (d) => svc(['T9', 'VAIRES', 'PARIS', d, '06:00', d, '12:00']);
   const mk = (l) => E.parseWeek(week(l, [{ mat: '1', nom: 'A', j: [t5(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] },
     { mat: '9', nom: 'V', ag: 'Vaires', j: [t9(l[2]), 'RP', 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
   const w1 = mk([2026, 9, 7]), w2 = mk([2026, 9, 14]);
@@ -808,4 +808,92 @@ test('Repos journaliers à résidence : au minimum (13 h conducteurs) et sous le
   const b = one([svc(['T1', 'HENDAYE', 'HENDAYE', 7, '06:00', 7, '18:00']), svc(['T2', 'HENDAYE', 'HENDAYE', 8, '06:00', 8, '10:00']), 'RP', 'RP', 'RP', 'RP', 'RP'], { met: 'AFR' }, RES);
   b.weekId = '2026-S37';
   assert.equal(E.reposJournaliersCourts([b], E.loadRules(RES)).minimum.length, 1);   // AFR : 12 h
+});
+
+// ---------- planification automatique : lieu, RHR, trajets seuls, 35 h, repos ----------
+const PDAYS = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
+const pvide = () => PDAYS.map(() => ({ c: '', m: [] }));
+const pag = (mat, met = 'CONDUCTEUR') => ({ matricule: mat, nom: 'N' + mat, prenom: 'P', agence: 'Hendaye', metier: met, jours: pvide() });
+const pmis = (id, label, from, to, d, h1, h2) => ({ id, label, from, to, start: `${PDAYS[d]}T${h1}:00.000Z`, end: `${h2 < h1 ? PDAYS[d + 1] : PDAYS[d]}T${h2}:00.000Z`, pauses: [], d, agence: 'Hendaye', fam: 'CDR' });
+const pctx = (x = {}) => ({ res: {}, resAg: { Hendaye: ['HENDAYE'] }, trajets: {}, fins: {}, lieux: {}, ...x });
+const pmeta = { weekId: '2026-S39', monday: PDAYS[0], sunday: PDAYS[6], days: PDAYS };
+
+test('Planification auto : la mission va à l’agent déjà sur place (RHR à Bordeaux), pas à celui qui devrait y aller', () => {
+  const pl = { meta: pmeta, agents: [pag('1'), pag('2')] };
+  const ctx = pctx({ lieux: { 'm:2': 'BORDEAUX' }, fins: { 'm:2': Date.parse('2026-09-20T12:00:00Z') },
+    trajets: { 'HENDAYE>BORDEAUX': [{ dep: 360, dur: 120 }], 'BORDEAUX>HENDAYE': [{ dep: 600, dur: 120 }] } });
+  const r = E.planifAuto(pl, [pmis('x', 'T1', 'BORDEAUX', 'HENDAYE', 0, '10:00', '12:00')], ctx, E.loadRules(RES));
+  assert.equal(r.reste.length, 0);
+  assert.equal(pl.agents[1].jours[0].m.map((m) => m.label).join(), 'T1');
+  assert.equal(pl.agents[0].jours[0].m.length, 0);
+  assert.match(pl.agents[1].jours[0].m[0].pourquoi.join(' '), /déjà sur place/);
+});
+
+test('Planification auto : trajet seul ajouté sur un horaire observé, 30 min de battement, sinon raison', () => {
+  const ctx = pctx({ trajets: { 'HENDAYE>BORDEAUX': [{ dep: 360, dur: 120 }], 'BORDEAUX>HENDAYE': [{ dep: 900, dur: 120 }] } });
+  const pl = { meta: pmeta, agents: [pag('1')] };
+  const r = E.planifAuto(pl, [pmis('x', 'T1', 'BORDEAUX', 'BORDEAUX', 0, '09:00', '12:00')], ctx, E.loadRules(RES));
+  assert.equal(r.reste.length, 0);
+  const l = pl.agents[0].jours.flatMap((j) => j.m).sort((a, b) => a.start.localeCompare(b.start));
+  // aller (trajet seul observé 06:00–08:00, 30 min avant 09:00), mission ; retour le lendemain : le jour même, la journée
+  // dépasserait 10 h de TTE (chaque mission de moins de 5 h compte 5 h), donc RHR de 9 h au moins puis premier train vu
+  assert.deepEqual(l.map((m) => [m.label, m.start.slice(5, 16), m.end.slice(11, 16)]),
+    [['VOY (ajouté)', '09-21T06:00', '08:00'], ['T1', '09-21T09:00', '12:00'], ['VOY (ajouté)', '09-22T15:00', '17:00']]);
+  const pl2 = { meta: pmeta, agents: [pag('1')] };
+  const r2 = E.planifAuto(pl2, [pmis('y', 'T2', 'BORDEAUX', 'BORDEAUX', 0, '08:10', '10:00')], ctx, E.loadRules(RES));
+  assert.equal(r2.reste.length, 1);                      // arrivée 08:00, battement 30 min : trop tard
+  assert.equal(r2.reste[0].raisons[0].raison, 'lieu');
+});
+
+test('Planification auto : un AFR rentre toujours le soir ; sans trajet de retour connu, la mission reste à placer', () => {
+  const afr = () => pag('5', 'AFR');
+  const m = () => ({ ...pmis('x', 'A1', 'HENDAYE', 'BAYONNE', 0, '08:00', '10:00'), fam: 'AFR' });
+  const pl = { meta: pmeta, agents: [afr()] };
+  const r = E.planifAuto(pl, [m()], pctx({ trajets: { 'BAYONNE>HENDAYE': [{ dep: 660, dur: 60 }] } }), E.loadRules(RES));
+  assert.equal(r.reste.length, 0);
+  assert.ok(pl.agents[0].jours[0].m.some((x) => x.ajout && x.to === 'HENDAYE' && x.start.slice(11, 16) === '11:00'));
+  const pl2 = { meta: pmeta, agents: [afr()] };
+  const r2 = E.planifAuto(pl2, [m()], pctx(), E.loadRules(RES));
+  assert.equal(r2.reste.length, 1);
+  assert.equal(r2.reste[0].raisons[0].raison, 'retour');
+});
+
+test('Planification auto : un conducteur peut découcher (RHR) et repartir le lendemain du lieu du RHR', () => {
+  const pl = { meta: pmeta, agents: [pag('1')] };
+  const ctx = pctx({ trajets: { 'BORDEAUX>HENDAYE': [{ dep: 900, dur: 120 }] } });
+  const r = E.planifAuto(pl, [pmis('a', 'ALLER', 'HENDAYE', 'BORDEAUX', 0, '14:00', '17:00'), pmis('b', 'RETOUR', 'BORDEAUX', 'HENDAYE', 1, '06:00', '09:00')], ctx, E.loadRules(RES));
+  assert.equal(r.reste.length, 0);                       // 17:00 → 06:00 : RHR de 13 h ≥ 9 h
+  assert.equal(pl.agents[0].jours[0].m.filter((m) => m.ajout).length, 0);
+  assert.equal(pl.agents[0].jours[1].m.filter((m) => m.ajout).length, 0);
+  const pl2 = { meta: pmeta, agents: [pag('1')] };
+  const r2 = E.planifAuto(pl2, [pmis('a', 'ALLER', 'HENDAYE', 'BORDEAUX', 0, '16:00', '21:30'), pmis('b', 'RETOUR', 'BORDEAUX', 'HENDAYE', 1, '06:00', '09:00')], ctx, E.loadRules(RES));
+  assert.equal(r2.reste.length, 1);                      // 21:30 → 06:00 : 8 h 30 < 9 h
+  assert.equal(r2.reste[0].raisons[0].raison, 'rhr');
+});
+
+test('Planification auto : priorité à l’agent le plus loin de 35 h ; repos du planning type déplacé si besoin', () => {
+  const pl = { meta: pmeta, agents: [pag('1'), pag('2')] };
+  for (let d = 1; d <= 4; d++) pl.agents[0].jours[d].m.push({ id: 'f' + d, label: 'F', from: 'HENDAYE', to: 'HENDAYE', start: `${PDAYS[d]}T08:00:00.000Z`, end: `${PDAYS[d]}T15:00:00.000Z`, pauses: [] });
+  E.planifAuto(pl, [pmis('x', 'T1', 'HENDAYE', 'HENDAYE', 5, '08:00', '14:00')], pctx(), E.loadRules(RES));
+  assert.equal(pl.agents[1].jours[5].m.length, 1);       // l'agent 2 (0 h) passe avant l'agent 1 (28 h)
+  const pl2 = { meta: pmeta, agents: [pag('3')] };
+  pl2.agents[0].jours[0].c = 'RP'; pl2.agents[0].jours[0].cAuto = true; pl2.agents[0].jours[1].c = 'RP'; pl2.agents[0].jours[1].cAuto = true;
+  const r = E.planifAuto(pl2, [pmis('y', 'T2', 'HENDAYE', 'HENDAYE', 0, '08:00', '14:00')], pctx(), E.loadRules(RES));
+  assert.equal(r.reste.length, 0);
+  assert.equal(pl2.agents[0].jours[0].c, '');
+  assert.equal(pl2.agents[0].jours.filter((j) => j.c === 'RP').length, 2);   // toujours 2 RP, ailleurs
+});
+
+test('Planification : horaires observés entre deux lieux (trajets seuls et trains vus dans les fichiers)', () => {
+  const w = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'A', j: [svc(['VOY-1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '08:00']), svc(['T7', 'HENDAYE', 'BORDEAUX', 8, '10:00', 8, '12:30']), 'RP', 'RP', 'RP', 'RP', 'RP'] }]));
+  const t = E.planifTrajets([w]);
+  assert.deepEqual(JSON.parse(JSON.stringify(t['HENDAYE>BORDEAUX'])), [{ dep: 360, dur: 120 }, { dep: 600, dur: 150 }]);
+});
+
+test('Planification auto : plus de 6 h de travail sans pause de 20 min → refusé (comme le contrôle de conformité)', () => {
+  const pl = { meta: pmeta, agents: [pag('1')] };
+  const r = E.planifAuto(pl, [pmis('x', 'LONG', 'HENDAYE', 'HENDAYE', 2, '06:00', '13:00')], pctx(), E.loadRules(RES));
+  assert.equal(r.reste[0].raisons[0].raison, 'pause');
+  const m = pmis('y', 'LONG', 'HENDAYE', 'HENDAYE', 2, '06:00', '13:00'); m.pauses = [['2026-09-23T09:00:00.000Z', '2026-09-23T09:30:00.000Z']];
+  assert.equal(E.planifAuto({ meta: pmeta, agents: [pag('1')] }, [m], pctx(), E.loadRules(RES)).reste.length, 0);
 });
