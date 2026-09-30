@@ -3451,7 +3451,7 @@ function viewAgents(){
     for(const a of v.agents){ if(a.exclu) continue; const x=sliceAgent(a,debCP,finCP); if(!x) continue;
       const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); } }
   const jp=joursDePeriode(), dRP=decalagesRP(), bRP=blocsRP(lignesChargees()), d0=debutPeriode(), d1=finPeriode();
-  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}, pk=personKey(a), bl=(bRP.get(pk)||[]).filter(b=>b.debut>=d0&&b.debut<=d1);
+  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}, pk=personKey(a), bl=(bRP.get(pk)||[]).filter(b=>b.fin>=d0&&b.fin<=d1);   // bloc compté dans la semaine où il se termine (choix de l'utilisateur)
     o.rpInfo=dRP.get(pk)||null; o.rpDecal=o.rpInfo?o.rpInfo.ecart:null; o.rp3=bl.filter(b=>b.n===3).length; o.rp4=bl.filter(b=>b.n===4).length; o.rp5=bl.filter(b=>b.n>=5).length; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
     const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
     o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
@@ -3741,13 +3741,13 @@ function hsSemainesCard(sc){
   const bl=[...blocsRP(lignesChargees()).entries()].filter(([k])=>pks.has(k)).flatMap(([,l])=>l);
   const d0=debutPeriode(), d1=finPeriode();
   const sem=ids.map(id=>{ const w=W(id)||{}, r=rows.filter(a=>a.weekId===id), cc=k=>r.reduce((n,a)=>n+((a.codeCounts||{})[k]||0),0);
-    const b=bl.filter(x=>x.debut>=w.monday&&x.debut<=w.sunday&&x.debut>=d0&&x.debut<=d1);
+    const b=bl.filter(x=>x.fin>=w.monday&&x.fin<=w.sunday&&x.fin>=d0&&x.fin<=d1);
     return {id,w,hs:r.reduce((n,a)=>n+(a.heuresSup||0),0),ag:new Set(r.filter(a=>a.heuresSup>0).map(personKey)).size,
       rp3:b.filter(x=>x.n===3).length,rp4:b.filter(x=>x.n===4).length,rp5:b.filter(x=>x.n>=5).length,CP:cc('CP'),RCL:cc('RCL'),RCC:cc('RCC')}; });
   if(!sem.length) return '';
   const lab=x=>x.w.week?`S${String(x.w.week).padStart(2,'0')}`:x.id, maxH=Math.max(1e-9,...sem.map(x=>x.hs)), n=sem.length;
   const top=[...sem].sort((a,b)=>b.hs-a.hs).filter(x=>x.hs>0).slice(0,3);
-  const LIG=[['rp3','RP triples','repos triples (3 RP d’affilée) commencés'],['rp4','RP quadruples','repos quadruples (4 RP d’affilée) commencés'],['rp5','RP 5 et +','blocs de 5 RP ou plus commencés'],
+  const LIG=[['rp3','RP triples','repos triples (3 RP d’affilée) terminés'],['rp4','RP quadruples','repos quadruples (4 RP d’affilée) terminés'],['rp5','RP 5 et +','blocs de 5 RP ou plus terminés'],
     ['CP','CP','jours de CP'],['RCL','RCL','jours de RCL'],['RCC','RCC','jours de RCC']];
   const cells=LIG.map(([k,l,t])=>{ const mx=Math.max(1e-9,...sem.map(x=>x[k]));
     return `<div class="hw-r"><span class="hw-l" title="${esc(t)}">${l}</span>${sem.map(x=>`<span class="hw-c" style="background:${x[k]?`color-mix(in srgb,var(--accent) ${Math.round(15+85*x[k]/mx)}%,var(--surface-2))`:'var(--surface-2)'}" data-tip="${esc(`<b>${lab(x)} · ${weekRange(x.w)}</b><span class="tr"><span>${t}</span><b>${nf(x[k])}</b></span><span class="tr"><span>Heures sup</span><b>${fmtH(x.hs)}</b></span>`)}">${x[k]?nf(x[k]):''}</span>`).join('')}</div>`; }).join('');
@@ -3766,7 +3766,7 @@ function hsSemainesCard(sc){
     <label class="fld"><span class="flabel">Agence</span><select data-prhsag><option value="">Toutes (filtre du haut)</option>${ags.map(a=>`<option${a===fa?' selected':''}>${esc(a)}</option>`).join('')}</select></label></div>
     <div class="card-b stack">${cout}
       <div class="tw"><div class="hw" style="--hwn:${n}">${barres}${axe}${cells}</div></div>
-      <p class="mut sm">Barres : heures sup de la semaine (au-delà de ${nf(S.rules.seuilHebdo||35)} h par agent). Cellules : nombre de repos triples, quadruples, 5 et + (RP d’affilée, comptés la semaine où ils commencent, jonction dimanche → lundi comprise) et jours de CP, RCL, RCC ; chaque ligne a sa propre échelle de couleur (plus foncé = plus fréquent). Survolez pour le détail.</p></div></section>`;
+      <p class="mut sm">Barres : heures sup de la semaine (au-delà de ${nf(S.rules.seuilHebdo||35)} h par agent). Cellules : nombre de repos triples, quadruples, 5 et + (RP d’affilée, comptés la semaine où ils se terminent, jonction dimanche → lundi comprise) et jours de CP, RCL, RCC ; chaque ligne a sa propre échelle de couleur (plus foncé = plus fréquent). Survolez pour le détail.</p></div></section>`;
 }
 /** Planning type de la semaine qui suit la dernière importée (trame service / repos, sans trains) */
 function trameCard(){

@@ -159,13 +159,13 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   chargent toute l'année de la période.
 - **Repos consécutifs** (demandé par l'utilisateur ; choix : RP seulement, 5 et + à part) : `blocsRP` (moteur, testé) sur
   toutes les semaines chargées, jours qui se suivent au calendrier (jonction dimanche → lundi entre deux semaines) ; bloc
-  compté dans la période où il commence ; colonnes Agents « RP triples », « RP quadruples », « RP 5 et + ».
+  compté dans la semaine / la période **où il se termine** (choix de l'utilisateur : sam-dim S39 + lun-mar S40 = quadruple en S40) ; colonnes Agents « RP triples », « RP quadruples », « RP 5 et + ».
 - **Coût des heures sup** (demandé par l'utilisateur ; choix : taux saisis par l'utilisateur, vides par défaut) : Réglages →
   Production, taux AFR / coordo et conducteurs (€/h) + majoration % (`rules.production.coutHS` {afr, cdr, maj}) ;
   `coutHeuresSup` (moteur, testé) = heures sup × taux du métier × (1 + majoration) ; carte Production « Heures sup et repos,
   semaine par semaine » (`hsSemainesCard`) : coût total et par agence × métier (sinon lien vers Réglages), barres des heures
   sup par semaine et, alignées dessous, cellules (échelle propre à chaque ligne) : repos triples, quadruples, 5 et +
-  (semaine où ils commencent), jours de CP, RCL, RCC ; filtre d'agence propre (`S.prHsAg`) ; semaines les plus chargées
+  (semaine où ils se terminent), jours de CP, RCL, RCC ; filtre d'agence propre (`S.prHsAg`) ; semaines les plus chargées
   dans le sous-titre. Deux échelles séparées alignées semaine par semaine, jamais de double axe.
 - **Planning type de la semaine suivante** (demandé par l'utilisateur ; choix : trame service / repos **sans trains**, pour la
   semaine qui suit la dernière importée, périmètre du filtre) : `trameSemaine(rowsAll, lastWeekId, scopePks, rules)` (moteur,
