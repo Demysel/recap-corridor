@@ -119,7 +119,8 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   trajet seul, ni DISPO, ni ATCMD) assuré par un autre agent du même métier (toutes agences), parti entre l'arrivée de
   l'agent à X et le départ prévu + fenêtre réglable (défaut 2 h) ; « journée économisable » si l'agent de ce train était
   venu à X en trajet seul et n'a rien fait d'autre. Présenté comme piste à vérifier (habilitations, ligne, repos).
-- Réglages → « Production » (`rules.production` : reposDus, reposPar, reposCodes, reposResMin, optiFenetre).
+- Réglages → « Production » (`rules.production` : reposDusCDR / reposDusAFR — séparés à la demande de l'utilisateur, vide =
+  accord 117 / 113 par an ; l'ancien `reposDus` commun reste lu en secours —, reposPar, reposCodes, reposResMin, optiFenetre, coutHS).
 - **Accord d'entreprise ECR 2018** (PDF fourni par l'utilisateur, scanné, non versé au dépôt) — valeurs pré-remplies et
   réglables (`ACCORD_DEF`, `rules.accord`, Réglages → « Accord d'entreprise ») ; correspondance validée : CONDUCTEUR (dont
   « CDR + AFR ») = personnel roulant, chapitre 3 ; AFR et COORDO AFR = continuité de service, chapitre 4 titre 2.

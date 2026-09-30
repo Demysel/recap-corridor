@@ -1190,7 +1190,7 @@ const DEFAULT_RULES={
   panierRHR:true,             // un RHR qui touche la plage du midi et/ou du soir donne un panier par plage
   horsColonne:'ecarter',      // mission datée hors de sa colonne : 'ecarter' ou 'garder'
   horsColonneTolerance:6,     // un service qui démarre le lendemain avant cette heure reste rattaché à sa colonne
-  production:{reposDus:null,reposPar:'an',reposCodes:['RP'],reposResMin:null,optiFenetre:2},   // onglet Production : repos dus (vide = non affiché), repos à résidence minimum, fenêtre d'optimisation (h)
+  production:{reposDus:null,reposDusCDR:null,reposDusAFR:null,reposPar:'an',reposCodes:['RP'],reposResMin:null,optiFenetre:2},   // onglet Production : repos dus (vide = non affiché), repos à résidence minimum, fenêtre d'optimisation (h)
 };
 /** Une personne = son matricule (à défaut, nom + prénom) */
 const personKey=a=>a.matricule?'m:'+a.matricule:'n:'+deacc(`${a.nom}|${a.prenom}`).toUpperCase();
@@ -2432,7 +2432,7 @@ function trameSemaine(rowsAll,lastWeekId,scopePks,rulesIn){
 /** Onglet Production (demandé par l'utilisateur) : chiffres orientés production, calculés sur le planning seulement
     (ni réalisé, ni effectif théorique, ni coûts). `rows` : lignes agent-semaine du périmètre (coupées au jour près) ;
     `pool` : toutes les lignes des mêmes semaines, toutes agences (trains qu'un autre agent a assurés, pour l'optimisation). */
-const PROD_DEF={reposDus:null,reposPar:'an',reposCodes:['RP'],reposResMin:null,optiFenetre:2};
+const PROD_DEF={reposDus:null,reposDusCDR:null,reposDusAFR:null,reposPar:'an',reposCodes:['RP'],reposResMin:null,optiFenetre:2};
 function productionData(rows,pool,rulesIn){
   const R={...DEFAULT_RULES,...(rulesIn||{})}, P={...PROD_DEF,...(R.production||{})}, trajT=R.trajetTypes||[];
   const hOf=s=>{ const d=new Date(s); return d.getUTCHours()+d.getUTCMinutes()/60; };
@@ -2443,7 +2443,8 @@ function productionData(rows,pool,rulesIn){
   const diy=d=>{ const y=+d.slice(0,4); return (y%4===0&&y%100!==0)||y%400===0?366:365; };
   const partJour=d=>P.reposPar==='semaine'?1/7:P.reposPar==='mois'?1/dim(d):1/diy(d);
   const codesR=(P.reposCodes&&P.reposCodes.length?P.reposCodes:['RP']);
-  const nDus=Number(P.reposDus)>0?Number(P.reposDus):null, resMin=Number(P.reposResMin)>0?Number(P.reposResMin):null;
+  // repos dus propres aux conducteurs et aux AFR / coordo (demandé par l'utilisateur) ; ancien réglage commun en secours
+  const nDusDe=m=>{ const v=Number(isAFR(m)?P.reposDusAFR:P.reposDusCDR); return v>0?v:Number(P.reposDus)>0?Number(P.reposDus):null; }, resMin=Number(P.reposResMin)>0?Number(P.reposResMin):null;
   const personnes=[];
   for(const [pk,list] of groupBy(rows,personKey)){
     list.sort((x,y)=>String(x.weekId).localeCompare(String(y.weekId)));
@@ -2466,6 +2467,7 @@ function productionData(rows,pool,rulesIn){
     // repos : pris (codes choisis dans Réglages), dus au prorata des jours présents dans les fichiers
     // repos dus : nombre réglé à la main, sinon l'accord (117 RP / an conducteurs, 113 AFR et coordinateurs), au prorata des jours présents
     const Acc=accordOf(R), rpAn=isAFR(last.metier)?Acc.continuite.rpAn:Acc.roulant.rpAn;
+    const nDus=nDusDe(last.metier);
     p.reposDus=nDus?J.reduce((s,{j})=>s+nDus*partJour(j.date),0):J.reduce((s,{j})=>s+rpAn/diy(j.date),0);
     p.doublesDus=J.reduce((s,{j})=>s+Acc.rdAn/diy(j.date),0); p.weDus=J.reduce((s,{j})=>s+Acc.rdWeAn/diy(j.date),0);
     let run=0, prev=null, prevSvc=null;
@@ -3648,7 +3650,8 @@ function viewProduction(){
   const card=(t,s,body,note)=>`<section class="card"><div class="card-h"><div><h2>${t}</h2><p class="card-s">${s}</p></div></div><div class="card-b stack">${note?`<div class="note">${note}</div>`:''}${body}</div></section>`;
   const repos=card('Repos','repos pris et dus, week-ends, périodes de repos',
     `<div class="kpis">${kp('Repos pris',nf(pris),esc(codesR)+' comptés')}
-      ${kp('Repos dus',dusOk?nf(dus,1):'—',P.reposDus?`${nfa(+P.reposDus)} ${parL}, au prorata des jours présents`:`accord : ${nfa(accordOf(S.rules).roulant.rpAn)} RP / an (conducteurs), ${nfa(accordOf(S.rules).continuite.rpAn)} (AFR, coordo), au prorata des jours présents`)}
+      ${kp('Repos dus',dusOk?nf(dus,1):'—',(()=>{ const A=accordOf(S.rules), c=+P.reposDusCDR>0?+P.reposDusCDR:+P.reposDus>0?+P.reposDus:null, f=+P.reposDusAFR>0?+P.reposDusAFR:+P.reposDus>0?+P.reposDus:null;
+        return `conducteurs ${c?`${nfa(c)} ${parL}`:`${nfa(A.roulant.rpAn)} / an (accord)`} · AFR, coordo ${f?`${nfa(f)} ${parL}`:`${nfa(A.continuite.rpAn)} / an (accord)`} · au prorata des jours présents`; })())}
       ${kp('Écart',dusOk?(pris-dus>=0?'+':'')+nf(pris-dus,1):'—',dusOk?`${nf(deficit.length)} agent${deficit.length>1?'s':''} en dessous`:'',dusOk&&deficit.length)}
       ${kp('Week-ends complets',nf(T('weekends')),`sur ${nf(T('weekendsPossibles'))} week-ends (${pct(T('weekends'),T('weekendsPossibles'))})`)}
       ${kp('Repos doubles',nf(T('reposDoubles')),`dus : ${nf(T('doublesDus'),1)} (${nfa(accordOf(S.rules).rdAn)} / an) · ${nf(T('periodesRepos'))} périodes de RP`,T('reposDoubles')<Math.floor(T('doublesDus')))}
@@ -5602,8 +5605,8 @@ function viewReglages(){
           <span class="rd">L'intitulé contient l'un de ces mots (séparés par des virgules) comme mot à part — VOY-541, 541-VOY, VS 12 — et jamais collé à un « + » (CSE+VOY, VOY+PREPA ne sont pas des trajets seuls).</span>
           <span class="inl"><input type="text" id="rTraj" value="${esc((r.trajetTypes||[]).join(', '))}" style="width:160px"></span></span></div>
         <div class="rule"${enTest()?'':' style="display:none"'}><span class="sp"></span><span style="flex:1"><span class="rn">Production</span>
-          <span class="rd">Onglet Production. Repos dus : laissez vide tant que la règle n'est pas fixée (l'indicateur n'est alors pas affiché) ; ils sont ramenés aux jours où l'agent est dans les fichiers. Repos à résidence minimum : vide = non contrôlé. Fenêtre : délai après le départ prévu d'un trajet seul dans lequel un train productif sur le même parcours est proposé à la place.</span>
-          <span class="inl">repos dus <input type="text" id="prRD" value="${esc(rp.reposDus??'')}" inputmode="decimal"> <select id="prRP">${[['semaine','par semaine'],['mois','par mois'],['an','par an']].map(([k,l])=>`<option value="${k}"${rp.reposPar===k?' selected':''}>${l}</option>`).join('')}</select></span>
+          <span class="rd">Onglet Production. Repos dus, séparés pour les conducteurs et les AFR / coordo : vide = valeur de l'accord (117 et 113 RP par an, affichées en grisé) ; ils sont ramenés aux jours où l'agent est dans les fichiers. Repos à résidence minimum : vide = non contrôlé. Fenêtre : délai après le départ prévu d'un trajet seul dans lequel un train productif sur le même parcours est proposé à la place.</span>
+          <span class="inl">repos dus conducteurs <input type="text" id="prRDC" value="${esc(rp.reposDusCDR??rp.reposDus??'')}" placeholder="${accordOf(S.rules).roulant.rpAn}" inputmode="decimal"> · AFR / coordo <input type="text" id="prRDA" value="${esc(rp.reposDusAFR??rp.reposDus??'')}" placeholder="${accordOf(S.rules).continuite.rpAn}" inputmode="decimal"> <select id="prRP">${[['semaine','par semaine'],['mois','par mois'],['an','par an']].map(([k,l])=>`<option value="${k}"${rp.reposPar===k?' selected':''}>${l}</option>`).join('')}</select></span>
           <span class="inl">codes comptés ${FAM_REPOS.map(c=>`<label class="mut"><input type="checkbox" data-prc="${c}" ${(rp.reposCodes||['RP']).includes(c)?'checked':''}> ${c}</label>`).join(' ')}</span>
           <span class="inl">repos à résidence d'au moins <input type="text" id="prRM" value="${esc(rp.reposResMin??'')}" inputmode="decimal"> <span class="mut">h (vide = non contrôlé)</span></span>
           <span class="inl">fenêtre d'optimisation <input type="text" id="prOF" value="${esc(rp.optiFenetre??2)}" inputmode="decimal"> <span class="mut">h</span></span>
@@ -6289,7 +6292,7 @@ document.addEventListener('click',async e=>{
       production: (()=>{ const o=v=>{ const x=parseFloat(String(el(v)?.value??'').replace(',','.')); return isFinite(x)&&x>0?x:null; };
         const c=[...document.querySelectorAll('[data-prc]')].filter(i=>i.checked).map(i=>i.dataset.prc);
         const maj=parseFloat(String(el('prCM')?.value??'').replace(',','.'));
-        return {reposDus:o('prRD'),reposPar:el('prRP')?.value||'an',reposCodes:c.length?c:['RP'],reposResMin:o('prRM'),optiFenetre:o('prOF')??0,
+        return {reposDus:null,reposDusCDR:o('prRDC'),reposDusAFR:o('prRDA'),reposPar:el('prRP')?.value||'an',reposCodes:c.length?c:['RP'],reposResMin:o('prRM'),optiFenetre:o('prOF')??0,
           coutHS:{afr:o('prCA'),cdr:o('prCC'),maj:isFinite(maj)&&maj>=0?maj:null}}; })(),
       accord: (()=>{ const o=structuredClone(accordOf(S.rules));
         document.querySelectorAll('[data-acc]').forEach(i=>{ const v=parseFloat(String(i.value).replace(',','.')); if(!isFinite(v)) return;

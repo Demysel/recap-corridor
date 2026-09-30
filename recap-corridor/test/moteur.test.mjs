@@ -921,3 +921,16 @@ test('Repos consécutifs : triple, quadruple et 5+ (RP seulement), jonction dima
   assert.equal(E.coutHeuresSup(10, 'CONDUCTEUR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 250);
   assert.equal(E.coutHeuresSup(10, 'AFR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 225);
 });
+
+test('Production : repos dus séparés conducteurs / AFR (Réglages), accord à défaut', () => {
+  const d = (x) => svc(['T' + x, 'HENDAYE', 'HENDAYE', x, '08:00', x, '14:00']);
+  const w = run(week([2026, 9, 7], [{ mat: '1', nom: 'C', j: [d(7), d(8), d(9), d(10), d(11), 'RP', 'RP'] },
+    { mat: '2', nom: 'F', met: 'AFR', j: [d(7), d(8), d(9), d(10), d(11), 'RP', 'RP'] }]), RES);
+  w.agents.forEach((a) => a.weekId = w.meta.weekId);
+  const R = E.loadRules({ ...RES, production: { reposDusCDR: 2, reposDusAFR: 3, reposPar: 'semaine' } });
+  const P = E.productionData(w.agents, w.agents, R).personnes;
+  assert.ok(Math.abs(P.find((p) => p.nom === 'C').reposDus - 2) < 1e-9);
+  assert.ok(Math.abs(P.find((p) => p.nom === 'F').reposDus - 3) < 1e-9);
+  const P2 = E.productionData(w.agents, w.agents, E.loadRules(RES)).personnes;   // vide : accord 117 / 113 par an
+  assert.ok(P2.find((p) => p.nom === 'C').reposDus > P2.find((p) => p.nom === 'F').reposDus);
+});
