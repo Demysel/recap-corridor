@@ -157,15 +157,15 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   absences, pastille ambre = retard, verte = avance, détail en infobulle) ; tuile « Décalage des RP » de la Synthèse (choix :
   agents en retard / en avance, arrondi au RP près, + à l'heure et moyenne ; clic → Agents). Agents, Synthèse et Production
   chargent toute l'année de la période.
-- **Repos consécutifs** (demandé par l'utilisateur ; choix : RP seulement, 5 et + à part) : `blocsRP` (moteur, testé) sur
-  toutes les semaines chargées, jours qui se suivent au calendrier (jonction dimanche → lundi entre deux semaines) ; bloc
-  compté dans la semaine / la période **où il se termine** (choix de l'utilisateur : sam-dim S39 + lun-mar S40 = quadruple en S40) ; colonnes Agents « RP triples », « RP quadruples », « RP 5 et + ».
+- **RP triples / quadruples** (demandé par l'utilisateur ; règle précisée : **nombre de RP dans la même semaine civile**,
+  lundi → dimanche, qu'ils se suivent ou non — S40 : RP lun-mar + sam-dim = quadruple ; RP seulement, numéro déjà lu non
+  recompté ; 5 et + à part) : `rpSemaines` (moteur, testé) ; semaines de la période repérées par leur dimanche ; colonnes
+  Agents « RP triples », « RP quadruples », « RP 5 et + » (nombre de semaines).
 - **Coût des heures sup** (demandé par l'utilisateur ; choix : taux saisis par l'utilisateur, vides par défaut) : Réglages →
   Production, taux AFR / coordo et conducteurs (€/h) + majoration % (`rules.production.coutHS` {afr, cdr, maj}) ;
   `coutHeuresSup` (moteur, testé) = heures sup × taux du métier × (1 + majoration) ; carte Production « Heures sup et repos,
   semaine par semaine » (`hsSemainesCard`) : coût total et par agence × métier (sinon lien vers Réglages), barres des heures
-  sup par semaine et, alignées dessous, cellules (échelle propre à chaque ligne) : repos triples, quadruples, 5 et +
-  (semaine où ils se terminent), jours de CP, RCL, RCC ; filtre d'agence propre (`S.prHsAg`) ; semaines les plus chargées
+  sup par semaine et, alignées dessous, cellules (échelle propre à chaque ligne) : agents avec 3, 4, 5 RP et + dans la semaine, jours de CP, RCL, RCC ; filtre d'agence propre (`S.prHsAg`) ; semaines les plus chargées
   dans le sous-titre. Deux échelles séparées alignées semaine par semaine, jamais de double axe.
 - **Planning type de la semaine suivante** (demandé par l'utilisateur ; choix : trame service / repos **sans trains**, pour la
   semaine qui suit la dernière importée, périmètre du filtre) : `trameSemaine(rowsAll, lastWeekId, scopePks, rules)` (moteur,

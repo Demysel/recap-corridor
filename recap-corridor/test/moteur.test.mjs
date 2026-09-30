@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,blocsRP,coutHeuresSup,semainesEcoulees};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,rpSemaines,coutHeuresSup,semainesEcoulees};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -911,12 +911,12 @@ test('Décalage des RP : numéro RP-n lu face à 117 / 52 × semaines (conducteu
   assert.equal(y.reel, 50); assert.ok(Math.abs(y.attendu - 113 / 52 * 20) < 1e-9); assert.ok(y.ecart > 6);   // en avance
 });
 
-test('Repos consécutifs : triple, quadruple et 5+ (RP seulement), jonction dimanche → lundi entre deux semaines', () => {
+test('RP par semaine : 4 RP dans la même semaine = quadruple, même non consécutifs ; coût des heures sup', () => {
   const d = (x) => svc(['T' + x, 'HENDAYE', 'HENDAYE', x, '08:00', x, '14:00']);
   const w1 = one([d(7), d(8), d(9), d(10), 'RP', 'RP', 'RP'], {}, RES);
-  const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'TEST', j: ['RP', d(15), 'RP', 'RP', 'RF', 'RP', 'RP'] }]), RES).agents[0];
-  const b = E.blocsRP([w1, w2]).get(E.personKey(w1));
-  assert.deepEqual(JSON.parse(JSON.stringify(b)), [{ debut: '2026-09-11', fin: '2026-09-14', n: 4 }]);   // ven → lun : quadruple ; mer-jeu RP puis RF : coupé ; sam-dim : 2
+  const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'TEST', j: ['RP-88', 'RP-89', d(16), d(17), d(18), 'RP-90', 'RP-91'] }]), RES).agents[0];
+  const b = E.rpSemaines([w1, w2]).get(E.personKey(w1));
+  assert.deepEqual(JSON.parse(JSON.stringify(b)), [{ lundi: '2026-09-07', dimanche: '2026-09-13', n: 3 }, { lundi: '2026-09-14', dimanche: '2026-09-20', n: 4 }]);
   assert.equal(E.coutHeuresSup(10, 'CONDUCTEUR', {}), null);
   assert.equal(E.coutHeuresSup(10, 'CONDUCTEUR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 250);
   assert.equal(E.coutHeuresSup(10, 'AFR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 225);
