@@ -463,6 +463,12 @@ th.sub,td.sub{color:var(--ink-3);font-size:12px}
 .lienf{margin-top:12px;display:flex;flex-direction:column;gap:6px}
 .lienf select{max-width:320px;font-size:12.5px}
 .hm{display:flex;flex-direction:column;gap:2px;overflow-x:auto;padding-bottom:4px}
+.hw{min-width:calc(150px + var(--hwn) * 26px)}.hw-r{display:grid;grid-template-columns:150px repeat(var(--hwn),minmax(22px,56px));gap:2px;align-items:center}
+.hw-l{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+.hw-b{align-items:end;height:120px;border-bottom:1px solid var(--line)}.hw-bar{height:100%;display:flex;align-items:flex-end;cursor:default}
+.hw-bar i{display:block;width:100%;background:var(--s1);border-radius:4px 4px 0 0;min-height:0}.hw-bar:hover i{filter:brightness(1.15)}
+.hw-x span{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);text-align:center}.hw-x{margin:2px 0 6px}
+.hw-c{height:22px;border-radius:3px;font-size:10.5px;font-family:var(--mono);color:var(--ink);display:flex;align-items:center;justify-content:center}
 .hm-r{display:grid;grid-template-columns:150px repeat(24,minmax(18px,1fr));gap:2px;align-items:center;min-width:640px}
 .hm-l{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
 .hm-x{font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}
@@ -2059,6 +2065,46 @@ function equiteData(rows){
   }
   return {pers,groupes};
 }
+/** Décalage des RP (demandé par l'utilisateur) : avancement normal = RP dus par an (accord : 117 conducteurs, 113 AFR /
+    coordo) / 52 × semaines écoulées à la date `fin` (fin de la semaine 20 : 117 / 52 × 20 = 45). RP réalisés = dernier
+    numéro « RP-n » lu dans le fichier depuis le 1er janvier de l'année de `fin` (choix de l'utilisateur) ; sans numéro,
+    nombre de RP comptés. Écart = réalisés − attendus : positif = en avance, négatif = en retard. */
+function semainesEcoulees(fin){
+  const an=+fin.slice(0,4), d=new Date(Date.parse(fin+'T00:00:00Z')), w=isoWeek(d), dow=(d.getUTCDay()+6)%7;
+  const s=w.year===an?w.week-1+(dow+1)/7:(Date.parse(fin+'T00:00:00Z')-Date.UTC(an,0,1))/DAY/7+1/7;
+  return Math.min(52,Math.max(0,s));
+}
+function decalageRP(rows,fin,rulesIn){
+  const A=accordOf({...DEFAULT_RULES,...(rulesIn||{})}), deb=fin.slice(0,4)+'-01-01', sem=semainesEcoulees(fin), out=new Map();
+  for(const [pk,l] of groupBy(rows,personKey)){ let num=null, nDate=null, cnt=0, met=null, md='';
+    for(const a of l) for(const j of a.jours||[]){ if(!j.date||j.date<deb||j.date>fin) continue;
+      if(j.date>=md){ md=j.date; met=a.metier; }
+      if(j.kind!=='CODE'||j.family!=='RP') continue; if(!j.rpDouble) cnt++;
+      const n=rpNum(j.code); if(n!=null&&(num==null||n>num)){ num=n; nDate=j.date; } }
+    if(!met) continue;
+    const rpAn=isAFR(met)?A.continuite.rpAn:A.roulant.rpAn, attendu=rpAn/52*sem, reel=num!=null?num:cnt;
+    out.set(pk,{reel,source:num!=null?'numero':'compte',date:nDate,attendu,ecart:reel-attendu,rpAn,sem}); }
+  return out;
+}
+/** Blocs de RP consécutifs (demandé par l'utilisateur : triples, quadruples ; 5 et plus à part ; RP seulement) sur toutes
+    les semaines données, la jonction dimanche → lundi entre deux semaines comprise (jours qui se suivent au calendrier).
+    Renvoie personne → [{debut, fin, n}]. */
+function blocsRP(rows){
+  const out=new Map();
+  for(const [pk,l] of groupBy(rows,personKey)){ const jr=new Map();
+    for(const a of l) for(const j of a.jours||[]){ if(!j.date) continue; if(!jr.has(j.date)||j.kind==='CODE') jr.set(j.date,j.kind==='CODE'&&j.family==='RP'); }
+    const dates=[...jr.keys()].sort(), bl=[]; let cur=null;
+    for(const d of dates){ if(!jr.get(d)){ cur=null; continue; }
+      if(cur&&Date.parse(d+'T00:00:00Z')-Date.parse(cur.fin+'T00:00:00Z')===DAY){ cur.fin=d; cur.n++; } else { cur={debut:d,fin:d,n:1}; bl.push(cur); } }
+    out.set(pk,bl.filter(b=>b.n>=3)); }
+  return out;
+}
+/** Coût approximatif des heures sup (demandé par l'utilisateur) : heures × taux horaire de son métier (AFR / coordo ou
+    conducteur) × (1 + majoration %) ; taux saisis dans Réglages → Production, vides par défaut (null = non calculé) */
+function coutHeuresSup(h,metier,rulesIn){
+  const c=((rulesIn||{}).production||{}).coutHS||{}, t=isAFR(metier)?c.afr:c.cdr;
+  return t>0?h*t*(1+(c.maj||0)/100):null;
+}
 /** Planification (demandé par l'utilisateur) : semaine au choix, missions dans les cases, trains réguliers pré-placés,
     ajout à la main par glisser-déposer, alertes de l'accord à chaque changement ; brouillon enregistré sur le serveur.
     Train régulier : même intitulé, même trajet (départ → arrivée, demandé par l'utilisateur), même jour de semaine, présent au moins `seuil` fois sur les semaines données (2 sur 4,
@@ -2957,7 +3003,8 @@ const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includ
     semaine suivante, quel que soit l'affichage, pour que les chiffres d'une semaine ne dépendent pas de la vue */
 const toLoad=()=>{ if(needsAll()) return S.weeks.map(w=>w.weekId);
   const ids=S.weeks.map(w=>w.weekId).sort(), out=new Set(activeWeeks());
-  if(S.tab==='agents') for(const id of periodWeeks('y:'+anneeCP(),S.weeks)) out.add(id);
+  // Agents, Synthèse, Production : toute l'année de la période (CP de l'année, décalage des RP depuis le 1er janvier)
+  if(['agents','synthese','production'].includes(S.tab)) for(const id of periodWeeks('y:'+anneeCP(),S.weeks)) out.add(id);
   // Production : planning type de S+1 — la dernière semaine, ses 3 précédentes et toute son année (repos pris depuis le 1er janvier)
   if(S.tab==='production'&&ids.length){ const l=S.weeks.find(w=>w.weekId===ids[ids.length-1]); ids.slice(-4).forEach(x=>out.add(x)); for(const id of periodWeeks('y:'+l.sunday.slice(0,4),S.weeks)) out.add(id); }
   { const t=isoD(new Date(nowW())); for(const w of S.weeks) if(w.monday<=t&&t<=w.sunday){ out.add(w.weekId); const i=ids.indexOf(w.weekId); if(i>0) out.add(ids[i-1]); } }
@@ -3182,7 +3229,7 @@ function agentPanel(){
     <div class="frow" style="max-height:240px;overflow:auto">${l.slice(0,300).map(({k,a})=>`<button class="chip chip-mini" data-agsel="${esc(k)}" aria-pressed="${sel.includes(k)}">${esc(a.nom)} ${esc(a.prenom)} <span class="mut">· ${esc(a.agence)}</span></button>`).join('')||'<span class="mut sm">Aucun agent</span>'}</div>
     <div class="btns"><button class="btn btn-sm" id="agtAll">Tout sélectionner (liste affichée)</button><button class="btn btn-sm" id="agtClr">Effacer la sélection</button><button class="btn btn-sm btn-pri" id="agtBtn">Fermer</button></div></div></div>`;
 }
-function kpiRow(g){
+function kpiRow(g,extra=''){
   const nW=S.rules.nuitAFR, nC=S.rules.nuitCDR, T='title="Cliquez : règle et détail"';
   // quatre indicateurs principaux, puis les autres en bandeau compact
   return `<div class="kpis lead">
@@ -3200,7 +3247,16 @@ function kpiRow(g){
     <div class="kpi xk" data-explain="heuresNuit" ${T}><div class="k">Heures de nuit</div><div class="v">${fmtH(g.heuresNuit)}</div><div class="n">AFR ${nW[0]}h–${nW[1]}h · CDR ${nC[0]}h–${nC[1]}h</div></div>
     <div class="kpi xk" data-explain="nbMissions" ${T}><div class="k">Missions</div><div class="v" data-count="${g.nbMissions}">${nf(g.nbMissions)}</div><div class="n">${nf(g.nbMissions_moy,1)} par agent · ${nf(g.nbTrajetsSeuls)} trajets seuls</div></div>
     <div class="kpi xk" data-explain="joursRepos" ${T}><div class="k">Repos & congés</div><div class="v">${nf(g.joursRepos)}<small> repos</small></div><div class="n">${nf(g.joursCP)} congés · ${nf(g.joursAbsence)} absences</div></div>
+    ${extra}
   </div>`;
+}
+/** Tuile « Décalage des RP » (demandée par l'utilisateur) : agents en retard / en avance sur l'avancement normal des RP
+    de l'année (117 conducteurs, 113 AFR / coordo, / 52 × semaines écoulées), écart arrondi au RP près */
+function tuileRP(sc){
+  const d=decalagesRP(), l=[...new Set(sc.map(personKey))].map(k=>d.get(k)).filter(Boolean); if(!l.length) return '';
+  const r=l.filter(x=>Math.round(x.ecart)<0), a=l.filter(x=>Math.round(x.ecart)>0), moy=l.reduce((s,x)=>s+x.ecart,0)/l.length;
+  return `<div class="kpi xk" data-goto="agents" title="Fin de période ${dFull(finPeriode())} · ${nf(l[0].sem,1)} semaines écoulées · RP réalisés = dernier numéro RP-n lu dans le fichier depuis le 1er janvier (sinon RP comptés) · écart arrondi au RP près · détail : colonne « Décalage RP » de l’onglet Agents">
+    <div class="k">Décalage des RP</div><div class="v">${nf(r.length)}<small> en retard</small></div><div class="n">${nf(a.length)} en avance · ${nf(l.length-r.length-a.length)} à l’heure · moyenne ${fmtDecal(moy)} RP</div></div>`;
 }
 function viewSynthese(){
   const sc=scopeAgents(); if(!sc.length) return emptyScope();
@@ -3245,7 +3301,7 @@ function viewSynthese(){
       return n?`<div class="note w"><b>${n} agent${n>1?'s':''} exclu${n>1?'s':''} des chiffres</b> sur ce périmètre (incohérence signalée) — liste et réintégration dans Réglages, « Corrections mémorisées ».</div>`:''; })()}
   ${enBref()}
   ${liveNote()}
-  ${kpiRow(g)}
+  ${kpiRow(g,tuileRP(sc))}
   <section class="card">
     <div class="card-h"><div><h2>Par agence et corps de métier</h2><p class="card-s">${m==='total'?'total <span class="mut">· moyenne par agent</span>':modeHint()} — cliquez un en-tête pour trier</p></div>
       <div class="btns">${modeSeg()}<button class="btn btn-sm" data-goto="exports">Exporter</button></div></div>
@@ -3310,6 +3366,11 @@ const COLS=[
   {g:'absences',k:'joursCP',l:'Congés'},
   {g:'absences',k:'c_CP',l:'CP',cls:'sub'},
   {g:'absences',k:'cpAnnee',l:'CP année',f:a=>a.cpAnnee?`<b>${nf(a.cpAnnee)}</b>`:'<span class="z">0</span>',t:a=>a.cpAnnee},
+  // décalage des RP et repos consécutifs (demandés par l'utilisateur)
+  {g:'absences',k:'rpDecal',l:'Décalage RP',f:a=>{ const x=a.rpInfo; if(!x) return '<span class="z">—</span>';
+    const t=`${x.source==='numero'?`Dernier numéro lu : RP-${x.reel}${x.date?` le ${dISO(x.date)}`:''}`:`${x.reel} RP comptés (aucun numéro RP-n lu)`} · attendu ${nf(x.attendu,1)} (${x.rpAn} / 52 × ${nf(x.sem,1)} semaines) · ${Math.round(x.ecart)<0?'en retard':Math.round(x.ecart)>0?'en avance':'à l’heure'}`;
+    return `<span class="${Math.round(x.ecart)<0?'pill pill-w':Math.round(x.ecart)>0?'pill pill-g':''}" title="${esc(t)}">${fmtDecal(x.ecart)}</span>`; },t:a=>a.rpInfo?a.rpInfo.ecart:-1e9},
+  {g:'absences',k:'rp3',l:'RP triples'},{g:'absences',k:'rp4',l:'RP quadruples'},{g:'absences',k:'rp5',l:'RP 5 et +'},
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
@@ -3326,6 +3387,13 @@ const joursDePeriode=()=>{ const r=periodRange(S.selWeek); let n=0;
     for(let i=0;i<7;i++){ const d=isoD(new Date(Date.parse(w.monday+'T00:00:00Z')+i*DAY)); if(!r||(d>=r[0]&&d<=r[1])) n++; } }
   return n; };
 /** Dernier jour de la période choisie : fin du mois / de l'année, sinon dimanche de la dernière semaine */
+const debutPeriode=()=>{ const r=periodRange(S.selWeek); if(r) return r[0];
+  const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[0]); return w?w.monday:isoD(new Date()); };
+/** Toutes les semaines chargées (agents non exclus), pour les calculs qui remontent au 1er janvier ou enjambent deux semaines */
+const lignesChargees=()=>{ const out=[]; for(const [id,v] of S.loaded) for(const a of v.agents) if(!a.exclu){ a.weekId=a.weekId||id; out.push(a); } return out; };
+/** Décalage des RP de chaque agent à la fin de la période (numéro RP-n lu face à l'avancement normal de l'année) */
+const decalagesRP=()=>decalageRP(lignesChargees(),finPeriode(),S.rules);
+const fmtDecal=x=>x==null?'—':(x>0?'+':x<0?'−':'')+nf(Math.abs(x),1);
 const finPeriode=()=>{ const r=periodRange(S.selWeek); if(r) return r[1];
   const ids=activeWeeks(), w=S.weeks.find(x=>x.weekId===ids[ids.length-1]); return w?w.sunday:isoD(new Date()); };
 const anneeCP=()=>{ const r=periodRange(S.selWeek); if(r) return r[1].slice(0,4);
@@ -3380,8 +3448,9 @@ function viewAgents(){
   for(const [id,v] of S.loaded){ const w=S.weeks.find(x=>x.weekId===id); if(!w||w.sunday<debCP||w.monday>finCP) continue;
     for(const a of v.agents){ if(a.exclu) continue; const x=sliceAgent(a,debCP,finCP); if(!x) continue;
       const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); } }
-  const jp=joursDePeriode();
-  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
+  const jp=joursDePeriode(), dRP=decalagesRP(), bRP=blocsRP(lignesChargees()), d0=debutPeriode(), d1=finPeriode();
+  const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}, pk=personKey(a), bl=(bRP.get(pk)||[]).filter(b=>b.debut>=d0&&b.debut<=d1);
+    o.rpInfo=dRP.get(pk)||null; o.rpDecal=o.rpInfo?o.rpInfo.ecart:null; o.rp3=bl.filter(b=>b.n===3).length; o.rp4=bl.filter(b=>b.n===4).length; o.rp5=bl.filter(b=>b.n>=5).length; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
     const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
     o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
     o.autresVides=Math.max(0,(a.joursVides||0)-(a.journeesBlanches||0));
@@ -3658,7 +3727,44 @@ function viewProduction(){
     `Chaque valeur est ramenée à une semaine de présence dans les fichiers. En ambre : au-dessus de la moyenne de l’agence et du métier de plus d’un écart-type ; en rose : en dessous. « Inégal » : écart-type supérieur à la moitié de la moyenne du groupe.`);
   const trame=trameCard();
   return `<section class="card"><div class="card-h"><div><h2>Points d’attention</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · ${nf(L.length)} agents · calculés sur le planning (pas sur le réalisé)</p></div></div>
-    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${trame}${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
+    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${trame}${hsSemainesCard(sc)}${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
+}
+/** Heures sup par semaine et repos (demandé par l'utilisateur) : dans quelles semaines tombent surtout les heures sup, avec
+    en regard les repos triples / quadruples / 5 et + (RP d'affilée, jonction entre semaines comprise), les CP, RCL et RCC ;
+    filtre d'agence propre ; coût approximatif des heures sup (taux saisis dans Réglages → Production). Deux échelles
+    séparées alignées semaine par semaine (heures d'un côté, nombres de l'autre), jamais un double axe. */
+function hsSemainesCard(sc){
+  const ags=[...new Set(sc.map(a=>a.agence))].sort(), fa=ags.includes(S.prHsAg)?S.prHsAg:'', rows=sc.filter(a=>!fa||a.agence===fa);
+  const pks=new Set(rows.map(personKey)), ids=[...new Set(rows.map(a=>a.weekId))].sort(), W=id=>S.weeks.find(w=>w.weekId===id);
+  const bl=[...blocsRP(lignesChargees()).entries()].filter(([k])=>pks.has(k)).flatMap(([,l])=>l);
+  const d0=debutPeriode(), d1=finPeriode();
+  const sem=ids.map(id=>{ const w=W(id)||{}, r=rows.filter(a=>a.weekId===id), cc=k=>r.reduce((n,a)=>n+((a.codeCounts||{})[k]||0),0);
+    const b=bl.filter(x=>x.debut>=w.monday&&x.debut<=w.sunday&&x.debut>=d0&&x.debut<=d1);
+    return {id,w,hs:r.reduce((n,a)=>n+(a.heuresSup||0),0),ag:new Set(r.filter(a=>a.heuresSup>0).map(personKey)).size,
+      rp3:b.filter(x=>x.n===3).length,rp4:b.filter(x=>x.n===4).length,rp5:b.filter(x=>x.n>=5).length,CP:cc('CP'),RCL:cc('RCL'),RCC:cc('RCC')}; });
+  if(!sem.length) return '';
+  const lab=x=>x.w.week?`S${String(x.w.week).padStart(2,'0')}`:x.id, maxH=Math.max(1e-9,...sem.map(x=>x.hs)), n=sem.length;
+  const top=[...sem].sort((a,b)=>b.hs-a.hs).filter(x=>x.hs>0).slice(0,3);
+  const LIG=[['rp3','RP triples','repos triples (3 RP d’affilée) commencés'],['rp4','RP quadruples','repos quadruples (4 RP d’affilée) commencés'],['rp5','RP 5 et +','blocs de 5 RP ou plus commencés'],
+    ['CP','CP','jours de CP'],['RCL','RCL','jours de RCL'],['RCC','RCC','jours de RCC']];
+  const cells=LIG.map(([k,l,t])=>{ const mx=Math.max(1e-9,...sem.map(x=>x[k]));
+    return `<div class="hw-r"><span class="hw-l" title="${esc(t)}">${l}</span>${sem.map(x=>`<span class="hw-c" style="background:${x[k]?`color-mix(in srgb,var(--accent) ${Math.round(15+85*x[k]/mx)}%,var(--surface-2))`:'var(--surface-2)'}" data-tip="${esc(`<b>${lab(x)} · ${weekRange(x.w)}</b><span class="tr"><span>${t}</span><b>${nf(x[k])}</b></span><span class="tr"><span>Heures sup</span><b>${fmtH(x.hs)}</b></span>`)}">${x[k]?nf(x[k]):''}</span>`).join('')}</div>`; }).join('');
+  const barres=`<div class="hw-r hw-b"><span class="hw-l">Heures sup</span>${sem.map(x=>`<span class="hw-bar" data-tip="${esc(`<b>${lab(x)} · ${weekRange(x.w)}</b><span class="tr"><span>Heures sup</span><b>${fmtH(x.hs)}</b></span><span class="tr"><span>Agents concernés</span><b>${nf(x.ag)}</b></span>`)}"><i style="height:${(x.hs/maxH*100).toFixed(1)}%"></i></span>`).join('')}</div>`;
+  const axe=`<div class="hw-r hw-x"><span class="hw-l"></span>${sem.map((x,i)=>`<span>${n<=26||i%2===0?lab(x):''}</span>`).join('')}</div>`;
+  // coût approximatif des heures sup
+  const c=(S.rules.production||{}).coutHS||{}, ok=c.afr>0||c.cdr>0;
+  const grp=[...groupBy(rows,a=>a.agence+'|'+famMetier(a.metier))].map(([k,l])=>{ const h=l.reduce((n,a)=>n+(a.heuresSup||0),0);
+    return {ag:k.split('|')[0],me:k.split('|')[1]==='AFR'?'AFR et coordo':'Conducteurs',h,c:l.reduce((n,a)=>{ const x=coutHeuresSup(a.heuresSup||0,a.metier,S.rules); return x==null?n:n+x; },0)}; }).filter(x=>x.h>0);
+  const tot=grp.reduce((n,x)=>n+x.c,0), totH=grp.reduce((n,x)=>n+x.h,0);
+  const eur=v=>v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  const cout=ok?`<div class="kpis"><div class="kpi hot"><div class="k">Coût approximatif des heures sup</div><div class="v">${eur(tot)}</div><div class="n">${fmtH(totH)} · taux AFR ${c.afr>0?eur(c.afr)+'/h':'non saisi'} · conducteurs ${c.cdr>0?eur(c.cdr)+'/h':'non saisi'}${c.maj?` · majoration ${nf(c.maj)} %`:''}</div></div></div>
+      ${grp.length?`<div class="tw"><table><thead><tr><th class="l">Agence</th><th class="l">Métier</th><th>Heures sup</th><th>Coût</th></tr></thead><tbody>${grp.sort((a,b)=>b.c-a.c).map(x=>`<tr><td class="l nm">${esc(x.ag)}</td><td class="l">${x.me}</td><td>${fmtH(x.h)}</td><td>${eur(x.c)}</td></tr>`).join('')}</tbody></table></div>`:''}`
+    :`<div class="note">Coût des heures sup : saisissez un taux horaire AFR et un taux conducteur (et la majoration) dans <button class="lnk" data-goto="reglages">Réglages → Production</button>.</div>`;
+  return `<section class="card"><div class="card-h"><div><h2>Heures sup et repos, semaine par semaine</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · ${fa?esc(fa):'toutes les agences du filtre'}${top.length?` · semaines les plus chargées : ${top.map(x=>`${lab(x)} (${fmtH(x.hs)})`).join(', ')}`:''}</p></div>
+    <label class="fld"><span class="flabel">Agence</span><select data-prhsag><option value="">Toutes (filtre du haut)</option>${ags.map(a=>`<option${a===fa?' selected':''}>${esc(a)}</option>`).join('')}</select></label></div>
+    <div class="card-b stack">${cout}
+      <div class="tw"><div class="hw" style="--hwn:${n}">${barres}${axe}${cells}</div></div>
+      <p class="mut sm">Barres : heures sup de la semaine (au-delà de ${nf(S.rules.seuilHebdo||35)} h par agent). Cellules : nombre de repos triples, quadruples, 5 et + (RP d’affilée, comptés la semaine où ils commencent, jonction dimanche → lundi comprise) et jours de CP, RCL, RCC ; chaque ligne a sa propre échelle de couleur (plus foncé = plus fréquent). Survolez pour le détail.</p></div></section>`;
 }
 /** Planning type de la semaine qui suit la dernière importée (trame service / repos, sans trains) */
 function trameCard(){
@@ -5501,7 +5607,8 @@ function viewReglages(){
           <span class="inl">repos dus <input type="text" id="prRD" value="${esc(rp.reposDus??'')}" inputmode="decimal"> <select id="prRP">${[['semaine','par semaine'],['mois','par mois'],['an','par an']].map(([k,l])=>`<option value="${k}"${rp.reposPar===k?' selected':''}>${l}</option>`).join('')}</select></span>
           <span class="inl">codes comptés ${FAM_REPOS.map(c=>`<label class="mut"><input type="checkbox" data-prc="${c}" ${(rp.reposCodes||['RP']).includes(c)?'checked':''}> ${c}</label>`).join(' ')}</span>
           <span class="inl">repos à résidence d'au moins <input type="text" id="prRM" value="${esc(rp.reposResMin??'')}" inputmode="decimal"> <span class="mut">h (vide = non contrôlé)</span></span>
-          <span class="inl">fenêtre d'optimisation <input type="text" id="prOF" value="${esc(rp.optiFenetre??2)}" inputmode="decimal"> <span class="mut">h</span></span></span></div>
+          <span class="inl">fenêtre d'optimisation <input type="text" id="prOF" value="${esc(rp.optiFenetre??2)}" inputmode="decimal"> <span class="mut">h</span></span>
+          <span class="inl">coût des heures sup : taux AFR / coordo <input type="text" id="prCA" value="${esc((rp.coutHS||{}).afr??'')}" inputmode="decimal"> <span class="mut">€/h</span> · conducteurs <input type="text" id="prCC" value="${esc((rp.coutHS||{}).cdr??'')}" inputmode="decimal"> <span class="mut">€/h</span> · majoration <input type="text" id="prCM" value="${esc((rp.coutHS||{}).maj??'')}" inputmode="decimal"> <span class="mut">% (vide = non calculé ; ordre de grandeur, sous la médiane)</span></span></span></div>
         <div class="rule"${enTest()?'':' style="display:none"'}><span class="sp"></span><span style="flex:1"><span class="rn">Accord d'entreprise (conformité, onglet Production)</span>
           <span class="rd">Valeurs de l'accord ECR 2018, pré-remplies. Conducteurs : chapitre 3 (art. 12, 17, 19) ; AFR et coordinateurs : chapitre 4 (art. 28, 29, 30). Heures en décimal (9,5 = 9h30).</span>
           <div class="tw"><table class="acc-t"><thead><tr><th class="l">Règle</th><th>Conducteurs</th><th>AFR / coordo</th></tr></thead><tbody>
@@ -6182,7 +6289,9 @@ document.addEventListener('click',async e=>{
       nuitAFR:[num('rNA0',22),num('rNA1',7)], nuitCDR:[num('rNC0',22),num('rNC1',5)],
       production: (()=>{ const o=v=>{ const x=parseFloat(String(el(v)?.value??'').replace(',','.')); return isFinite(x)&&x>0?x:null; };
         const c=[...document.querySelectorAll('[data-prc]')].filter(i=>i.checked).map(i=>i.dataset.prc);
-        return {reposDus:o('prRD'),reposPar:el('prRP')?.value||'an',reposCodes:c.length?c:['RP'],reposResMin:o('prRM'),optiFenetre:o('prOF')??0}; })(),
+        const maj=parseFloat(String(el('prCM')?.value??'').replace(',','.'));
+        return {reposDus:o('prRD'),reposPar:el('prRP')?.value||'an',reposCodes:c.length?c:['RP'],reposResMin:o('prRM'),optiFenetre:o('prOF')??0,
+          coutHS:{afr:o('prCA'),cdr:o('prCC'),maj:isFinite(maj)&&maj>=0?maj:null}}; })(),
       accord: (()=>{ const o=structuredClone(accordOf(S.rules));
         document.querySelectorAll('[data-acc]').forEach(i=>{ const v=parseFloat(String(i.value).replace(',','.')); if(!isFinite(v)) return;
           const [a,b]=i.dataset.acc.split('.'); if(b) o[a][b]=v; else o[a]=v; });
@@ -6203,6 +6312,7 @@ document.addEventListener('click',async e=>{
     render(); setTimeout(()=>{S.msg=null;render();},5000); return; }
 });
 document.addEventListener('change',async e=>{
+  if(e.target.dataset&&e.target.dataset.prhsag!=null){ S.prHsAg=e.target.value; render(); return; }
   if(e.target.dataset&&e.target.dataset.udr){ const [email,k]=e.target.dataset.udr.split('|'), u=(S.users?.utilisateurs||[]).find(x=>x.email===email);
     if(!u) return; const d={...(u.droits||{})}, on=e.target.checked;
     if(k==='admin'&&on&&!confirm(`Donner le droit Administration à ${email} ? Il pourra gérer tous les comptes, y compris le vôtre.`)){ e.target.checked=false; return; }

@@ -148,6 +148,24 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   de préférence un agent venu en trajet seul pour ce train (« trajet seul » économisé) ou qui n'a rien fait d'autre
   (« journée ») — tableau dans « Optimisation des plannings ».
 - Périmètre choisi par l'utilisateur : contrôle + équité + pistes sur les plannings importés (pas de génération automatique).
+- **Décalage des RP** (demandé par l'utilisateur) : avancement normal = RP dus / an (accord : 117 conducteurs, 113 AFR /
+  coordo ; `rpAn`) / 52 × semaines écoulées à la fin de la période (fin de la S20 : 117 / 52 × 20 = 45 ; `semainesEcoulees` :
+  numéro de semaine ISO, au prorata des jours pour une fin en milieu de semaine) ; RP réalisés = **dernier numéro « RP-n »
+  lu dans le fichier** depuis le 1er janvier (choix de l'utilisateur ; sans numéro : RP comptés) ; écart = réalisés −
+  attendus (+ avance, − retard) — `decalageRP` (moteur, testé). Colonne « Décalage RP » de l'onglet Agents (groupe Repos &
+  absences, pastille ambre = retard, verte = avance, détail en infobulle) ; tuile « Décalage des RP » de la Synthèse (choix :
+  agents en retard / en avance, arrondi au RP près, + à l'heure et moyenne ; clic → Agents). Agents, Synthèse et Production
+  chargent toute l'année de la période.
+- **Repos consécutifs** (demandé par l'utilisateur ; choix : RP seulement, 5 et + à part) : `blocsRP` (moteur, testé) sur
+  toutes les semaines chargées, jours qui se suivent au calendrier (jonction dimanche → lundi entre deux semaines) ; bloc
+  compté dans la période où il commence ; colonnes Agents « RP triples », « RP quadruples », « RP 5 et + ».
+- **Coût des heures sup** (demandé par l'utilisateur ; choix : taux saisis par l'utilisateur, vides par défaut) : Réglages →
+  Production, taux AFR / coordo et conducteurs (€/h) + majoration % (`rules.production.coutHS` {afr, cdr, maj}) ;
+  `coutHeuresSup` (moteur, testé) = heures sup × taux du métier × (1 + majoration) ; carte Production « Heures sup et repos,
+  semaine par semaine » (`hsSemainesCard`) : coût total et par agence × métier (sinon lien vers Réglages), barres des heures
+  sup par semaine et, alignées dessous, cellules (échelle propre à chaque ligne) : repos triples, quadruples, 5 et +
+  (semaine où ils commencent), jours de CP, RCL, RCC ; filtre d'agence propre (`S.prHsAg`) ; semaines les plus chargées
+  dans le sous-titre. Deux échelles séparées alignées semaine par semaine, jamais de double axe.
 - **Planning type de la semaine suivante** (demandé par l'utilisateur ; choix : trame service / repos **sans trains**, pour la
   semaine qui suit la dernière importée, périmètre du filtre) : `trameSemaine(rowsAll, lastWeekId, scopePks, rules)` (moteur,
   testé), carte « Planning type — Sxx » en haut de Production (`trameCard`). État repris de S-1 : GPT en cours, RP en fin de
