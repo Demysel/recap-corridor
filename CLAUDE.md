@@ -168,7 +168,8 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   dans le sous-titre. Deux échelles séparées alignées semaine par semaine, jamais de double axe.
 - **Planning type de la semaine suivante** (demandé par l'utilisateur ; choix : trame service / repos **sans trains**, pour la
   semaine qui suit la dernière importée, périmètre du filtre) : `trameSemaine(rowsAll, lastWeekId, scopePks, rules)` (moteur,
-  testé), carte « Planning type — Sxx » en haut de Production (`trameCard`). État repris de S-1 : GPT en cours, RP en fin de
+  testé) ; la carte « Planning type — Sxx » (`trameCard`) n'est plus affichée dans Production (retirée à la demande de
+  l'utilisateur : elle encombrait la vue) ; `trameSemaine` sert toujours à poser les RP de la semaine à venir en Planification. État repris de S-1 : GPT en cours, RP en fin de
   semaine, dernier service (fin, lieu, résidence ou RHR, journée de nuit), RP pris depuis le 1er janvier, repos double
   samedi-dimanche du mois. Règles appliquées (affichées) : RP de la semaine = dus à la fin de la semaine − pris, borné 2–3, en
   un seul bloc ; bloc placé pour GPT ≤ 6 jours, ≤ 3 RP d'affilée avec la fin de S-1, sur samedi-dimanche si le mois n'en a

@@ -3725,9 +3725,8 @@ function viewProduction(){
     stable('prEqP',[nom,ag,{k:'metier',l:'Métier',cls:'l',f:p=>esc(p.metier)},{k:'semaines',l:'Semaines',f:p=>nf(p.semaines,1)},
       ...EQUITE.map(([k,l,u])=>({k,l,v:p=>p.v[k],f:p=>eqv(p,k,u)}))],eq.pers,{sort:{k:'joursService',dir:'desc'},tall:true,sticky:true}),
     `Chaque valeur est ramenée à une semaine de présence dans les fichiers. En ambre : au-dessus de la moyenne de l’agence et du métier de plus d’un écart-type ; en rose : en dessous. « Inégal » : écart-type supérieur à la moitié de la moyenne du groupe.`);
-  const trame=trameCard();
   return `<section class="card"><div class="card-h"><div><h2>Points d’attention</h2><p class="card-s">${esc(periodLabel(S.selWeek,S.weeks))} · ${nf(L.length)} agents · calculés sur le planning (pas sur le réalisé)</p></div></div>
-    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${trame}${hsSemainesCard(sc)}${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
+    <div class="card-b"><ul class="prod-pts">${points.map(x=>`<li>${x}</li>`).join('')}</ul></div></section>${hsSemainesCard(sc)}${confCard}${repos}${eqCard}${util}${nonProd}${irr}${opti}`;
 }
 /** Heures sup par semaine et repos (demandé par l'utilisateur) : dans quelles semaines tombent surtout les heures sup, avec
     en regard les repos triples / quadruples / 5 et + (RP d'affilée, jonction entre semaines comprise), les CP, RCL et RCC ;
