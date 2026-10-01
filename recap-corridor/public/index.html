@@ -3115,8 +3115,9 @@ const TI={compte:'M8 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 13.5c.6-2.6 2.6-
     Sans serveur (artifact) : tous. Le serveur revérifie chaque appel. */
 const peut=k=>backend.mode==='artifact'||!!(S.caps&&S.caps[k]);
 const DROITS_L=[['vitrine','Vitrine'],['coco','Coco'],['lecture','Consultation complète'],['modif','Modification'],['admin','Administration']];
-/** Onglets encore en travail (demandé par l'utilisateur) : Production et Planification ne s'affichent que sur le site de test */
-const EN_TRAVAIL=['production','planif'], enTest=()=>document.documentElement.dataset.env==='dev';
+/** Onglets encore en travail (demandé par l'utilisateur) : la Planification ne s'affiche que sur le site de test
+    (Production publiée sur le principal à la demande de l'utilisateur) */
+const EN_TRAVAIL=['planif'], enTest=()=>document.documentElement.dataset.env==='dev';
 const tabVisible=t=>EN_TRAVAIL.includes(t.k)&&!enTest()?false:t.k==='compte'?!!S.user:t.k==='utilisateurs'?backend.mode==='web'&&peut('admin'):S.role==='aucun'?false
   :S.role==='admin'?t.k!=='mentions'&&(peut('modif')||!['import','reglages','planif'].includes(t.k))
   :S.role==='covoit'?t.k==='coco':S.role==='mixte'?['vitrine','coco','lecture','mentions'].includes(t.k):['vitrine','lecture','mentions'].includes(t.k);
@@ -5628,14 +5629,14 @@ function viewReglages(){
         <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Trajet seul</span>
           <span class="rd">L'intitulé contient l'un de ces mots (séparés par des virgules) comme mot à part — VOY-541, 541-VOY, VS 12 — et jamais collé à un « + » (CSE+VOY, VOY+PREPA ne sont pas des trajets seuls).</span>
           <span class="inl"><input type="text" id="rTraj" value="${esc((r.trajetTypes||[]).join(', '))}" style="width:160px"></span></span></div>
-        <div class="rule"${enTest()?'':' style="display:none"'}><span class="sp"></span><span style="flex:1"><span class="rn">Production</span>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Production</span>
           <span class="rd">Onglet Production. Repos dus, séparés pour les conducteurs et les AFR / coordo : vide = valeur de l'accord (117 et 113 RP par an, affichées en grisé) ; ils sont ramenés aux jours où l'agent est dans les fichiers. Repos à résidence minimum : vide = non contrôlé. Fenêtre : délai après le départ prévu d'un trajet seul dans lequel un train productif sur le même parcours est proposé à la place.</span>
           <span class="inl">repos dus conducteurs <input type="text" id="prRDC" value="${esc(rp.reposDusCDR??rp.reposDus??'')}" placeholder="${accordOf(S.rules).roulant.rpAn}" inputmode="decimal"> · AFR / coordo <input type="text" id="prRDA" value="${esc(rp.reposDusAFR??rp.reposDus??'')}" placeholder="${accordOf(S.rules).continuite.rpAn}" inputmode="decimal"> <select id="prRP">${[['semaine','par semaine'],['mois','par mois'],['an','par an']].map(([k,l])=>`<option value="${k}"${rp.reposPar===k?' selected':''}>${l}</option>`).join('')}</select></span>
           <span class="inl">codes comptés ${FAM_REPOS.map(c=>`<label class="mut"><input type="checkbox" data-prc="${c}" ${(rp.reposCodes||['RP']).includes(c)?'checked':''}> ${c}</label>`).join(' ')}</span>
           <span class="inl">repos à résidence d'au moins <input type="text" id="prRM" value="${esc(rp.reposResMin??'')}" inputmode="decimal"> <span class="mut">h (vide = non contrôlé)</span></span>
           <span class="inl">fenêtre d'optimisation <input type="text" id="prOF" value="${esc(rp.optiFenetre??2)}" inputmode="decimal"> <span class="mut">h</span></span>
           <span class="inl">coût des heures sup : taux AFR / coordo <input type="text" id="prCA" value="${esc((rp.coutHS||{}).afr??'')}" inputmode="decimal"> <span class="mut">€/h</span> · conducteurs <input type="text" id="prCC" value="${esc((rp.coutHS||{}).cdr??'')}" inputmode="decimal"> <span class="mut">€/h</span> · majoration <input type="text" id="prCM" value="${esc((rp.coutHS||{}).maj??'')}" inputmode="decimal"> <span class="mut">% (vide = non calculé ; ordre de grandeur, sous la médiane)</span></span></span></div>
-        <div class="rule"${enTest()?'':' style="display:none"'}><span class="sp"></span><span style="flex:1"><span class="rn">Accord d'entreprise (conformité, onglet Production)</span>
+        <div class="rule"><span class="sp"></span><span style="flex:1"><span class="rn">Accord d'entreprise (conformité, onglet Production)</span>
           <span class="rd">Valeurs de l'accord ECR 2018, pré-remplies. Conducteurs : chapitre 3 (art. 12, 17, 19) ; AFR et coordinateurs : chapitre 4 (art. 28, 29, 30). Heures en décimal (9,5 = 9h30).</span>
           <div class="tw"><table class="acc-t"><thead><tr><th class="l">Règle</th><th>Conducteurs</th><th>AFR / coordo</th></tr></thead><tbody>
           ${[['tteMax','TTE max par journée (h)'],['tteMaxNuit','TTE max, journée de nuit (h)'],['ampMax','Amplitude max (h)'],['ampMaxNuit','Amplitude max, journée de nuit (h)'],

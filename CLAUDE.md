@@ -96,10 +96,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 
 ## Onglet Production (demandé par l'utilisateur, admin seulement, groupe Pilotage)
 
-**Encore en travail** (demandé par l'utilisateur) : Production et Planification ne s'affichent que sur le site de test
-(`EN_TRAVAIL`, `enTest()` = page marquée `data-env="dev"`) ; sur le principal, onglets masqués ainsi que les réglages
-« Production » et « Accord d'entreprise » (valeurs par défaut de l'accord utilisées, notamment par les colonnes RJ).
-Le code est le même sur les deux branches ; retirer un onglet de `EN_TRAVAIL` pour le publier.
+**Publié sur le principal** (demandé par l'utilisateur), avec les réglages « Production » et « Accord d'entreprise ».
+La **Planification reste en travail** : affichée seulement sur le site de test (`EN_TRAVAIL`, `enTest()` = page marquée
+`data-env="dev"`) ; le code est le même sur les deux branches ; retirer un onglet de `EN_TRAVAIL` pour le publier.
 
 Chiffres orientés production, calculés sur le planning seulement (ni réalisé, ni effectif théorique, ni coûts) par
 `productionData(rows, pool, rules)` (moteur, testé) sur le périmètre et la période du filtre principal ; `viewProduction`.
