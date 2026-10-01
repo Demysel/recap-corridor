@@ -419,6 +419,11 @@ Serveur : page lue, empreinte (ETag) et version compressée calculées une fois 
 base connectée, moteur chargé et vitrine préparée d'avance ; vue Coco gardée en mémoire par semaine (`cocoCache`),
 vidée comme la vitrine à chaque import, suppression, changement de règles ou de sélection Coco (`invalider`).
 Page : semaines demandées au serveur en parallèle, 6 à la fois (`ensureLoaded`).
+**Cache local des semaines** (demandé par l'utilisateur, le site ramait) : `cacheSem` (IndexedDB `recap-cache`, magasin
+`semaines`) garde le détail brut de chaque semaine avec sa signature (date d'import + nombre de lignes) ; `ensureLoaded` lit
+d'abord le cache, ne demande au serveur que les semaines absentes ou réimportées, puis les met en cache ; semaines supprimées
+retirées au démarrage et à l'actualisation (`nettoyer`) ; cache vidé à la déconnexion ; jamais pour le visiteur (qui ne
+charge pas de détail). Les règles et corrections restent appliquées à chaque affichage (cache = données brutes du fichier).
 
 ## Interface
 

@@ -2975,11 +2975,35 @@ const scopeAgences=()=>S.selAgences||allAgences();
 const scopeMetiers=()=>S.selMetiers||allMetiers();
 const nbWeeksLoaded=()=>activeWeeks().filter(id=>S.loaded.has(id)).length;
 
+/** Cache local des semaines (demandé par l'utilisateur : le site rame sur certaines données) : le détail de chaque semaine
+    est gardé dans le navigateur (IndexedDB) avec la signature de son import (date d'import + nombre de lignes) ; une
+    semaine réimportée change de signature et est retéléchargée, une semaine supprimée est retirée du cache. Seulement
+    pour les comptes qui voient le détail (jamais le visiteur) ; vidé à la déconnexion. Toute erreur : on passe par le serveur. */
+const cacheSem={
+  db:null,
+  ouvrir(){ if(this.db!==null) return Promise.resolve(this.db);
+    return new Promise(ok=>{ try{ const r=indexedDB.open('recap-cache',1);
+      r.onupgradeneeded=()=>{ try{ r.result.createObjectStore('semaines'); }catch(e){} };
+      r.onsuccess=()=>{ this.db=r.result; ok(this.db); }; r.onerror=()=>{ this.db=false; ok(false); }; r.onblocked=()=>{ this.db=false; ok(false); };
+    }catch(e){ this.db=false; ok(false); } }); },
+  sig(id){ const w=S.weeks.find(x=>x.weekId===id); return w?`${w.importedAt||''}|${w.nbAgents||''}`:null; },
+  async op(mode,f){ const db=await this.ouvrir(); if(!db) return null;
+    return new Promise(ok=>{ try{ const tx=db.transaction('semaines',mode), st=tx.objectStore('semaines'), r=f(st);
+      tx.oncomplete=()=>ok(r&&'result' in r?r.result:true); tx.onerror=tx.onabort=()=>ok(null); }catch(e){ ok(null); } }); },
+  async lire(id){ const sg=this.sig(id); if(!sg) return null; const v=await this.op('readonly',st=>st.get(id)); return v&&v.sig===sg&&Array.isArray(v.docs)?v.docs:null; },
+  ecrire(id,docs){ const sg=this.sig(id); if(!sg) return Promise.resolve(null); return this.op('readwrite',st=>st.put({sig:sg,docs},id)); },
+  async nettoyer(){ const ids=new Set(S.weeks.map(w=>w.weekId)), cles=await this.op('readonly',st=>st.getAllKeys());
+    if(Array.isArray(cles)) for(const k of cles) if(!ids.has(k)) await this.op('readwrite',st=>st.delete(k)); },
+  vider(){ return this.op('readwrite',st=>st.clear()); }
+};
 async function ensureLoaded(ids){
   if(backend.mode!=='artifact'&&S.role!=='admin') return;   // visiteur : statistiques anonymes uniquement, jamais le détail
-  // semaines demandées au serveur en parallèle (6 à la fois), puis traitées dans l'ordre
+  // d'abord le cache local du navigateur, puis le serveur pour le reste (6 semaines à la fois), puis traitement dans l'ordre
   const manq=[...new Set(ids)].filter(id=>!S.loaded.has(id)), recus=new Map();
-  for(let k=0;k<manq.length;k+=6) await withLoad(Promise.all(manq.slice(k,k+6).map(id=>api.semaine(id).then(r=>recus.set(id,r)))));
+  const web=backend.mode==='web';
+  if(web&&manq.length){ const l=await Promise.all(manq.map(id=>cacheSem.lire(id).catch(()=>null))); manq.forEach((id,i)=>{ if(l[i]) recus.set(id,{docs:l[i]}); }); }
+  const aDemander=manq.filter(id=>!recus.has(id));
+  for(let k=0;k<aDemander.length;k+=6) await withLoad(Promise.all(aDemander.slice(k,k+6).map(id=>api.semaine(id).then(r=>{ recus.set(id,r); if(web&&r&&Array.isArray(r.docs)&&r.docs.length) cacheSem.ecrire(id,r.docs).catch(()=>{}); }))));
   for(const id of manq){
     if(S.loaded.has(id)) continue;
     const {docs}=recus.get(id)||{};
@@ -6221,7 +6245,7 @@ document.addEventListener('click',async e=>{
     lr[ag]=(lr[ag]||[]).filter(x=>x!==l); if(!lr[ag].length) delete lr[ag];
     return saveCorrection(`« ${l} » n’est plus reconnu comme résidence de ${ag}`); }
   if(t.dataset.act==='out'){ el('btnOut').click(); return; }
-  if(t.id==='btnOut'){ if(['compte','utilisateurs'].includes(S.tab)) S.tab='synthese'; if(api.jeton) api.post('auth/logout').catch(()=>{}); api.code=''; api.jeton=''; S.role=null; S.caps=null; S.user=null; S.users=null; S.uLien=null; S.weeks=[]; S.loaded.clear(); S.parsedCache.clear(); savePrefs(); render(); return; }
+  if(t.id==='btnOut'){ if(['compte','utilisateurs'].includes(S.tab)) S.tab='synthese'; if(api.jeton) api.post('auth/logout').catch(()=>{}); api.code=''; api.jeton=''; S.role=null; S.caps=null; S.user=null; S.users=null; S.uLien=null; S.weeks=[]; S.loaded.clear(); S.parsedCache.clear(); cacheSem.vider().catch(()=>{}); savePrefs(); render(); return; }
   if(t.id==='btnTheme'){ const cur=document.documentElement.dataset.theme
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
@@ -6437,6 +6461,7 @@ async function boot(){
     const et=await withLoad(api.etat()), {weeks,regles,suivi,journal,coco}=et; S.sig=sigEtat(et);
     S.coco=coco&&Array.isArray(coco.agents)?coco:{agents:[]};
     S.weeks=weeks||[]; S.suivi=suivi||{alertes:{}}; S.journal=journal||[];
+    if(S.role==='admin'&&backend.mode==='web') cacheSem.nettoyer().catch(()=>{});   // semaines supprimées : retirées du cache local
     S.rules=loadRules(regles);
     const p=prefs();
     if(p.selAgences) S.selAgences=p.selAgences.filter(a=>allAgences().includes(a));
@@ -6477,7 +6502,7 @@ async function rafraichir(){
     if(S.role==='covoit'||S.role==='mixte'&&S.tab==='coco'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }
     const et=await api.etat(), sig=sigEtat(et);
     if(sig===S.sig||saisieEnCours()||S.busy||S.queue.length) return;
-    S.sig=sig; S.weeks=et.weeks||[];
+    S.sig=sig; S.weeks=et.weeks||[]; if(S.role==='admin'&&backend.mode==='web') cacheSem.nettoyer().catch(()=>{});
     if(S.role!=='admin'){ S.vit=null; await loadVitrine(true); render(); return; }
     S.rules=loadRules(et.regles); S.suivi=et.suivi||{alertes:{}}; S.journal=et.journal||[]; S.coco=et.coco&&Array.isArray(et.coco.agents)?et.coco:{agents:[]};
     S.loaded=new Map(); S.parsedCache=new Map(); S.vit=null;
