@@ -119,6 +119,7 @@ async function tablesAuth(p) {
     alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
     alter table ${SCHEMA}.utilisateurs add column if not exists agent jsonb;
     alter table ${SCHEMA}.utilisateurs add column if not exists cal text;
+    alter table ${SCHEMA}.utilisateurs add column if not exists newsletter boolean not null default false;
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
     alter table ${SCHEMA}.jetons_mdp enable row level security;
@@ -155,13 +156,13 @@ async function lienMdp(p, req, email, heures) {
 }
 /** Envoi d'un e-mail par l'API Brevo (clé et expéditeur dans les variables Render) ; false si non configuré ou refusé */
 const MAIL = !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM);
-async function mail(to, sujet, html, pj) {
+async function mail(to, sujet, html, pj, nom = 'Récap Corridor') {
   if (!MAIL) return false;
   try {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST', signal: AbortSignal.timeout(10000),
       headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + 'Récap Corridor' }, to: [{ email: to }],
+      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + nom }, to: [{ email: to }],
         subject: (DEV ? '[TEST] ' : '') + sujet,
         htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111">${html}</div>`,
         ...(pj ? { attachment: [{ name: pj.nom, content: Buffer.from(pj.texte, 'utf8').toString('base64') }] } : {}) }),
@@ -376,7 +377,7 @@ async function api(req, res, url) {
     await tablesAuth(p);
     const moi = A.user ? A.user.email : '';
     if (req.method === 'GET') {
-      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande, agent, (cal is not null) as cal from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
+      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande, agent, (cal is not null) as cal, newsletter from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
       return json(req, res, 200, { utilisateurs: q.rows, moi, mail: MAIL });
     }
     if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
@@ -410,6 +411,10 @@ async function api(req, res, url) {
         const lien = b ? `${b}/cal/${j}.ics` : null;
         return json(req, res, 200, { ok: true, lien, envoye: lien ? await mailAgenda(email, lien) : false });
       }
+      if (body.action === 'newsletter') {   // abonnement à la newsletter, coché par l'admin seulement
+        await p.query(`update ${SCHEMA}.utilisateurs set newsletter = $2, maj = now() where email = $1`, [email, !!body.on]);
+        return json(req, res, 200, { ok: true });
+      }
       if (body.action === 'calOff') {
         await p.query(`update ${SCHEMA}.utilisateurs set cal = null, maj = now() where email = $1`, [email]);
         calCache.clear();
@@ -431,7 +436,7 @@ async function api(req, res, url) {
           bouton = boutonAgenda(`${base(req)}/cal/s/${j}.ics`);
         }
         html = html.replace('%%AGENDA%%', bouton);
-        if (!(await mail(email, sujet, html, pj))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
+        if (!(await mail(email, sujet, html, pj, 'Mon récapitulatif Hebdomadaire'))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
         return json(req, res, 200, { ok: true, envoye: true });
       }
       const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;

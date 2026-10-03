@@ -5950,7 +5950,7 @@ function recapSemaine(u,id){
     ${RECAP_AGENDA}
     <h3 ${H3}>Détail des missions</h3><table style="border-collapse:collapse;font-size:14px;width:auto">${plan}</table>${cov}
     <p style="margin:22px 0 0;color:#555">📅 Le planning de la semaine (missions, RP, CP, RHR) est aussi en pièce jointe : ouvrez le fichier pour l’ajouter à votre agenda.</p>
-    <p style="margin:12px 0 0;color:#888;font-size:12px">Chiffres calculés à partir du planning (fichier Récap Corridor), avec les règles du site.</p>`;
+    <p style="margin:12px 0 0;color:#888;font-size:12px">Estimations pouvant contenir des erreurs, ne fait aucunement foi devant les tribunaux populaires.</p>`;
   return {sujet:`Votre récap de la semaine ${weekLabel(w)}`,html,ics:icsTexte(calEvenements([v],pk),`${a.nom} ${a.prenom}`.trim()),nomIcs:`planning-${weekLabel(w).replace(' ','-')}.ics`};
 }
 async function recapCharger(){ const ids=S.weeks.map(w=>w.weekId).sort(), i=ids.indexOf(S.uRc.w); await ensureLoaded([ids[i-1],ids[i],ids[i+1]].filter(Boolean)); render(); }
@@ -6002,6 +6002,7 @@ function viewUtilisateurs(){
         <button class="btn btn-sm" data-uag="${esc(u.email)}">${u.agent?'Changer':'Rattacher'}</button>${u.agent&&u.valide&&U.mail?`<button class="btn btn-sm" data-urecap="${esc(u.email)}" title="Envoyer par e-mail le récap d’une semaine">Récap</button>`:''}${u.agent&&u.valide?`<button class="btn btn-sm${u.cal?' btn-pri':''}" data-ucal="${esc(u.email)}" title="${u.cal?'Agenda abonné : créer un nouveau lien (l’ancien cesse de marcher)':'Créer le lien d’abonnement à l’agenda (missions, RP, CP, RHR)'}${U.mail?', envoyé par e-mail':''}">Agenda</button>${u.cal?`<button class="lnk" data-ucaloff="${esc(u.email)}" title="Couper le lien d’agenda">×</button>`:''}`:''}</span></td>
       ${DROITS_L.map(([k,l])=>{ const impl=(k!=='admin'&&d.admin)||(k==='lecture'&&d.modif);
         return `<td><input type="checkbox" data-udr="${esc(u.email)}|${k}"${d[k]||impl?' checked':''}${impl?' disabled':''} title="${l}${impl?' (compris dans un droit supérieur)':''}" aria-label="${l}"></td>`; }).join('')}
+      <td><input type="checkbox" data-unl="${esc(u.email)}"${u.newsletter?' checked':''} title="Abonné à la newsletter" aria-label="Newsletter"></td>
       <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.valide?`<button class="btn btn-sm" data-uval="${esc(u.email)}" data-v="">Suspendre</button>`:`<button class="btn btn-sm btn-pri" data-uval="${esc(u.email)}" data-v="1">Valider</button>`}
         <button class="btn btn-sm${u.demande?' btn-pri':''}" data-ureinit="${esc(u.email)}" title="Crée un lien pour choisir un nouveau mot de passe (valable 24 h)${S.users&&S.users.mail?', envoyé par e-mail et affiché ici':', à transmettre vous-même'}">Lien mot de passe</button>
         <button class="btn btn-sm dgr" data-udel="${esc(u.email)}">Supprimer</button></span></td>
@@ -6013,7 +6014,7 @@ function viewUtilisateurs(){
   ${recapPanneaux(U)}
   ${dem.length?`<div class="note w"><b>Mot de passe oublié</b> : ${dem.map(u=>`${esc(u.nom||u.email)} (${fmtDH(u.demande)})`).join(', ')} — ${S.users&&S.users.mail?'un lien leur a été envoyé par e-mail ; sans réponse, cliquez « Lien mot de passe » sur leur ligne.':'cliquez « Lien mot de passe » sur sa ligne et transmettez le lien.'}</div>`:''}
   <section class="card"><div class="card-h"><div><h2>Comptes</h2><p class="card-s">${nf(L.length)} compte${L.length>1?'s':''}${att.length?` · <b>${nf(att.length)} en attente de validation</b>`:''} · les codes d’accès restent valables en parallèle</p></div></div>
-    <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th><th class="l">Agent</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
+    <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th><th class="l">Agent</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th>Newsletter</th><th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
       <tbody>${L.map(ligne).join('')}</tbody></table></div>`:'<p class="mut">Aucun compte.</p>'}
     <p class="lg-n mt"><b>Vitrine</b> : statistiques anonymes · <b>Coco</b> : vue covoiturage · <b>Consultation complète</b> : tous les onglets nominatifs, sans rien modifier ·
       <b>Modification</b> : import, réglages, corrections, planification (comprend la consultation) · <b>Administration</b> : gestion des comptes (comprend tout).
@@ -6516,6 +6517,9 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   if(e.target.dataset&&e.target.dataset.prhsag!=null){ S.prHsAg=e.target.value; render(); return; }
+  if(e.target.dataset&&e.target.dataset.unl){ const email=e.target.dataset.unl, on=e.target.checked;   // abonnement à la newsletter (admin)
+    try{ await withLoad(api.userSet({email,action:'newsletter',on})); S.msg={m:on?`${email} abonné à la newsletter.`:`${email} désabonné de la newsletter.`}; }catch(err){ S.msg={m:err.message,t:'c'}; }
+    await loadUsers(); return; }
   if(e.target.dataset&&e.target.dataset.udr){ const [email,k]=e.target.dataset.udr.split('|'), u=(S.users?.utilisateurs||[]).find(x=>x.email===email);
     if(!u) return; const d={...(u.droits||{})}, on=e.target.checked;
     if(k==='admin'&&on&&!confirm(`Donner le droit Administration à ${email} ? Il pourra gérer tous les comptes, y compris le vôtre.`)){ e.target.checked=false; return; }

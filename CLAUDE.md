@@ -123,7 +123,12 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   missions et le covoiturage. **Bouton « Ajouter cette semaine à mon agenda »** (demandé : la semaine envoyée seulement) :
   `%%AGENDA%%` remplacé par le serveur à l'envoi (`boutonAgenda`, même texte que `recapBouton` de l'aperçu) par un lien vers
   le fichier .ics de la semaine envoyée, gardé 90 jours (table `agendas` : empreinte du jeton, ics, expiration ; route
-  publique `GET /cal/s/<jeton>.ics`) ; la pièce jointe reste.
+  publique `GET /cal/s/<jeton>.ics`) ; la pièce jointe reste. Pied du récap (demandé) : « Estimations pouvant contenir des erreurs, ne fait aucunement foi
+  devant les tribunaux populaires. » ; nom d'expéditeur du récap seulement : « Mon récapitulatif Hebdomadaire » (`mail(…, nom)` ;
+  les autres mails gardent « Récap Corridor »).
+- **Newsletter** (demandé par l'utilisateur) : case « Newsletter » dans Utilisateurs → Comptes, cochée par l'admin seulement
+  (colonne `newsletter` boolean de `utilisateurs`, PUT `action:'newsletter'`). Contenu et envoi de la newsletter : à définir
+  avec l'utilisateur (distinct du récap).
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
   ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
   `APP_URL` réglée sur les deux services Render.

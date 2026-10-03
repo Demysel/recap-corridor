@@ -72,6 +72,7 @@ revoke all on schema recap from public, anon, authenticated;
 -- alter table recap.utilisateurs add column if not exists demande timestamptz;
 -- alter table recap.utilisateurs add column if not exists agent jsonb;   -- agent rattaché ({pk, nom}) pour le récap de la semaine
 -- alter table recap.utilisateurs add column if not exists cal text;     -- empreinte du jeton du lien d'abonnement à l'agenda (/cal/<jeton>.ics)
+-- alter table recap.utilisateurs add column if not exists newsletter boolean not null default false;   -- abonné à la newsletter (coché par l'admin)
 -- alter table recap.utilisateurs enable row level security;
 -- alter table recap.sessions     enable row level security;
 -- alter table recap.jetons_mdp   enable row level security;
