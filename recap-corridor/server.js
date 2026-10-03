@@ -295,8 +295,7 @@ const nlSigne = (sec, email) => crypto.createHmac('sha256', sec).update(email).d
 const nlPropre = (h) => String(h || '').replace(/<\/?(script|iframe|object|embed|form|input|button|style|link|meta)[^>]*>/gi, '')
   .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
 function nlMail(titre, html, desabo) {
-  return `<h1 style="font-size:22px;color:#EC0016;margin:0 0 14px">${escH(titre)}</h1>
-    <div style="font-size:15px;line-height:1.55">${html.replace(/<img /gi, '<img style="max-width:100%;height:auto" ')}</div>
+  return `<div style="font-size:15px;line-height:1.55">${html.replace(/<img /gi, '<img style="max-width:100%;height:auto" ')}</div>
     <p style="margin:28px 0 0;padding-top:12px;border-top:1px solid #e3e3e3;font-size:12px;color:#888">Vous recevez cette newsletter car un administrateur
     vous y a abonné. ${desabo ? `<a href="${escH(desabo)}" style="color:#888">Se désabonner</a>` : ''}</p>`;
 }

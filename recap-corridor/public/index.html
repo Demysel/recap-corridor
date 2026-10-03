@@ -676,8 +676,17 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .lg-l{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
 .lg-t{display:flex;gap:6px}.lg-t .sg{flex:1}
 .ut td input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
-.nl-ed{min-height:320px;border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:#fff;color:#111;font:15px/1.55 Arial,sans-serif;outline:none;overflow-wrap:anywhere}
-.nl-ed:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.nl-box{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.nl-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}
+.nl-tb{display:flex;flex-wrap:wrap;align-items:center;gap:4px 2px;padding:6px 8px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.nl-g{display:flex;align-items:center;gap:2px}.nl-sep{width:1px;height:22px;background:var(--line);margin:0 5px}
+.nl-b{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--ink);cursor:pointer}
+.nl-b:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}.nl-b.on{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.nl-s{height:30px;padding:0 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px;max-width:150px}
+.nl-col{flex-direction:column;gap:1px;padding-top:2px}.nl-col i{display:block;width:16px;height:3px;border-radius:2px}.nl-col input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.nl-pan{margin:0;border-radius:0;border-width:0 0 1px}
+.nl-ed{min-height:340px;max-height:70vh;overflow:auto;padding:18px 22px;background:#fff;color:#111;font:15px/1.55 Arial,sans-serif;outline:none;overflow-wrap:anywhere}
+.nl-ed blockquote{margin:8px 0;padding:6px 14px;border-left:3px solid #ccc;color:#444}.nl-ed hr{border:0;border-top:1px solid #ddd;margin:14px 0}
 .nl-ed h2{font-size:20px;margin:14px 0 6px;color:#111}.nl-ed h3{font-size:17px;margin:12px 0 4px;color:#111}.nl-ed p{margin:0 0 8px}
 .nl-ed img{max-width:100%;height:auto}.nl-ed a{color:#EC0016}.nl-ed table{width:auto}.nl-ed td{color:#111;text-align:left;background:transparent;font-size:14px}
 
@@ -5879,25 +5888,43 @@ const capsU=d=>{ const c=Object.fromEntries(DROITS_L.map(([k])=>[k,!!(d&&d[k])])
    resservir de modèle ; lien de désabonnement dans chaque e-mail (serveur).
    ========================================================================== */
 const NL_POLICES=['Arial','Georgia','Times New Roman','Verdana','Trebuchet MS','Courier New'];
+const NL_TAILLES=[['2','Petit'],['3','Normal'],['4','Moyen'],['5','Grand'],['6','Très grand']];
+/** Barre d'outils : boutons et listes qui suivent la sélection (gras actif, style, police, taille…) */
+function nlEtat(){ const e=el('nlEd'), s=getSelection(); if(!e||!s.rangeCount||!e.contains(s.anchorNode)) return;
+  document.querySelectorAll('.nl-b[data-nlcmd]').forEach(b=>{ let on=false; try{ on=['bold','italic','underline','strikeThrough','insertUnorderedList','insertOrderedList','justifyLeft','justifyCenter','justifyRight'].includes(b.dataset.nlcmd)&&document.queryCommandState(b.dataset.nlcmd); }catch(_){} b.classList.toggle('on',!!on); });
+  const bl=el('nlBloc'), v=(document.queryCommandValue('formatBlock')||'').toUpperCase(); if(bl) bl.value=['H2','H3','BLOCKQUOTE'].includes(v)?v:'P';
+  const fo=el('nlFont'), f=(document.queryCommandValue('fontName')||'').replace(/["']/g,'').split(',')[0].trim(); if(fo) fo.value=NL_POLICES.find(x=>x.toLowerCase()===f.toLowerCase())||'Arial';
+  const ta=el('nlTaille'), t=String(document.queryCommandValue('fontSize')||'3'); if(ta) ta.value=NL_TAILLES.some(([x])=>x===t)?t:'3'; }
 const NL_DONNEES=[['n','Agents',v=>nf(v.n)],['tte','TTE moyen par agent',v=>fmtH(v.s.heuresPlanifiees/v.n)],['hs','Heures sup (total)',v=>fmtH(v.s.heuresSup)],
   ['hsm','Heures sup par agent',v=>fmtH(v.s.heuresSup/v.n)],['nuit','Heures de nuit (total)',v=>fmtH(v.s.heuresNuit)],['dim','Heures du dimanche (total)',v=>fmtH(v.s.heuresDimanche)],
   ['rhr','RHR',v=>nf(v.s.nbRHR)],['jb','Journées blanches',v=>nf(v.s.journeesBlanches)],['pan','Paniers repas',v=>nf(v.s.nbPaniers)],['ts','Trajets seuls',v=>nf(v.s.nbTrajetsSeuls)]];
-async function loadNl(){ try{ S.nl=await withLoad(backend.call('newsletter')); }catch(e){ S.msg={m:'Newsletter : '+e.message,t:'c'}; } if(!S.nlEd) S.nlEd={id:null,titre:'',html:''}; render(); }
+async function loadNl(){ try{ S.nl=await withLoad(backend.call('newsletter')); if(!S.vit) await loadVitrine(); }catch(e){ S.msg={m:'Newsletter : '+e.message,t:'c'}; } if(!S.nlEd) S.nlEd={id:null,titre:'',html:''}; render(); }
 /** Contenu de l'éditeur nettoyé : balises et attributs autorisés seulement (le serveur retire en plus tout ce qui s'exécute) */
 function nlNettoyer(html){
-  const OK=new Set(['P','BR','B','STRONG','I','EM','U','H2','H3','A','IMG','UL','OL','LI','FONT','SPAN','DIV','TABLE','TBODY','THEAD','TR','TD','TH','BLOCKQUOTE','HR']);
+  const OK=new Set(['P','BR','B','STRONG','I','EM','U','S','STRIKE','H2','H3','A','IMG','UL','OL','LI','FONT','SPAN','DIV','TABLE','TBODY','THEAD','TR','TD','TH','BLOCKQUOTE','HR']);
   const tpl=document.createElement('template'); tpl.innerHTML=html||'';
   const net=n=>{ for(const c of [...n.childNodes]){ if(c.nodeType===3) continue; if(c.nodeType!==1){ c.remove(); continue; }
       if(!OK.has(c.tagName)){ if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META)$/.test(c.tagName)) c.remove(); else { net(c); c.replaceWith(...c.childNodes); } continue; }
       for(const a of [...c.attributes]){ const k=a.name.toLowerCase(), v=a.value;
         const garde=(k==='href'&&c.tagName==='A'&&/^(https?:|mailto:)/i.test(v))||(k==='src'&&c.tagName==='IMG'&&/^https?:/i.test(v))||(k==='alt'&&c.tagName==='IMG')
-          ||(k==='face'&&c.tagName==='FONT')||(k==='style'&&!/url\(|expression|javascript/i.test(v))||(k==='colspan'||k==='width'||k==='cellpadding'||k==='cellspacing');
+          ||(['face','size','color'].includes(k)&&c.tagName==='FONT')||k==='align'||(k==='style'&&!/url\(|expression|javascript/i.test(v))||(k==='colspan'||k==='width'||k==='cellpadding'||k==='cellspacing');
         if(!garde) c.removeAttribute(a.name); }
       if(c.tagName==='A'){ c.setAttribute('target','_blank'); c.setAttribute('rel','noopener'); }
       net(c); } };
   net(tpl.content); return tpl.innerHTML;
 }
-document.addEventListener('selectionchange',()=>{ if(S.tab==='newsletter') nlGarderSel(); });
+document.addEventListener('selectionchange',()=>{ if(S.tab==='newsletter'){ nlGarderSel(); nlEtat(); } });
+window.addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('#nlEd')&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); e.stopImmediatePropagation(); nlLienOuvrir(); } },true);   // dans l'éditeur, Ctrl+K = lien (pas la recherche du site)
+/** Lien hypertexte : texte affiché + adresse ; sur un lien existant, le modifier ou le retirer */
+function nlLienOuvrir(){ nlGarderSel(); const s=getSelection(); let a=null, t='';
+  if(s.rangeCount){ const n=s.anchorNode; a=n&&(n.nodeType===1?n:n.parentElement).closest('#nlEd a'); t=a?a.textContent:s.toString(); }
+  S.nlL={a,t,u:a?a.getAttribute('href'):'https://'}; S.nlD=null; nlZones(); const f=el(t?'nlLu':'nlLt'); if(f){ f.focus(); f.select(); } }
+function nlLienPanneau(){ const L=S.nlL; if(!L) return '';
+  return `<div class="note nl-pan"><b>${L.a?'Modifier le lien':'Insérer un lien'}</b>
+    <div class="frow mt" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <label class="fld" style="flex:1;min-width:180px"><span class="flabel">Texte affiché</span><input type="text" id="nlLt" value="${esc(L.t)}" placeholder="ex. : la vidéo de présentation"></label>
+      <label class="fld" style="flex:2;min-width:220px"><span class="flabel">Adresse</span><input type="url" id="nlLu" value="${esc(L.u)}" placeholder="https://…"></label>
+      <button class="btn btn-sm btn-pri" id="nlLgo">${L.a?'Enregistrer':'Insérer'}</button>${L.a?'<button class="btn btn-sm" id="nlLdel">Retirer le lien</button>':''}<button class="btn btn-sm" id="nlLx">Annuler</button></div></div>`; }
 document.addEventListener('focusin',e=>{ if(e.target.id==='nlEd') document.execCommand('defaultParagraphSeparator',false,'p'); });   // une ligne = un paragraphe
 document.addEventListener('mousedown',e=>{ if(e.target.closest&&e.target.closest('[data-nlcmd]')) e.preventDefault(); });   // la sélection reste dans l'éditeur
 function nlSync(){ const e=el('nlEd'); if(e&&S.nlEd) S.nlEd.html=e.innerHTML; const t=el('nlTitre'); if(t&&S.nlEd) S.nlEd.titre=t.value; }
@@ -5917,26 +5944,41 @@ function nlBlocDonnees(w,ag,cles){
     ${L.map(([,l,f])=>`<tr><td style="padding:5px 12px;color:#555;border-top:1px solid #eee">${l}</td><td style="padding:5px 12px;font-weight:bold;border-top:1px solid #eee;text-align:right !important">${f(g)}</td></tr>`).join('')}
   </table><p><br></p>`;
 }
-function viewNewsletter(){
-  const N=S.nl, E=S.nlEd||{id:null,titre:'',html:''};
-  if(!N) return `<section class="card"><div class="card-b"><p class="mut">Chargement…</p></div></section>`;
-  const env=E.id&&(N.liste||[]).find(x=>x.id===E.id&&x.envoye);
-  const bt=(c,l,t,v)=>`<button class="btn btn-sm" data-nlcmd="${c}"${v?` data-v="${esc(v)}"`:''} title="${t}">${l}</button>`;
-  const outils=`<div class="frow" style="gap:6px;flex-wrap:wrap;align-items:center">
-    ${bt('bold','<b>G</b>','Gras')}${bt('italic','<i>I</i>','Italique')}${bt('underline','<u>S</u>','Souligné')}
-    <select id="nlBloc" title="Titre"><option value="">Style…</option><option value="P">Texte</option><option value="H2">Titre</option><option value="H3">Sous-titre</option></select>
-    <select id="nlFont" title="Police"><option value="">Police…</option>${NL_POLICES.map(f=>`<option value="${f}" style="font-family:${f}">${f}</option>`).join('')}</select>
-    ${bt('insertUnorderedList','• Liste','Liste à puces')}${bt('lien','🔗 Lien','Lien sur le texte sélectionné')}${bt('image','🖼 Image','Insérer une image (fichier)')}
-    ${bt('donnee','📊 Donnée du site','Chiffres anonymes du site (groupes d’au moins 5 agents)')}${bt('removeFormat','Effacer','Effacer la mise en forme de la sélection')}
-    <input type="file" id="nlImg" accept="image/jpeg,image/png,image/gif,image/webp" hidden></div>`;
+function nlDonPanneau(){
   const V=S.vit, sem=V?V.semaines.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)):[], AG=V?[...new Set(V.cells.map(c=>c.ag))].sort((a,b)=>a.localeCompare(b,'fr')):[];
   const D=S.nlD||{};
-  const panneau=S.nlD?`<div class="note" style="margin-top:8px"><b>Insérer des chiffres anonymes</b> (agrégats de la vitrine : groupes d’au moins 5 agents, aucune donnée individuelle)
+  return S.nlD?`<div class="note nl-pan"><b>Insérer des chiffres anonymes</b> (agrégats de la vitrine : groupes d’au moins 5 agents, aucune donnée individuelle)
     ${V?`<div class="frow mt" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
       <label class="fld"><span class="flabel">Semaine</span><select id="nlDw">${sem.map(w=>`<option value="${w.weekId}"${w.weekId===D.w?' selected':''}>S${String(w.week).padStart(2,'0')} ${w.year}</option>`).join('')}</select></label>
       <label class="fld"><span class="flabel">Agence</span><select id="nlDag"><option value="">Toutes</option>${AG.map(a=>`<option${a===D.ag?' selected':''}>${esc(a)}</option>`).join('')}</select></label></div>
       <div class="frow mt" style="gap:12px;flex-wrap:wrap">${NL_DONNEES.map(([k,l])=>`<label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-nldk="${k}"${(D.k||['n','tte','hs','rhr']).includes(k)?' checked':''}> ${l}</label>`).join('')}</div>
       <p class="mt"><button class="btn btn-sm btn-pri" id="nlDgo">Insérer</button> <button class="btn btn-sm" id="nlDx">Fermer</button></p>`:'<p class="mut">Chargement des statistiques…</p>'}</div>`:'';
+}
+/** Panneaux lien / chiffres affichés sous la barre sans redessiner l'éditeur (curseur et sélection gardés) */
+function nlZones(){ const a=el('nlLienZone'), b=el('nlDonZone'); if(a) a.innerHTML=nlLienPanneau(); if(b) b.innerHTML=nlDonPanneau(); }
+function viewNewsletter(){
+  const N=S.nl, E=S.nlEd||{id:null,titre:'',html:''};
+  if(!N) return `<section class="card"><div class="card-b"><p class="mut">Chargement…</p></div></section>`;
+  const env=E.id&&(N.liste||[]).find(x=>x.id===E.id&&x.envoye);
+  const bt=(c,l,t,v)=>`<button class="btn btn-sm" data-nlcmd="${c}"${v?` data-v="${esc(v)}"`:''} title="${t}">${l}</button>`;
+  const ic=d=>`<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  const B=(c,i,t)=>`<button type="button" class="nl-b" data-nlcmd="${c}" title="${t}" aria-label="${t}">${i}</button>`, sep='<span class="nl-sep"></span>';
+  const outils=`<div class="nl-tb" role="toolbar" aria-label="Mise en forme">
+    <div class="nl-g">${B('undo',ic('M5.5 4 2.5 7l3 3M2.5 7H10a3.5 3.5 0 0 1 0 7H8'),'Annuler (Ctrl+Z)')}${B('redo',ic('M10.5 4l3 3-3 3M13.5 7H6a3.5 3.5 0 0 0 0 7h2'),'Rétablir (Ctrl+Y)')}</div>${sep}
+    <div class="nl-g"><select id="nlBloc" class="nl-s" title="Style du paragraphe"><option value="P">Texte</option><option value="H2">Titre</option><option value="H3">Sous-titre</option><option value="BLOCKQUOTE">Citation</option></select>
+      <select id="nlFont" class="nl-s" title="Police">${NL_POLICES.map(f=>`<option value="${f}" style="font-family:${f}">${f}</option>`).join('')}</select>
+      <select id="nlTaille" class="nl-s" title="Taille du texte">${NL_TAILLES.map(([v,l])=>`<option value="${v}"${v==='3'?' selected':''}>${l}</option>`).join('')}</select></div>${sep}
+    <div class="nl-g">${B('bold','<b style="font-size:15px">G</b>','Gras (Ctrl+B)')}${B('italic','<i style="font-size:15px;font-family:Georgia">I</i>','Italique (Ctrl+I)')}${B('underline','<u style="font-size:15px">S</u>','Souligné (Ctrl+U)')}${B('strikeThrough','<s style="font-size:15px">B</s>','Barré')}
+      <label class="nl-b nl-col" title="Couleur du texte"><span style="font-weight:700;font-size:15px">A</span><i id="nlCoulV" style="background:${esc(S.nlCoul||'#EC0016')}"></i><input type="color" id="nlCoul" value="${esc(S.nlCoul||'#EC0016')}"></label>
+      <label class="nl-b nl-col" title="Surligner"><span>${ic('M3 13.5h10M5 11l6.5-6.5 1.5 1.5L6.5 12.5H5z')}</span><i id="nlSurV" style="background:${esc(S.nlSur||'#FFE14D')}"></i><input type="color" id="nlSur" value="${esc(S.nlSur||'#FFE14D')}"></label></div>${sep}
+    <div class="nl-g">${B('justifyLeft',ic('M2.5 4h11M2.5 7h7M2.5 10h11M2.5 13h7'),'Aligner à gauche')}${B('justifyCenter',ic('M2.5 4h11M4.5 7h7M2.5 10h11M4.5 13h7'),'Centrer')}${B('justifyRight',ic('M2.5 4h11M6.5 7h7M2.5 10h11M6.5 13h7'),'Aligner à droite')}</div>${sep}
+    <div class="nl-g">${B('insertUnorderedList',ic('M6 4h7.5M6 8h7.5M6 12h7.5M2.8 4h.1M2.8 8h.1M2.8 12h.1'),'Liste à puces')}${B('insertOrderedList',ic('M6.5 4h7M6.5 8h7M6.5 12h7M2.5 3l1-.5V6M2.3 9.5c.3-.6 1.7-.6 1.7.3 0 .7-1.7 1.4-1.7 2.2h1.8'),'Liste numérotée')}
+      ${B('outdent',ic('M6.5 4h7M6.5 8h7M2.5 12h11M4.5 6 2.5 8l2 2'),'Diminuer le retrait')}${B('indent',ic('M6.5 4h7M6.5 8h7M2.5 12h11M2.5 6l2 2-2 2'),'Augmenter le retrait')}</div>${sep}
+    <div class="nl-g">${B('lien',ic('M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-.8.8M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l.8-.8'),'Lien (Ctrl+K)')}${B('image',ic('M2.5 3.5h11v9h-11zM2.5 10.5l3-3 3 3 2-2 3 3M10.5 6.2h.1'),'Image')}
+      ${B('insertHorizontalRule',ic('M2 8h12'),'Ligne de séparation')}${B('donnee',ic('M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5'),'Chiffres du site (anonymes)')}</div>${sep}
+    <div class="nl-g">${B('removeFormat',ic('M3 3.5h9M7.5 3.5 6 12.5M3 13.5l10-10M10 13.5h3'),'Effacer la mise en forme')}</div>
+    <input type="file" id="nlImg" accept="image/jpeg,image/png,image/gif,image/webp" hidden></div>`;
+
   const liste=(N.liste||[]).map(x=>`<tr${x.id===E.id?' style="background:var(--hl,rgba(236,0,22,.06))"':''}><td class="l nm">${esc(x.titre||'(sans titre)')}</td>
     <td class="l">${x.envoye?`<span class="pill pill-g">envoyée</span> ${fmtDH(x.envoye)} · ${nf(x.nb||0)} destinataire${x.nb>1?'s':''}`:`<span class="pill pill-n">brouillon</span> ${fmtDH(x.maj)}`}</td>
     <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap">${x.envoye?`<button class="btn btn-sm" data-nlmodele="${x.id}" title="Nouveau brouillon à partir de cette newsletter">Réutiliser comme modèle</button>`:`<button class="btn btn-sm" data-nlouvrir="${x.id}">Ouvrir</button>`}
@@ -5946,8 +5988,8 @@ function viewNewsletter(){
       <button class="btn btn-sm" id="nlNew">Nouvelle</button></div>
     <div class="card-b stack">
       <label class="fld"><span class="flabel">Titre de la newsletter (objet de l’e-mail)</span><input type="text" id="nlTitre" value="${esc(E.titre)}" maxlength="200" placeholder="Ex. : Les nouvelles du corridor — octobre"${env?' disabled':''}></label>
-      ${env?'':outils}${panneau}
-      <div id="nlEd" class="nl-ed" contenteditable="${env?'false':'true'}" spellcheck="true">${E.html||'<p><br></p>'}</div>
+      <div class="nl-box">${env?'':outils}<div id="nlLienZone">${env?'':nlLienPanneau()}</div><div id="nlDonZone">${env?'':nlDonPanneau()}</div>
+      <div id="nlEd" class="nl-ed" contenteditable="${env?'false':'true'}" spellcheck="true">${E.html||'<p><br></p>'}</div></div>
       <div class="frow" style="gap:8px;flex-wrap:wrap">${env?`<button class="btn btn-pri" data-nlmodele="${E.id}">Réutiliser comme modèle</button>`:`<button class="btn" id="nlSave">Enregistrer le brouillon</button>
         <button class="btn" id="nlTest"${N.mail?'':' disabled'}>M’envoyer un essai</button>
         <button class="btn btn-pri" id="nlSend"${N.mail&&N.abonnes?'':' disabled'}>Envoyer aux ${nf(N.abonnes||0)} abonné${N.abonnes>1?'s':''}</button>`}</div>
@@ -5970,16 +6012,23 @@ async function actionNl(b){
   try{
     const E=S.nlEd;
     if(b.dataset.nlcmd){ const c=b.dataset.nlcmd;
-      if(c==='lien'){ nlGarderSel(); const u=prompt('Adresse du lien (https://…) :','https://'); if(!u||!/^(https?:\/\/|mailto:)/i.test(u.trim())) return;
-        nlRendreSel(); const s=getSelection(); if(s.isCollapsed) nlCmd('insertHTML',`<a href="${esc(u.trim())}">${esc(u.trim())}</a>`); else nlCmd('createLink',u.trim()); return; }
+      if(c==='lien'){ nlLienOuvrir(); return; }
       if(c==='image'){ nlGarderSel(); el('nlImg').click(); return; }
-      if(c==='donnee'){ nlGarderSel(); nlSync(); S.nlD={w:(S.nlD&&S.nlD.w)||null}; render(); if(!S.vit){ await loadVitrine(); }
-        if(S.vit&&!S.nlD.w){ const W=S.vit.semaines.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)); S.nlD.w=W[0]&&W[0].weekId; } render(); return; }
+      if(c==='donnee'){ nlGarderSel(); S.nlD={w:(S.nlD&&S.nlD.w)||null}; S.nlL=null; nlZones(); if(!S.vit){ await loadVitrine(); }
+        if(S.vit&&!S.nlD.w){ const W=S.vit.semaines.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)); S.nlD.w=W[0]&&W[0].weekId; } nlZones(); return; }
       nlCmd(c); return; }
-    if(b.id==='nlDx'){ nlSync(); S.nlD=null; render(); return; }
+    if(b.id==='nlLx'){ S.nlL=null; nlZones(); nlRendreSel(); return; }
+    if(b.id==='nlLgo'){ const t=el('nlLt').value.trim(), u=el('nlLu').value.trim();
+      if(!/^(https?:\/\/\S+|mailto:\S+)$/i.test(u)) throw new Error('Adresse du lien invalide : elle doit commencer par https:// (ou mailto:).');
+      const L=S.nlL; S.nlL=null; nlZones(); nlRendreSel();
+      if(L&&L.a&&el('nlEd').contains(L.a)){ L.a.setAttribute('href',u); if(t) L.a.textContent=t; nlSync(); }
+      else nlCmd('insertHTML',`<a href="${esc(u)}">${esc(t||u)}</a>`);
+      return; }
+    if(b.id==='nlLdel'){ const L=S.nlL; S.nlL=null; nlZones(); if(L&&L.a&&el('nlEd').contains(L.a)){ L.a.replaceWith(...L.a.childNodes); nlSync(); } return; }
+    if(b.id==='nlDx'){ S.nlD=null; nlZones(); nlRendreSel(); return; }
     if(b.id==='nlDgo'){ const w=el('nlDw').value, ag=el('nlDag').value, k=[...document.querySelectorAll('[data-nldk]')].filter(x=>x.checked).map(x=>x.dataset.nldk);
       if(!k.length) throw new Error('Cochez au moins un chiffre.'); const h=nlBlocDonnees(w,ag,k); if(!h) throw new Error('Aucun chiffre publiable pour ce choix (groupes de moins de 5 agents).');
-      S.nlD={w,ag,k}; nlCmd('insertHTML',h); nlSync(); S.nlD=null; render(); return; }
+      S.nlD=null; nlZones(); nlCmd('insertHTML',h); return; }
     if(b.id==='nlNew'){ nlSync(); if(E&&(E.titre||E.html)&&!E.id&&!confirm('Abandonner la newsletter en cours (non enregistrée) ?')) return; S.nlEd={id:null,titre:'',html:''}; S.nlD=null; render(); return; }
     if(b.id==='nlSave'){ await nlEnregistrer(); S.msg={m:'Brouillon enregistré.'}; render(); return; }
     if(b.id==='nlTest'){ const id=await nlEnregistrer(); await withLoad(backend.call('newsletter/envoi',{method:'POST',body:JSON.stringify({id,test:true})})); S.msg={m:`Essai envoyé à ${S.user?S.user.email:'vous'}.`}; render(); return; }
@@ -6395,7 +6444,7 @@ document.addEventListener('click',async e=>{
   if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
     if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
   if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
-  { const b=S.tab==='newsletter'&&e.target.closest('[data-nlcmd],[data-nlouvrir],[data-nlmodele],[data-nldel],#nlDx,#nlDgo,#nlNew,#nlSave,#nlTest,#nlSend');   // newsletter
+  { const b=S.tab==='newsletter'&&e.target.closest('#nlLx,#nlLgo,#nlLdel,[data-nlcmd],[data-nlouvrir],[data-nlmodele],[data-nldel],#nlDx,#nlDgo,#nlNew,#nlSave,#nlTest,#nlSend');   // newsletter
     if(b){ await actionNl(b); return; } }
   { const b=S.tab==='utilisateurs'&&e.target.closest('[data-uag],[data-uagdel],[data-uagset],[data-urecap],[data-ucal],[data-ucaloff],#uAgX,#uRcX,#uRcGo');   // récap de la semaine
     if(b){ await actionRecap(b); return; } }
@@ -6677,8 +6726,11 @@ document.addEventListener('change',async e=>{
       S.msg={m:'Sauvegarde restaurée.'}; }
     catch(err){ S.msg={m:'Restauration impossible : '+err.message,t:'c'}; }
     render(); return; }
-  if(e.target.id==='nlBloc'&&e.target.value){ const v=e.target.value; e.target.value=''; nlCmd('formatBlock',v); return; }
-  if(e.target.id==='nlFont'&&e.target.value){ const v=e.target.value; e.target.value=''; nlCmd('fontName',v); return; }
+  if(e.target.id==='nlBloc'){ nlCmd('formatBlock',e.target.value); nlEtat(); return; }
+  if(e.target.id==='nlFont'){ nlCmd('fontName',e.target.value); nlEtat(); return; }
+  if(e.target.id==='nlTaille'){ nlCmd('fontSize',e.target.value); nlEtat(); return; }
+  if(e.target.id==='nlCoul'){ S.nlCoul=e.target.value; el('nlCoulV').style.background=S.nlCoul; nlCmd('foreColor',S.nlCoul); return; }
+  if(e.target.id==='nlSur'){ S.nlSur=e.target.value; el('nlSurV').style.background=S.nlSur; nlCmd('hiliteColor',S.nlSur); return; }
   if(e.target.id==='nlImg'&&e.target.files&&e.target.files[0]){ const f=e.target.files[0]; e.target.value=''; try{ await nlImage(f); }catch(err){ S.msg={m:err.message,t:'c'}; render(); } return; }
   if(e.target.id==='uRcW'&&S.uRc){ S.uRc.w=e.target.value; render(); await recapCharger(); return; }
   if(e.target.id==='cocoW'){ S.cocoW=e.target.value; await loadCoco(); return; }

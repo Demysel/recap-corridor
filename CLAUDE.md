@@ -128,9 +128,14 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   les autres mails gardent « Récap Corridor »).
 - **Newsletter** (demandé par l'utilisateur) : case « Newsletter » dans Utilisateurs → Comptes, cochée par l'admin seulement
   (colonne `newsletter` boolean de `utilisateurs`, PUT `action:'newsletter'`). Onglet **« Newsletter »** (groupe Diffusion,
-  droit admin, `viewNewsletter`) : message libre — titre (= objet de l'e-mail) et éditeur (`#nlEd`, contenteditable +
-  execCommand : gras, italique, souligné, style texte / titre / sous-titre, police `NL_POLICES`, liste, lien, image, « Donnée
-  du site », effacer ; un retour à la ligne = un paragraphe). **Données du site = agrégats anonymes de la vitrine** (`S.vit`,
+  droit admin, `viewNewsletter`) : message libre — titre (= objet de l'e-mail, **pas répété dans le corps** : demandé) et
+  éditeur dans un cadre avec **barre d'outils en haut** (demandé : « comme un vrai outil de rédaction ») : annuler / rétablir,
+  style (texte, titre, sous-titre, citation), police `NL_POLICES`, taille `NL_TAILLES`, gras, italique, souligné, barré,
+  couleur du texte, surlignage, alignement gauche / centre / droite, listes à puces / numérotée, retraits, lien, image,
+  ligne de séparation, chiffres du site, effacer la mise en forme ; boutons et listes suivent la sélection (`nlEtat`).
+  **Lien hypertexte** (demandé) : panneau « Texte affiché » + « Adresse » (bouton ou Ctrl+K, qui l'emporte sur la recherche
+  du site dans l'éditeur), modifier ou retirer un lien existant. Les panneaux lien / chiffres s'ouvrent sous la barre sans
+  redessiner l'éditeur (`nlZones` : curseur gardé, insertion à l'endroit du curseur). Un retour à la ligne = un paragraphe. **Données du site = agrégats anonymes de la vitrine** (`S.vit`,
   cellules ≥ 5 agents, semaine entière, agence au choix ou toutes, chiffres `NL_DONNEES` : agents, TTE moyen, heures sup
   total / par agent, nuit, dimanche, RHR, journées blanches, paniers, trajets seuls) insérés comme tableau figé
   (`nlBlocDonnees`). Images : réduites à 1200 px (JPEG) dans la page, stockées en base (table `nl_images`), servies
