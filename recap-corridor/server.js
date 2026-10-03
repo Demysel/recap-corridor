@@ -116,6 +116,7 @@ async function tablesAuth(p) {
     create table if not exists ${SCHEMA}.jetons_mdp (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
+    alter table ${SCHEMA}.utilisateurs add column if not exists agent jsonb;
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
     alter table ${SCHEMA}.jetons_mdp enable row level security;`);
@@ -329,7 +330,7 @@ async function api(req, res, url) {
     await tablesAuth(p);
     const moi = A.user ? A.user.email : '';
     if (req.method === 'GET') {
-      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
+      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande, agent from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
       return json(req, res, 200, { utilisateurs: q.rows, moi, mail: MAIL });
     }
     if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
@@ -347,6 +348,20 @@ async function api(req, res, url) {
       if (body.action === 'reinit') {   // lien de réinitialisation : envoyé par e-mail si Brevo est configuré, et affiché à l'admin
         const lien = await lienMdp(p, req, email, 24);
         return json(req, res, 200, { ok: true, lien, envoye: await mailLien(email, lien, false, '24 heures') });
+      }
+      if (body.action === 'agent') {   // agent rattaché au compte (récap de la semaine) ; null = aucun
+        const a = body.agent && typeof body.agent.pk === 'string' && body.agent.pk.trim()
+          ? { pk: body.agent.pk.trim().slice(0, 200), nom: String(body.agent.nom || '').trim().slice(0, 120) } : null;
+        await p.query(`update ${SCHEMA}.utilisateurs set agent = $2, maj = now() where email = $1`, [email, a]);
+        return json(req, res, 200, { ok: true });
+      }
+      if (body.action === 'recap') {   // récap de la semaine de l'agent rattaché, préparé par la page de l'admin, envoyé à ce compte seulement
+        if (!MAIL) return json(req, res, 400, { error: 'Envoi d’e-mail non configuré (BREVO_API_KEY, MAIL_FROM).' });
+        if (!u.valide) return json(req, res, 400, { error: 'Ce compte n’est pas validé.' });
+        const sujet = String(body.sujet || '').trim().slice(0, 200), html = String(body.html || '');
+        if (!sujet || !html || html.length > 300000) return json(req, res, 400, { error: 'Récap vide ou trop long.' });
+        if (!(await mail(email, sujet, html))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
+        return json(req, res, 200, { ok: true, envoye: true });
       }
       const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;
       const restaitAdmin = valide && !!droits.admin;

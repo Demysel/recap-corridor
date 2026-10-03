@@ -95,6 +95,15 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (adresse du site dans les liens).
 - Page : `lgForm` / `lgValider` (connexion, inscription, oubli, nouveau mot de passe), `reprendre` (session mémorisée,
   prefs `jeton`), onglets « Utilisateurs » (droit admin) et « Mon compte » (droits, changer de mot de passe).
+- **Récap de la semaine par e-mail** (demandé par l'utilisateur) : dans Utilisateurs, colonne « Agent » — l'admin rattache un
+  agent au compte (recherche dans les semaines chargées ; colonne `agent` jsonb {pk, nom} de `utilisateurs`, PUT
+  `action:'agent'`), puis « Récap » (compte validé, Brevo configuré) : semaine au choix (dernière par défaut), aperçu, envoi
+  quand l'admin le décide (PUT `action:'recap'` : la page construit le message, `recapSemaine`, le serveur l'envoie à ce
+  compte seulement). Contenu choisi par l'utilisateur : jours de service, TTE, heures sup, heures de nuit, heures du dimanche,
+  paniers (détail midi / soir / nuit / RHR), RHR et lieux (pas pour les AFR), journées blanches, planning jour par jour
+  (missions, trajet, horaire, pauses, codes, RHR). **Covoiturage seulement si le compte a le droit Coco** (sinon la partie
+  n'apparaît pas) : « vous avez accès à la vue Coco » + covoiturages possibles avec qui, calculés comme l'onglet Coco
+  (`cocoCalcul` + `cocoCovoit`, parmi les agents de la vue Coco ; agent absent de la vue Coco : dit, sans calcul).
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
   ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
   `APP_URL` réglée sur les deux services Render.

@@ -725,6 +725,7 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
   .kpis{break-inside:avoid}
   .enter>*{animation:none}
 }
+.rcp table,.rcp td,.rcp tr{text-align:left!important;background:none!important;width:auto}
 </style>
 </head>
 <body>
@@ -5821,6 +5822,78 @@ function viewCompte(){
 async function loadUsers(){ try{ S.users=await withLoad(api.users()); }catch(e){ S.msg={m:'Utilisateurs : '+e.message,t:'c'}; } render(); }
 const fmtDH=x=>x?new Date(x).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'—';
 /** Administration → Utilisateurs : valider les inscriptions, accorder / retirer les droits, lien de mot de passe, suppression */
+/** Récap de la semaine envoyé par e-mail à un compte (demandé) : agent rattaché au compte (Utilisateurs), semaine au choix
+    (dernière par défaut) ; chiffres (service, TTE, heures sup, nuit, dimanche, paniers, RHR, journées blanches) et planning
+    jour par jour. Covoiturage seulement si le compte a le droit Coco : parmi les agents de la vue Coco, comme l'onglet Coco
+    (prise et fin de service à 30 min près) ; sans ce droit, rien n'apparaît. */
+const capsU=d=>{ const c=Object.fromEntries(DROITS_L.map(([k])=>[k,!!(d&&d[k])])); if(c.admin) for(const k in c) c[k]=true; if(c.modif) c.lecture=true; return c; };
+function recapSemaine(u,id){
+  const v=S.loaded.get(id), w=S.weeks.find(x=>x.weekId===id), pk=u&&u.agent&&u.agent.pk;
+  const a=v&&pk&&v.agents.find(x=>personKey(x)===pk); if(!a||!w) return null;
+  const ST='style="padding:5px 14px 5px 0;vertical-align:top;text-align:left;border-bottom:1px solid #eee;background:none"', H3='style="font-size:15px;margin:22px 0 6px;color:#111"';
+  const T=(l,val)=>`<tr><td ${ST}><span style="color:#555">${l}</span></td><td ${ST}><b>${val}</b></td></tr>`;
+  const pan=[[a.paniersMidi,'midi'],[a.paniersSoir,'soir'],[a.paniersNuit,'nuit'],[a.paniersRHR,'en RHR']].filter(x=>x[0]).map(x=>`${nf(x[0])} ${x[1]}`).join(', ');
+  const lieux=[...new Set((a.rhr||[]).map(r=>r.lieu).filter(Boolean))].join(', ');
+  const chiffres=[T('Jours de service',nf(a.joursService||0)),T('TTE (temps de travail effectif)',fmtH(a.heuresPlanifiees||0)),T('Heures sup',fmtH(a.heuresSup||0)),
+    T('Heures de nuit',fmtH(a.heuresNuit||0)),T('Heures du dimanche',fmtH(a.heuresDimanche||0)),T('Paniers repas',`${nf(a.nbPaniers||0)}${pan?` <span style="font-weight:normal;color:#555">(${pan})</span>`:''}`),
+    a.rhrApplicable?T('RHR (repos hors résidence)',`${nf(a.nbRHR||0)}${lieux?` <span style="font-weight:normal;color:#555">(${esc(lieux)})</span>`:''}`):'',
+    T('Journées blanches',nf(a.journeesBlanches||0))].join('');
+  const jour=d=>{ const x=new Date(d); return `${JN[(x.getUTCDay()+6)%7]} ${dISO(d)}`; };
+  const plan=a.jours.map((j,k)=>{ let t;
+    if(j.kind==='SERVICE') t=(j.missions||[]).map(m=>`<b>${esc(m.label)}</b>${m.from||m.to?` · ${esc(m.from||'?')} → ${esc(m.to||'?')}`:''} · ${hm(m.start)}–${hm(m.end)}${m.pauseMin?` <span style="color:#555">(pause ${m.pauseMin} min)</span>`:''}`).join('<br>')||'Service';
+    else if(j.kind==='CODE') t=esc(j.code||'');
+    else t=j.blanche?'<b>Journée blanche</b>':'<span style="color:#999">—</span>';
+    const r=(a.rhr||[]).filter(x=>x.debut&&x.debut.slice(0,10)===j.date).map(x=>`<br><span style="color:#555">RHR${x.lieu?` à ${esc(x.lieu)}`:''}${x.fin?` jusqu’au ${jour(x.fin)} ${hm(x.fin)}`:' (suite la semaine suivante)'}${x.dureeH!=null?` · ${fmtH(x.dureeH)}`:''}</span>`).join('');
+    return `<tr><td ${ST}><span style="color:#555;white-space:nowrap">${JN[k]} ${dISO(j.date)}</span></td><td ${ST}>${t}${r}</td></tr>`; }).join('');
+  let cov='';
+  if(capsU(u.droits).coco){
+    const ids=S.weeks.map(x=>x.weekId).sort(), i=ids.indexOf(id), ws=[ids[i-1],id,ids[i+1]].filter(Boolean).map(x=>S.parsedCache.get(x)).filter(Boolean);
+    const C=cocoCalcul(ws,S.rules,id,S.coco.agents||[]), sel=C?C.agents:[], me=sel.findIndex(x=>x.pk===pk);
+    let t;
+    if(me<0) t='Vous avez accès à la vue covoiturage (Coco) du site, mais votre nom n’y figure pas : aucun covoiturage calculé.';
+    else { const c=cocoCovoit(sel), l=sel[me].missions.map((m,k)=>({m,avec:c.get(me+'|'+k)})).filter(x=>x.avec);
+      t='Vous avez accès à la vue covoiturage (Coco) du site. '+(l.length?`Covoiturage possible (prise et fin de service à 30 min près) :<ul style="margin:6px 0;padding-left:18px">${l.map(x=>`<li>${jour(x.m.start)} · ${hm(x.m.start)}–${hm(x.m.end)} (${esc(x.m.label)}) : avec <b>${esc([...new Set(x.avec)].join(', '))}</b></li>`).join('')}</ul>`:'Aucun covoiturage possible cette semaine.'); }
+    cov=`<h3 ${H3}>Covoiturage</h3><p style="margin:0">${t}</p>`; }
+  const html=`<h2 style="color:#EC0016;font-size:19px;margin:0 0 4px">Récap de la semaine ${weekLabel(w)}</h2>
+    <p style="margin:0 0 14px;color:#555">${esc(`${a.nom} ${a.prenom}`.trim())} · ${esc(a.agence||'')} · ${esc(a.metier||'')} — du ${jour(w.monday)} au ${jour(w.sunday)}</p>
+    <table style="border-collapse:collapse;font-size:14px;width:auto">${chiffres}</table>
+    <h3 ${H3}>Planning</h3><table style="border-collapse:collapse;font-size:14px;width:auto">${plan}</table>${cov}
+    <p style="margin:22px 0 0;color:#888;font-size:12px">Chiffres calculés à partir du planning (fichier Récap Corridor), avec les règles du site.</p>`;
+  return {sujet:`Votre récap de la semaine ${weekLabel(w)}`,html};
+}
+async function recapCharger(){ const ids=S.weeks.map(w=>w.weekId).sort(), i=ids.indexOf(S.uRc.w); await ensureLoaded([ids[i-1],ids[i],ids[i+1]].filter(Boolean)); render(); }
+function recapPanneaux(U){
+  const L=U.utilisateurs||[];
+  if(S.uAg){ const q=deacc(S.uAgQ||'').toLowerCase().trim(), pers=new Map();
+    for(const v of S.loaded.values()) for(const a of v.agents){ const k=personKey(a); if(!pers.has(k)) pers.set(k,{pk:k,nom:`${a.nom} ${a.prenom}`.trim(),agence:a.agence,metier:a.metier}); }
+    const res=q?[...pers.values()].filter(x=>deacc(`${x.nom} ${x.agence} ${x.pk}`).toLowerCase().includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).slice(0,20):[];
+    return `<section class="card"><div class="card-h"><div><h2>Agent rattaché à ${esc(S.uAg)}</h2><p class="card-s">son récap de la semaine portera sur cet agent</p></div><button class="btn btn-sm" id="uAgX">Fermer</button></div>
+      <div class="card-b stack"><label class="fld"><span class="flabel">Chercher un agent</span><input type="search" id="uAgQ" value="${esc(S.uAgQ||'')}" placeholder="Nom, agence ou matricule…" autocomplete="off"></label>
+      ${q?`<div class="frow">${res.length?res.map(x=>`<button class="chip" data-uagset="${esc(x.pk)}" data-nom="${esc(x.nom)}">${esc(x.nom)} <span class="mut">${esc(x.agence)} · ${esc(x.metier)}</span></button>`).join(''):'<span class="mut">Aucun agent trouvé dans les semaines chargées.</span>'}</div>`:''}</div></section>`; }
+  if(S.uRc){ const u=L.find(x=>x.email===S.uRc.email); if(!u) return '';
+    const W=S.weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)), r=recapSemaine(u,S.uRc.w);
+    return `<section class="card"><div class="card-h"><div><h2>Récap de la semaine — ${esc(u.nom||u.email)}</h2><p class="card-s">agent ${esc(u.agent.nom||u.agent.pk)} · envoyé à ${esc(u.email)}${capsU(u.droits).coco?' · avec le covoiturage (droit Coco)':''}</p></div><button class="btn btn-sm" id="uRcX">Fermer</button></div>
+      <div class="card-b stack"><div class="frow"><label class="fld"><span class="flabel">Semaine</span><select id="uRcW">${W.map(w=>`<option value="${w.weekId}"${w.weekId===S.uRc.w?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
+        <button class="btn btn-pri" id="uRcGo"${r?'':' disabled'}>Envoyer le récap</button></div>
+      ${r?`<div class="rcp" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:14px;background:#fff;color:#111;font-family:Arial,sans-serif;font-size:14px;line-height:1.45;overflow-x:auto">${r.html}</div>`
+        :`<p class="mut">${S.loaded.has(S.uRc.w)?'Cet agent n’apparaît pas dans cette semaine.':'Chargement de la semaine…'}</p>`}</div></section>`; }
+  return '';
+}
+async function actionRecap(b){
+  try{
+    if(b.id==='uAgX'){ S.uAg=null; render(); return; }
+    if(b.id==='uRcX'){ S.uRc=null; render(); return; }
+    if(b.dataset.uag!=null){ S.uAg=b.dataset.uag; S.uAgQ=''; S.uRc=null; render(); await ensureLoaded(S.weeks.map(w=>w.weekId).sort().slice(-8)); render(); return; }
+    if(b.dataset.uagset!=null){ const email=S.uAg, nom=b.dataset.nom||'';
+      await withLoad(api.userSet({email,action:'agent',agent:{pk:b.dataset.uagset,nom}})); S.uAg=null; S.msg={m:`${nom} rattaché à ${email}.`}; await loadUsers(); return; }
+    if(b.dataset.uagdel!=null){ await withLoad(api.userSet({email:b.dataset.uagdel,action:'agent',agent:null})); S.msg={m:'Agent retiré du compte.'}; await loadUsers(); return; }
+    if(b.dataset.urecap!=null){ const ids=S.weeks.map(w=>w.weekId).sort(); S.uRc={email:b.dataset.urecap,w:ids[ids.length-1]}; S.uAg=null; render(); await recapCharger(); return; }
+    if(b.id==='uRcGo'&&S.uRc){ const u=(S.users.utilisateurs||[]).find(x=>x.email===S.uRc.email), r=recapSemaine(u,S.uRc.w);
+      if(!r) throw new Error('Récap indisponible pour cette semaine.');
+      await withLoad(api.userSet({email:u.email,action:'recap',sujet:r.sujet,html:r.html}));
+      S.msg={m:`Récap ${weekLabel(S.weeks.find(w=>w.weekId===S.uRc.w))} envoyé à ${u.email}.`}; render(); return; }
+  }catch(e){ S.msg={m:e.message,t:'c'}; render(); }
+}
 function viewUtilisateurs(){
   const U=S.users;
   if(!U) return `<section class="card"><div class="card-b"><p class="mut">Chargement des comptes…</p></div></section>`;
@@ -5828,6 +5901,8 @@ function viewUtilisateurs(){
   const ligne=u=>{ const d=u.droits||{};
     return `<tr><td class="l nm">${esc(u.nom||'—')}${u.email===U.moi?' <span class="pill pill-n">vous</span>':''}</td><td class="l mono">${esc(u.email)}</td>
       <td class="l">${u.valide?'<span class="pill pill-g">validé</span>':'<span class="pill pill-w">en attente</span>'}${u.demande?' <span class="pill pill-c">mot de passe oublié</span>':''}</td>
+      <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.agent?`${esc(u.agent.nom||u.agent.pk)} <button class="lnk" data-uagdel="${esc(u.email)}" title="Retirer l’agent">×</button>`:''}
+        <button class="btn btn-sm" data-uag="${esc(u.email)}">${u.agent?'Changer':'Rattacher'}</button>${u.agent&&u.valide&&U.mail?`<button class="btn btn-sm" data-urecap="${esc(u.email)}" title="Envoyer par e-mail le récap d’une semaine">Récap</button>`:''}</span></td>
       ${DROITS_L.map(([k,l])=>{ const impl=(k!=='admin'&&d.admin)||(k==='lecture'&&d.modif);
         return `<td><input type="checkbox" data-udr="${esc(u.email)}|${k}"${d[k]||impl?' checked':''}${impl?' disabled':''} title="${l}${impl?' (compris dans un droit supérieur)':''}" aria-label="${l}"></td>`; }).join('')}
       <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.valide?`<button class="btn btn-sm" data-uval="${esc(u.email)}" data-v="">Suspendre</button>`:`<button class="btn btn-sm btn-pri" data-uval="${esc(u.email)}" data-v="1">Valider</button>`}
@@ -5838,9 +5913,10 @@ function viewUtilisateurs(){
   const dem=L.filter(u=>u.demande);
   return `${S.uLien?`<div class="note">${S.uLien.envoye?`<b>E-mail envoyé à ${esc(S.uLien.email)}</b> avec le lien ; vous pouvez aussi le transmettre vous-même`:`<b>Lien à transmettre à ${esc(S.uLien.email)}</b>${S.users&&S.users.mail?' (l’e-mail n’a pas pu partir)':''}`} (SMS, WhatsApp…) — ${esc(S.uLien.duree)}, une seule utilisation :
     ${S.uLien.lien?`<span class="mono" style="word-break:break-all">${esc(S.uLien.lien)}</span> <button class="btn btn-sm" id="uCopy">Copier</button>`:'adresse du site inconnue : renseignez APP_URL dans Render'}</div>`:''}
+  ${recapPanneaux(U)}
   ${dem.length?`<div class="note w"><b>Mot de passe oublié</b> : ${dem.map(u=>`${esc(u.nom||u.email)} (${fmtDH(u.demande)})`).join(', ')} — ${S.users&&S.users.mail?'un lien leur a été envoyé par e-mail ; sans réponse, cliquez « Lien mot de passe » sur leur ligne.':'cliquez « Lien mot de passe » sur sa ligne et transmettez le lien.'}</div>`:''}
   <section class="card"><div class="card-h"><div><h2>Comptes</h2><p class="card-s">${nf(L.length)} compte${L.length>1?'s':''}${att.length?` · <b>${nf(att.length)} en attente de validation</b>`:''} · les codes d’accès restent valables en parallèle</p></div></div>
-    <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
+    <div class="card-b">${L.length?`<div class="tw"><table class="ut"><thead><tr><th class="l">Nom</th><th class="l">E-mail</th><th class="l">État</th><th class="l">Agent</th>${DROITS_L.map(([,l])=>`<th>${l.replace(' complète','')}</th>`).join('')}<th class="l">Actions</th><th class="l">Dernière connexion</th></tr></thead>
       <tbody>${L.map(ligne).join('')}</tbody></table></div>`:'<p class="mut">Aucun compte.</p>'}
     <p class="lg-n mt"><b>Vitrine</b> : statistiques anonymes · <b>Coco</b> : vue covoiturage · <b>Consultation complète</b> : tous les onglets nominatifs, sans rien modifier ·
       <b>Modification</b> : import, réglages, corrections, planification (comprend la consultation) · <b>Administration</b> : gestion des comptes (comprend tout).
@@ -6095,6 +6171,8 @@ document.addEventListener('click',async e=>{
   if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
     if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
   if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
+  { const b=S.tab==='utilisateurs'&&e.target.closest('[data-uag],[data-uagdel],[data-uagset],[data-urecap],#uAgX,#uRcX,#uRcGo');   // récap de la semaine
+    if(b){ await actionRecap(b); return; } }
   { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
     if(b){ await actionComptes(b); return; } }
   if(S.tab==='planif'&&admin()){ const t=e.target.closest('#plAuto,#plVider,#plReset,#plAdd,#plUndo')||{id:'',dataset:{}};
@@ -6370,6 +6448,7 @@ document.addEventListener('change',async e=>{
       S.msg={m:'Sauvegarde restaurée.'}; }
     catch(err){ S.msg={m:'Restauration impossible : '+err.message,t:'c'}; }
     render(); return; }
+  if(e.target.id==='uRcW'&&S.uRc){ S.uRc.w=e.target.value; render(); await recapCharger(); return; }
   if(e.target.id==='cocoW'){ S.cocoW=e.target.value; await loadCoco(); return; }
   if(e.target.id==='vWeek'){ S.vf.w=e.target.value; render(); return; }
   if(e.target.id==='stMetric'){ S.st.metric=e.target.value; savePrefs(); render(); return; }
@@ -6377,6 +6456,7 @@ document.addEventListener('change',async e=>{
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
+  if(e.target.id==='uAgQ'){ S.uAgQ=e.target.value; const p=e.target.selectionStart; render(); const n=el('uAgQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } return; }
   if(e.target.id==='cocoQ'){ S.cocoQ=e.target.value; const p=e.target.selectionStart; render(); const n=el('cocoQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } return; }
   if(e.target.dataset&&e.target.dataset.mn){ const first=!S.mnDraft; S.mnDraft=S.mnDraft||{...(S.mentions||{})}; S.mnDraft[e.target.dataset.mn]=e.target.value;
     if(first){ const b=el('mnSave'); if(b) b.disabled=false; } return; }

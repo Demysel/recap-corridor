@@ -69,6 +69,8 @@ revoke all on schema recap from public, anon, authenticated;
 --   email text not null references recap.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
 -- create table if not exists recap.jetons_mdp (jeton text primary key,
 --   email text not null references recap.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+-- alter table recap.utilisateurs add column if not exists demande timestamptz;
+-- alter table recap.utilisateurs add column if not exists agent jsonb;   -- agent rattaché ({pk, nom}) pour le récap de la semaine
 -- alter table recap.utilisateurs enable row level security;
 -- alter table recap.sessions     enable row level security;
 -- alter table recap.jetons_mdp   enable row level security;
