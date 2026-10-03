@@ -114,6 +114,16 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   Google Agenda depuis un ordinateur « À partir de l'URL », Outlook ; « × » = `calOff`). Route publique `GET /cal/<jeton>.ics`
   (`agenda` : 12 dernières semaines importées, `calAgent` dans le moteur du serveur avec les règles du site, `calCache` vidé
   avec `invalider` ; jeton inconnu = 404 compté comme essai). Un agent exclu des chiffres garde son planning dans l'agenda.
+- **Présentation du récap comme la fiche agent** (demandé par l'utilisateur, capture de la fiche) : `recapTuiles` (mêmes
+  tuiles que la fiche : jours de service, RHR ou n/a, journées blanches, amplitude, TTE, heures sup, nuit, dimanche, paniers
+  avec /JS et détail, MHIS · DISPO · ATCMD, codes) et `recapFrise` (frise 0–24 h par jour : missions en rouge avec pauses
+  foncées, RHR en pointillé ambre, code ou journée blanche sur la ligne, fin de mission de nuit + « Journée blanche » comme la
+  fiche ; à cheval sur minuit sur chaque jour touché ; libellé coupé à la largeur du segment), **en tableaux HTML** (les
+  clients mail n'acceptent ni SVG, ni grille CSS, ni script), 3 tuiles par ligne pour le téléphone ; puis le détail des
+  missions et le covoiturage. **Bouton « Ajouter cette semaine à mon agenda »** (demandé : la semaine envoyée seulement) :
+  `%%AGENDA%%` remplacé par le serveur à l'envoi (`boutonAgenda`, même texte que `recapBouton` de l'aperçu) par un lien vers
+  le fichier .ics de la semaine envoyée, gardé 90 jours (table `agendas` : empreinte du jeton, ics, expiration ; route
+  publique `GET /cal/s/<jeton>.ics`) ; la pièce jointe reste.
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
   ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
   `APP_URL` réglée sur les deux services Render.

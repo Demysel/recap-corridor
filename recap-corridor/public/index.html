@@ -725,7 +725,6 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
   .kpis{break-inside:avoid}
   .enter>*{animation:none}
 }
-.rcp table,.rcp td,.rcp tr{text-align:left!important;background:none!important;width:auto}
 </style>
 </head>
 <body>
@@ -5869,17 +5868,62 @@ const fmtDH=x=>x?new Date(x).toLocaleString('fr-FR',{dateStyle:'short',timeStyle
     jour par jour. Covoiturage seulement si le compte a le droit Coco : parmi les agents de la vue Coco, comme l'onglet Coco
     (prise et fin de service à 30 min près) ; sans ce droit, rien n'apparaît. */
 const capsU=d=>{ const c=Object.fromEntries(DROITS_L.map(([k])=>[k,!!(d&&d[k])])); if(c.admin) for(const k in c) c[k]=true; if(c.modif) c.lecture=true; return c; };
+/** Récap par e-mail : tuiles comme la fiche agent (demandé), en tableaux — seul format lu par tous les clients mail */
+function recapTuiles(a){
+  const t=(k,v,s,n)=>`<td${n?` colspan="${n}"`:''} width="${n?66:33}%" style="padding:4px;vertical-align:top"><div style="border:1px solid #e3e3e3;border-radius:8px;padding:8px 10px">
+    <div style="font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#777;font-weight:bold">${k}</div>
+    <div style="font-size:18px;font-weight:bold;color:#111;margin-top:2px">${v}${s?` <span style="font-size:11px;font-weight:normal;color:#777">${s}</span>`:''}</div></div></td>`;
+  const pan=[[a.paniersMidi,'midi'],[a.paniersSoir,'soir'],[a.paniersNuit,'nuit'],[a.paniersRHR,'RHR']].filter(x=>x[0]).map(x=>`${nf(x[0])} ${x[1]}`).join(', ');
+  const cc={}; for(const j of a.jours) if(j.kind==='CODE'&&j.family!=='HORS'&&!j.rpDouble) cc[j.family]=(cc[j.family]||0)+1;
+  const codes=Object.keys(cc).sort((p,q)=>codeOrd(p)-codeOrd(q)||p.localeCompare(q)).map(k=>`${esc(k)} ${cc[k]}`).join(' · ')||'<span style="font-size:13px;font-weight:normal;color:#777">aucun</span>';
+  const L=[t('Jours de service',nf(a.joursService||0)),t('RHR',a.rhrApplicable?nf(a.nbRHR||0):'n/a'),t('Journées blanches',nf(a.journeesBlanches||0)),
+    t('Amplitude',fmtH(a.amplitudeTotale||0)),t('TTE',fmtH(a.heuresPlanifiees||0)),t('Heures sup',fmtH(a.heuresSup||0)),
+    t('Heures de nuit',fmtH(a.heuresNuit||0)),t('Heures du dimanche',fmtH(a.heuresDimanche||0)),t('Paniers',nf(a.nbPaniers||0),`${nf(a.joursService?(a.nbPaniers||0)/a.joursService:0,2)}/JS${pan?`<br>${pan}`:''}`),
+    t('MHIS · DISPO · ATCMD',`${a.nbMHIS||0} · ${a.nbDISPO||0} · ${a.nbATCMD||0}`),t('Codes (repos, congés, absences)',codes,'',2)];
+  const rows=[]; for(let i=0;i<9;i+=3) rows.push(L.slice(i,i+3).join('')); rows.push(L.slice(9).join(''));
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 -4px">${rows.map(r=>`<tr>${r}</tr>`).join('')}</table>`;
+}
+/** Récap par e-mail : frise de la semaine comme la fiche agent (0–24 h par jour : missions en rouge avec leurs pauses, RHR en
+    pointillé ambre, code ou journée blanche sur toute la ligne ; mission ou RHR à cheval sur minuit sur chaque jour touché) */
+function recapFrise(a,days){
+  const D0=days.map(d=>Date.parse(d+'T00:00:00Z')), ms=[];
+  a.jours.forEach(j=>{ if(j.kind==='SERVICE') for(const m of j.missions||[]) if(m.start&&m.end&&!ms.includes(m)) ms.push(m); });
+  const rh=(a.rhr||[]).filter(r=>r.debut).map(r=>({s:Date.parse(r.debut),e:r.fin?Date.parse(r.fin):D0[6]+DAY,lieu:r.lieu||''}));
+  const H24='height:24px;padding:0', VIDE=`background:#f2f2f2;${H24}`, NUIT=`background:#e6e6e6;${H24}`;
+  const ST={m:`background:#EC0016;color:#fff;font-size:10px;font-weight:bold;${H24} 3px;white-space:nowrap;overflow:hidden`,p:`background:#8c000d;${H24}`,
+    r:`background:#fff4dc;border-top:1px dashed #d68a00;border-bottom:1px dashed #d68a00;color:#a35f00;font-size:10px;font-weight:bold;height:22px;padding:0 3px;white-space:nowrap;overflow:hidden`};
+  const td=(w,st,txt)=>`<td width="${w.toFixed(2)}%" style="${st}">${txt?esc(txt.length>Math.floor(w*0.85)?txt.slice(0,Math.max(0,Math.floor(w*0.85)-1))+'…':txt):''}</td>`;
+  const fond=(s,e,a0)=>{ let o=''; for(const [x,y,st] of [[a0,a0+6*H,NUIT],[a0+6*H,a0+22*H,VIDE],[a0+22*H,a0+DAY,NUIT]]){ const u=Math.max(s,x), v=Math.min(e,y); if(v>u) o+=td((v-u)/DAY*100,st); } return o; };
+  const lignes=days.map((d,k)=>{ const a0=D0[k], a1=a0+DAY, segs=[], j=a.jours[k];
+    for(const m of ms){ const s=Date.parse(m.start), e=Date.parse(m.end); if(!(s<a1&&e>a0)) continue;
+      const S0=Math.max(s,a0), E0=Math.min(e,a1), mine=[];
+      const ps=(m.pauses||[]).filter(Array.isArray).map(([x,y])=>[Math.max(Date.parse(x),S0),Math.min(Date.parse(y),E0)]).filter(([x,y])=>y>x).sort((p,q)=>p[0]-q[0]);
+      let c=S0; for(const [x,y] of ps){ if(x>c) mine.push({s:c,e:x,t:'m'}); segs.push({s:Math.max(x,c),e:y,t:'p'}); c=Math.max(c,y); } if(E0>c) mine.push({s:c,e:E0,t:'m'});
+      if(mine.length) mine.reduce((p,q)=>q.e-q.s>p.e-p.s?q:p).lab=(s<a0?'… ':'')+(m.label||''); segs.push(...mine); }
+    for(const r of rh) if(r.s<a1&&r.e>a0) segs.push({s:Math.max(r.s,a0),e:Math.min(r.e,a1),t:'r',lab:'RHR'+(r.lieu?' · '+r.lieu:'')});
+    segs.sort((x,y)=>x.s-y.s);
+    let inner='';
+    if(!segs.length){ const txt=j&&j.kind==='CODE'?`${j.code}${CODEL[j.family]?' · '+CODEL[j.family]:''}`:j&&j.blanche?'Journée blanche':'';
+      inner=j&&j.blanche?`<td style="border:1px dashed #d68a00;background:#fff4dc;color:#a35f00;font-size:11px;font-weight:bold;text-align:center;height:22px">Journée blanche</td>`
+        :txt?`<td style="background:#f2f2f2;color:#555;font-size:11px;text-align:center;${H24}">${esc(txt)}</td>`:fond(a0,a1,a0); }
+    else { // journée blanche touchée par la fin d'une mission de nuit : le reste de la ligne en cadre « Journée blanche » (comme la fiche)
+      const BL=`background:#fff4dc;border-top:1px dashed #d68a00;border-bottom:1px dashed #d68a00;color:#a35f00;font-size:10px;font-weight:bold;height:22px;padding:0 3px;white-space:nowrap;overflow:hidden;text-align:center`;
+      const trous=[]; let c=a0; for(const g of segs){ const s=Math.max(g.s,c); if(g.e<=s) continue; if(s>c) trous.push([c,s]); trous.push(g); c=g.e; } if(c<a1) trous.push([c,a1]);
+      const grand=j&&j.blanche?trous.filter(Array.isArray).reduce((p,q)=>!p||q[1]-q[0]>p[1]-p[0]?q:p,null):null;
+      for(const g of trous) inner+=Array.isArray(g)?(j&&j.blanche?td((g[1]-g[0])/DAY*100,BL,g===grand?'Journée blanche':''):fond(g[0],g[1],a0)):td((g.e-g.s)/DAY*100,ST[g.t],g.lab); }
+    return `<tr><td width="46" style="font-size:11px;color:#555;padding:3px 6px 3px 0;white-space:nowrap;vertical-align:middle;line-height:1.2"><b style="color:#111">${JN[k].slice(0,3)}</b><br>${dISO(d)}</td>
+      <td style="padding:3px 0"><table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:collapse;border-radius:4px"><tr>${inner}</tr></table></td></tr>`; });
+  const axe=`<tr><td></td><td style="padding:0 0 2px"><table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:collapse"><tr>${[0,3,6,9,12,15,18,21].map(h=>`<td width="12.5%" style="font-size:10px;color:#888;padding:0">${String(h).padStart(2,'0')}h</td>`).join('')}</tr></table></td></tr>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${axe}${lignes.join('')}</table>`;
+}
+/** Bouton « Ajouter cette semaine à mon agenda » : remplacé par le serveur à l'envoi (lien vers le fichier de la semaine) */
+const RECAP_AGENDA='%%AGENDA%%';
+const recapBouton=u=>`<p style="margin:16px 0 4px"><a href="${esc(u)}" style="display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">📅 Ajouter cette semaine à mon agenda</a></p>
+  <p style="margin:0;font-size:12px;color:#777">iPhone : touchez le bouton puis « Tout ajouter ». Android : ouvrez le fichier téléchargé avec votre agenda (Samsung Agenda, Outlook…).</p>`;
 function recapSemaine(u,id){
   const v=S.loaded.get(id), w=S.weeks.find(x=>x.weekId===id), pk=u&&u.agent&&u.agent.pk;
   const a=v&&pk&&v.agents.find(x=>personKey(x)===pk); if(!a||!w) return null;
   const ST='style="padding:5px 14px 5px 0;vertical-align:top;text-align:left;border-bottom:1px solid #eee;background:none"', H3='style="font-size:15px;margin:22px 0 6px;color:#111"';
-  const T=(l,val)=>`<tr><td ${ST}><span style="color:#555">${l}</span></td><td ${ST}><b>${val}</b></td></tr>`;
-  const pan=[[a.paniersMidi,'midi'],[a.paniersSoir,'soir'],[a.paniersNuit,'nuit'],[a.paniersRHR,'en RHR']].filter(x=>x[0]).map(x=>`${nf(x[0])} ${x[1]}`).join(', ');
-  const lieux=[...new Set((a.rhr||[]).map(r=>r.lieu).filter(Boolean))].join(', ');
-  const chiffres=[T('Jours de service',nf(a.joursService||0)),T('TTE (temps de travail effectif)',fmtH(a.heuresPlanifiees||0)),T('Heures sup',fmtH(a.heuresSup||0)),
-    T('Heures de nuit',fmtH(a.heuresNuit||0)),T('Heures du dimanche',fmtH(a.heuresDimanche||0)),T('Paniers repas',`${nf(a.nbPaniers||0)}${pan?` <span style="font-weight:normal;color:#555">(${pan})</span>`:''}`),
-    a.rhrApplicable?T('RHR (repos hors résidence)',`${nf(a.nbRHR||0)}${lieux?` <span style="font-weight:normal;color:#555">(${esc(lieux)})</span>`:''}`):'',
-    T('Journées blanches',nf(a.journeesBlanches||0))].join('');
   const jour=d=>{ const x=new Date(d); return `${JN[(x.getUTCDay()+6)%7]} ${dISO(d)}`; };
   const plan=a.jours.map((j,k)=>{ let t;
     if(j.kind==='SERVICE') t=(j.missions||[]).map(m=>`<b>${esc(m.label)}</b>${m.from||m.to?` · ${esc(m.from||'?')} → ${esc(m.to||'?')}`:''} · ${hm(m.start)}–${hm(m.end)}${m.pauseMin?` <span style="color:#555">(pause ${m.pauseMin} min)</span>`:''}`).join('<br>')||'Service';
@@ -5898,9 +5942,14 @@ function recapSemaine(u,id){
     cov=`<h3 ${H3}>Covoiturage</h3><p style="margin:0">${t}</p>`; }
   const html=`<h2 style="color:#EC0016;font-size:19px;margin:0 0 4px">Récap de la semaine ${weekLabel(w)}</h2>
     <p style="margin:0 0 14px;color:#555">${esc(`${a.nom} ${a.prenom}`.trim())} · ${esc(a.agence||'')} · ${esc(a.metier||'')} — du ${jour(w.monday)} au ${jour(w.sunday)}</p>
-    <table style="border-collapse:collapse;font-size:14px;width:auto">${chiffres}</table>
-    <h3 ${H3}>Planning</h3><table style="border-collapse:collapse;font-size:14px;width:auto">${plan}</table>${cov}
-    <p style="margin:22px 0 0;color:#555">📅 En pièce jointe : le planning de la semaine (missions, RP, CP, RHR) à ajouter à votre agenda — ouvrez le fichier.</p>
+    ${recapTuiles(a)}
+    <h3 ${H3}>Planning de la semaine</h3>${recapFrise(a,v.meta.days)}
+    <p style="margin:6px 0 0;font-size:11px;color:#888"><span style="display:inline-block;width:10px;height:10px;background:#EC0016;vertical-align:middle"></span> mission
+      &nbsp; <span style="display:inline-block;width:10px;height:10px;background:#8c000d;vertical-align:middle"></span> pause
+      &nbsp; <span style="display:inline-block;width:10px;height:8px;border:1px dashed #d68a00;background:#fff4dc;vertical-align:middle"></span> RHR</p>
+    ${RECAP_AGENDA}
+    <h3 ${H3}>Détail des missions</h3><table style="border-collapse:collapse;font-size:14px;width:auto">${plan}</table>${cov}
+    <p style="margin:22px 0 0;color:#555">📅 Le planning de la semaine (missions, RP, CP, RHR) est aussi en pièce jointe : ouvrez le fichier pour l’ajouter à votre agenda.</p>
     <p style="margin:12px 0 0;color:#888;font-size:12px">Chiffres calculés à partir du planning (fichier Récap Corridor), avec les règles du site.</p>`;
   return {sujet:`Votre récap de la semaine ${weekLabel(w)}`,html,ics:icsTexte(calEvenements([v],pk),`${a.nom} ${a.prenom}`.trim()),nomIcs:`planning-${weekLabel(w).replace(' ','-')}.ics`};
 }
@@ -5918,7 +5967,7 @@ function recapPanneaux(U){
     return `<section class="card"><div class="card-h"><div><h2>Récap de la semaine — ${esc(u.nom||u.email)}</h2><p class="card-s">agent ${esc(u.agent.nom||u.agent.pk)} · envoyé à ${esc(u.email)}${capsU(u.droits).coco?' · avec le covoiturage (droit Coco)':''}</p></div><button class="btn btn-sm" id="uRcX">Fermer</button></div>
       <div class="card-b stack"><div class="frow"><label class="fld"><span class="flabel">Semaine</span><select id="uRcW">${W.map(w=>`<option value="${w.weekId}"${w.weekId===S.uRc.w?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
         <button class="btn btn-pri" id="uRcGo"${r?'':' disabled'}>Envoyer le récap</button>${r?`<span class="mut sm">pièce jointe : ${esc(r.nomIcs)}</span>`:''}</div>
-      ${r?`<div class="rcp" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:14px;background:#fff;color:#111;font-family:Arial,sans-serif;font-size:14px;line-height:1.45;overflow-x:auto">${r.html}</div>`
+      ${r?`<div class="rcp" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:14px;background:#fff;color:#111;font-family:Arial,sans-serif;font-size:14px;line-height:1.45;overflow-x:auto;max-width:640px">${r.html.replace(RECAP_AGENDA,recapBouton('#'))}</div>`
         :`<p class="mut">${S.loaded.has(S.uRc.w)?'Cet agent n’apparaît pas dans cette semaine.':'Chargement de la semaine…'}</p>`}</div></section>`; }
   return '';
 }

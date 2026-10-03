@@ -75,4 +75,6 @@ revoke all on schema recap from public, anon, authenticated;
 -- alter table recap.utilisateurs enable row level security;
 -- alter table recap.sessions     enable row level security;
 -- alter table recap.jetons_mdp   enable row level security;
+-- create table if not exists recap.agendas (jeton text primary key, ics text not null, expire timestamptz not null);   -- semaine envoyée avec un récap (/cal/s/<jeton>.ics, 90 jours)
+-- alter table recap.agendas      enable row level security;
 -- reset role;

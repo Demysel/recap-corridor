@@ -113,6 +113,7 @@ async function tablesAuth(p) {
       maj timestamptz not null default now(), derniere timestamptz);
     create table if not exists ${SCHEMA}.sessions (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
+    create table if not exists ${SCHEMA}.agendas (jeton text primary key, ics text not null, expire timestamptz not null);
     create table if not exists ${SCHEMA}.jetons_mdp (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
@@ -120,7 +121,8 @@ async function tablesAuth(p) {
     alter table ${SCHEMA}.utilisateurs add column if not exists cal text;
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
-    alter table ${SCHEMA}.jetons_mdp enable row level security;`);
+    alter table ${SCHEMA}.jetons_mdp enable row level security;
+    alter table ${SCHEMA}.agendas enable row level security;`);
   tablesPretes = true;
 }
 /** Qui appelle : un code (x-acces) ou une session de compte (x-session) → { role, caps, user } ; null si inconnu */
@@ -177,6 +179,9 @@ function mailLien(email, lien, invitation, duree) {
     ? mail(email, 'Invitation à Récap Corridor', `<p>Bonjour,</p><p>Un compte Récap Corridor a été créé pour vous. Choisissez votre mot de passe :</p><p>${b}</p><p>Ce lien est valable ${duree} et ne sert qu’une fois.</p>`)
     : mail(email, 'Mot de passe Récap Corridor', `<p>Bonjour,</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien :</p><p>${b}</p><p>Il est valable ${duree} et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message : votre mot de passe actuel reste valable.</p>`);
 }
+/** Bouton du récap (même texte que recapBouton dans la page) */
+const boutonAgenda = (u) => `<p style="margin:16px 0 4px"><a href="${escH(u)}" style="display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">📅 Ajouter cette semaine à mon agenda</a></p>
+  <p style="margin:0;font-size:12px;color:#777">iPhone : touchez le bouton puis « Tout ajouter ». Android : ouvrez le fichier téléchargé avec votre agenda (Samsung Agenda, Outlook…).</p>`;
 /** E-mail du lien d'abonnement à l'agenda, avec la marche à suivre iPhone / Android / Outlook */
 function mailAgenda(email, lien) {
   const w = lien.replace(/^https?:/, 'webcal:'), b = `display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold`;
@@ -244,8 +249,14 @@ async function authPublique(req, res, route, ip) {
 async function agenda(req, res, url) {
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   if (trop(ip)) return send(req, res, 429, 'Trop d’essais.', 'text/plain; charset=utf-8');
-  const j = (url.pathname.match(/^\/cal\/([A-Za-z0-9_-]{20,100})\.ics$/) || [])[1];
   const p = await db(); await tablesAuth(p);
+  const js = (url.pathname.match(/^\/cal\/s\/([A-Za-z0-9_-]{20,100})\.ics$/) || [])[1];
+  if (js) {   // semaine envoyée avec un récap (bouton « Ajouter cette semaine à mon agenda »)
+    const r = (await p.query(`select ics from ${SCHEMA}.agendas where jeton = $1 and expire > now()`, [sha(js)])).rows[0];
+    if (!r) { echec(ip); return send(req, res, 404, 'Lien expiré ou inconnu.', 'text/plain; charset=utf-8'); }
+    return send(req, res, 200, r.ics, 'text/calendar; charset=utf-8', { 'Content-Disposition': 'inline; filename="planning-semaine.ics"' });
+  }
+  const j = (url.pathname.match(/^\/cal\/([A-Za-z0-9_-]{20,100})\.ics$/) || [])[1];
   const u = j && (await p.query(`select nom, agent, valide from ${SCHEMA}.utilisateurs where cal = $1`, [sha(j)])).rows[0];
   if (!u || !u.valide || !u.agent || !u.agent.pk) { echec(ip); return send(req, res, 404, 'Agenda introuvable.', 'text/plain; charset=utf-8'); }
   const cle = sha(j);
@@ -407,9 +418,19 @@ async function api(req, res, url) {
       if (body.action === 'recap') {   // récap de la semaine de l'agent rattaché, préparé par la page de l'admin, envoyé à ce compte seulement
         if (!MAIL) return json(req, res, 400, { error: 'Envoi d’e-mail non configuré (BREVO_API_KEY, MAIL_FROM).' });
         if (!u.valide) return json(req, res, 400, { error: 'Ce compte n’est pas validé.' });
-        const sujet = String(body.sujet || '').trim().slice(0, 200), html = String(body.html || ''), ics = String(body.ics || '');
+        const sujet = String(body.sujet || '').trim().slice(0, 200), ics = String(body.ics || '');
+        let html = String(body.html || '');
         if (!sujet || !html || html.length > 300000 || ics.length > 300000) return json(req, res, 400, { error: 'Récap vide ou trop long.' });
         const pj = /^BEGIN:VCALENDAR/.test(ics) ? { nom: String(body.nomIcs || 'planning.ics').replace(/[^\w.-]/g, '_').slice(0, 60), texte: ics } : null;
+        // bouton « Ajouter cette semaine à mon agenda » : lien vers le fichier de la semaine envoyée, gardé 90 jours
+        let bouton = '';
+        if (pj && base(req)) {
+          const j = jetonNeuf();
+          await p.query(`delete from ${SCHEMA}.agendas where expire < now()`);
+          await p.query(`insert into ${SCHEMA}.agendas(jeton, ics, expire) values ($1, $2, now() + interval '90 days')`, [sha(j), ics]);
+          bouton = boutonAgenda(`${base(req)}/cal/s/${j}.ics`);
+        }
+        html = html.replace('%%AGENDA%%', bouton);
         if (!(await mail(email, sujet, html, pj))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
         return json(req, res, 200, { ok: true, envoye: true });
       }
