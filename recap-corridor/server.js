@@ -114,6 +114,9 @@ async function tablesAuth(p) {
     create table if not exists ${SCHEMA}.sessions (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     create table if not exists ${SCHEMA}.agendas (jeton text primary key, ics text not null, expire timestamptz not null);
+    create table if not exists ${SCHEMA}.newsletters (id serial primary key, titre text not null default '', html text not null default '',
+      cree timestamptz not null default now(), maj timestamptz not null default now(), envoye timestamptz, nb int);
+    create table if not exists ${SCHEMA}.nl_images (id text primary key, type text not null, data bytea not null, cree timestamptz not null default now());
     create table if not exists ${SCHEMA}.jetons_mdp (jeton text primary key,
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
@@ -123,7 +126,9 @@ async function tablesAuth(p) {
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
     alter table ${SCHEMA}.jetons_mdp enable row level security;
-    alter table ${SCHEMA}.agendas enable row level security;`);
+    alter table ${SCHEMA}.agendas enable row level security;
+    alter table ${SCHEMA}.newsletters enable row level security;
+    alter table ${SCHEMA}.nl_images enable row level security;`);
   tablesPretes = true;
 }
 /** Qui appelle : un code (x-acces) ou une session de compte (x-session) → { role, caps, user } ; null si inconnu */
@@ -156,7 +161,7 @@ async function lienMdp(p, req, email, heures) {
 }
 /** Envoi d'un e-mail par l'API Brevo (clé et expéditeur dans les variables Render) ; false si non configuré ou refusé */
 const MAIL = !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM);
-async function mail(to, sujet, html, pj, nom = 'Récap Corridor') {
+async function mail(to, sujet, html, pj, nom = 'Récap Corridor', entetes) {
   if (!MAIL) return false;
   try {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -165,7 +170,8 @@ async function mail(to, sujet, html, pj, nom = 'Récap Corridor') {
       body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + nom }, to: [{ email: to }],
         subject: (DEV ? '[TEST] ' : '') + sujet,
         htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111">${html}</div>`,
-        ...(pj ? { attachment: [{ name: pj.nom, content: Buffer.from(pj.texte, 'utf8').toString('base64') }] } : {}) }),
+        ...(pj ? { attachment: [{ name: pj.nom, content: Buffer.from(pj.texte, 'utf8').toString('base64') }] } : {}),
+        ...(entetes ? { headers: entetes } : {}) }),
     });
     if (!r.ok) console.error('Brevo : envoi refusé', r.status, (await r.text()).slice(0, 300));
     return r.ok;
@@ -273,6 +279,114 @@ async function agenda(req, res, url) {
   return send(req, res, 200, calCache.get(cle), 'text/calendar; charset=utf-8', { 'Content-Disposition': 'inline; filename="planning.ics"' });
 }
 
+/* ------------------------------------------------------------ newsletter (demandée par l'utilisateur)
+   Message libre rédigé dans l'onglet Newsletter (admin), envoyé quand l'admin le décide aux comptes validés cochés
+   « Newsletter » ; chaque envoi est gardé (réutilisable comme modèle). Images stockées en base et servies publiquement
+   (/nl/img/<id>) pour que les messageries les affichent ; lien de désabonnement signé dans chaque e-mail (/nl/desabo). */
+async function nlSecret(p) {
+  const r = (await p.query(`select valeur from ${SCHEMA}.config where cle = 'nlsecret'`)).rows[0];
+  if (r && r.valeur && r.valeur.s) return r.valeur.s;
+  const s = crypto.randomBytes(32).toString('hex');
+  await p.query(`insert into ${SCHEMA}.config(cle, valeur) values ('nlsecret', $1) on conflict (cle) do nothing`, [{ s }]);
+  return (await p.query(`select valeur from ${SCHEMA}.config where cle = 'nlsecret'`)).rows[0].valeur.s;
+}
+const nlSigne = (sec, email) => crypto.createHmac('sha256', sec).update(email).digest('base64url').slice(0, 32);
+/** Défense : rien d'exécutable dans le message (la page nettoie déjà le contenu de l'éditeur) */
+const nlPropre = (h) => String(h || '').replace(/<\/?(script|iframe|object|embed|form|input|button|style|link|meta)[^>]*>/gi, '')
+  .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+function nlMail(titre, html, desabo) {
+  return `<h1 style="font-size:22px;color:#EC0016;margin:0 0 14px">${escH(titre)}</h1>
+    <div style="font-size:15px;line-height:1.55">${html.replace(/<img /gi, '<img style="max-width:100%;height:auto" ')}</div>
+    <p style="margin:28px 0 0;padding-top:12px;border-top:1px solid #e3e3e3;font-size:12px;color:#888">Vous recevez cette newsletter car un administrateur
+    vous y a abonné. ${desabo ? `<a href="${escH(desabo)}" style="color:#888">Se désabonner</a>` : ''}</p>`;
+}
+async function newsletter(req, res, route, url, p, A) {
+  if (!A.caps.admin) return json(req, res, 403, { error: 'Réservé aux administrateurs.' });
+  await tablesAuth(p);
+  if (route === 'newsletter' && req.method === 'GET') {
+    const l = await p.query(`select id, titre, html, cree, maj, envoye, nb from ${SCHEMA}.newsletters order by coalesce(envoye, maj) desc limit 200`);
+    const n = (await p.query(`select count(*)::int n from ${SCHEMA}.utilisateurs where valide and newsletter`)).rows[0].n;
+    return json(req, res, 200, { liste: l.rows, abonnes: n, mail: MAIL });
+  }
+  if (route === 'newsletter' && req.method === 'POST') {   // brouillon : création ou mise à jour (un envoi ne se modifie plus)
+    const b = await readBody(req), titre = String(b.titre || '').trim().slice(0, 200), html = nlPropre(b.html).slice(0, 500000);
+    if (b.id) {
+      const r = await p.query(`update ${SCHEMA}.newsletters set titre = $2, html = $3, maj = now() where id = $1 and envoye is null returning id`, [b.id, titre, html]);
+      if (!r.rowCount) return json(req, res, 409, { error: 'Cette newsletter est déjà envoyée : réutilisez-la comme modèle.' });
+      return json(req, res, 200, { ok: true, id: b.id });
+    }
+    const r = await p.query(`insert into ${SCHEMA}.newsletters(titre, html) values ($1, $2) returning id`, [titre, html]);
+    return json(req, res, 200, { ok: true, id: r.rows[0].id });
+  }
+  if (route === 'newsletter' && req.method === 'DELETE') {
+    await p.query(`delete from ${SCHEMA}.newsletters where id = $1`, [Number(url.searchParams.get('id')) || 0]);
+    return json(req, res, 200, { ok: true });
+  }
+  if (route === 'newsletter/image' && req.method === 'POST') {   // image de l'éditeur (déjà réduite par la page)
+    const b = await readBody(req), type = String(b.type || '');
+    if (!/^image\/(jpeg|png|gif|webp)$/.test(type)) return json(req, res, 400, { error: 'Format d’image non accepté (JPEG, PNG, GIF, WebP).' });
+    const data = Buffer.from(String(b.data || ''), 'base64');
+    if (!data.length || data.length > 3e6) return json(req, res, 400, { error: 'Image vide ou trop lourde (3 Mo au plus).' });
+    const id = crypto.randomBytes(12).toString('hex') + '.' + type.split('/')[1].replace('jpeg', 'jpg');
+    await p.query(`insert into ${SCHEMA}.nl_images(id, type, data) values ($1, $2, $3)`, [id, type, data]);
+    const bse = base(req);
+    return json(req, res, 200, { ok: true, url: `${bse || ''}/nl/img/${id}` });
+  }
+  if (route === 'newsletter/envoi' && req.method === 'POST') {   // test (à soi-même) ou envoi aux abonnés
+    if (!MAIL) return json(req, res, 400, { error: 'Envoi d’e-mail non configuré (BREVO_API_KEY, MAIL_FROM).' });
+    const b = await readBody(req), n = (await p.query(`select id, titre, html, envoye from ${SCHEMA}.newsletters where id = $1`, [b.id])).rows[0];
+    if (!n) return json(req, res, 404, { error: 'Newsletter introuvable : enregistrez-la d’abord.' });
+    if (!n.titre.trim()) return json(req, res, 400, { error: 'Donnez un titre à la newsletter.' });
+    const bse = base(req), sec = await nlSecret(p);
+    const lien = (email) => bse ? `${bse}/nl/desabo?e=${encodeURIComponent(email)}&s=${nlSigne(sec, email)}` : null;
+    if (b.test) {
+      if (!A.user) return json(req, res, 400, { error: 'Test réservé aux comptes e-mail.' });
+      const ok = await mail(A.user.email, '[Essai] ' + n.titre, nlMail(n.titre, n.html, lien(A.user.email)));
+      return ok ? json(req, res, 200, { ok: true, nb: 1 }) : json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
+    }
+    if (n.envoye) return json(req, res, 409, { error: 'Déjà envoyée : réutilisez-la comme modèle pour un nouvel envoi.' });
+    const dest = (await p.query(`select email from ${SCHEMA}.utilisateurs where valide and newsletter order by email`)).rows.map((x) => x.email);
+    if (!dest.length) return json(req, res, 400, { error: 'Aucun abonné : cochez « Newsletter » dans Utilisateurs → Comptes.' });
+    let nb = 0;
+    for (const e of dest) {
+      const l = lien(e);
+      if (await mail(e, n.titre, nlMail(n.titre, n.html, l), null, 'Récap Corridor', l ? { 'List-Unsubscribe': `<${l}>` } : null)) nb++;
+    }
+    if (nb) await p.query(`update ${SCHEMA}.newsletters set envoye = now(), nb = $2 where id = $1`, [n.id, nb]);
+    return json(req, res, nb ? 200 : 502, nb ? { ok: true, nb, total: dest.length } : { error: 'Aucun e-mail n’a pu partir (voir les journaux Render).' });
+  }
+  return json(req, res, 404, { error: 'Adresse inconnue.' });
+}
+/** Routes publiques : images des newsletters, désabonnement (confirmation par bouton, pour que l'aperçu des liens par
+    certaines messageries ne désabonne personne) */
+async function nlPublic(req, res, url) {
+  const p = await db(); await tablesAuth(p);
+  const mi = url.pathname.match(/^\/nl\/img\/([a-f0-9]{24}\.(jpg|png|gif|webp))$/);
+  if (mi) {
+    const r = (await p.query(`select type, data from ${SCHEMA}.nl_images where id = $1`, [mi[1]])).rows[0];
+    if (!r) return send(req, res, 404, 'Image introuvable.', 'text/plain; charset=utf-8');
+    return send(req, res, 200, r.data, r.type, { 'Cache-Control': 'public, max-age=31536000, immutable' });
+  }
+  if (url.pathname === '/nl/desabo') {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    if (trop(ip)) return send(req, res, 429, 'Trop d’essais.', 'text/plain; charset=utf-8');
+    let e = emailNorm(url.searchParams.get('e')), s = String(url.searchParams.get('s') || '');
+    if (req.method === 'POST') { const f = new URLSearchParams(await new Promise((ok) => { let t = ''; req.on('data', (c) => { t += c; if (t.length > 2000) req.destroy(); }); req.on('end', () => ok(t)); })); e = emailNorm(f.get('e')); s = String(f.get('s') || ''); }
+    const valide = e && s && s === nlSigne(await nlSecret(p), e);
+    const page = (corps) => send(req, res, valide ? 200 : 400, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Newsletter</title></head>
+      <body style="font-family:Arial,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;color:#111"><h1 style="color:#EC0016;font-size:22px">Newsletter</h1>${corps}</body></html>`, 'text/html; charset=utf-8');
+    if (!valide) { echec(ip); return page('<p>Lien de désabonnement invalide.</p>'); }
+    if (req.method === 'POST') {
+      await p.query(`update ${SCHEMA}.utilisateurs set newsletter = false, maj = now() where email = $1`, [e]);
+      return page(`<p>C’est fait : <b>${escH(e)}</b> ne recevra plus la newsletter.</p>`);
+    }
+    return page(`<p>Ne plus recevoir la newsletter à l’adresse <b>${escH(e)}</b> ?</p>
+      <form method="post" action="/nl/desabo"><input type="hidden" name="e" value="${escH(e)}"><input type="hidden" name="s" value="${escH(s)}">
+      <button style="background:#EC0016;color:#fff;border:0;padding:10px 18px;border-radius:6px;font-weight:bold;font-size:15px">Me désabonner</button></form>`);
+  }
+  return send(req, res, 404, 'Introuvable.', 'text/plain; charset=utf-8');
+}
+
 const echecs = new Map();   // ralentit les essais de code répétés
 function trop(ip) {
   const e = echecs.get(ip); const now = Date.now();
@@ -284,7 +398,7 @@ function echec(ip) { const e = echecs.get(ip); const now = Date.now(); if (!e ||
 /* ------------------------------------------------------------ réponses */
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'",
 };
 function send(req, res, status, body, type = 'application/json; charset=utf-8', extra = {}) {
   let buf = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
@@ -372,6 +486,7 @@ async function api(req, res, url) {
     await p.query(`delete from ${SCHEMA}.sessions where email = $1 and jeton <> $2`, [A.user.email, sha(req.headers['x-session'])]);   // les autres appareils sont déconnectés
     return json(req, res, 200, { ok: true });
   }
+  if (route.startsWith('newsletter')) return newsletter(req, res, route, url, p, A);
   if (route === 'utilisateurs') {   // gestion des comptes : droit « admin » seulement
     if (!caps.admin) return json(req, res, 403, { error: 'Réservé aux administrateurs.' });
     await tablesAuth(p);
@@ -637,6 +752,7 @@ http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (url.pathname.startsWith('/cal/')) return await agenda(req, res, url);
+    if (url.pathname.startsWith('/nl/')) return await nlPublic(req, res, url);
     if (url.pathname === '/robots.txt') return send(req, res, 200, 'User-agent: *\nDisallow: /\n', 'text/plain; charset=utf-8');
     if (ICONES[url.pathname]) return await icone(req, res, url.pathname);
     return await statique(req, res, url);

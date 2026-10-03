@@ -127,8 +127,22 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   devant les tribunaux populaires. » ; nom d'expéditeur du récap seulement : « Mon récapitulatif Hebdomadaire » (`mail(…, nom)` ;
   les autres mails gardent « Récap Corridor »).
 - **Newsletter** (demandé par l'utilisateur) : case « Newsletter » dans Utilisateurs → Comptes, cochée par l'admin seulement
-  (colonne `newsletter` boolean de `utilisateurs`, PUT `action:'newsletter'`). Contenu et envoi de la newsletter : à définir
-  avec l'utilisateur (distinct du récap).
+  (colonne `newsletter` boolean de `utilisateurs`, PUT `action:'newsletter'`). Onglet **« Newsletter »** (groupe Diffusion,
+  droit admin, `viewNewsletter`) : message libre — titre (= objet de l'e-mail) et éditeur (`#nlEd`, contenteditable +
+  execCommand : gras, italique, souligné, style texte / titre / sous-titre, police `NL_POLICES`, liste, lien, image, « Donnée
+  du site », effacer ; un retour à la ligne = un paragraphe). **Données du site = agrégats anonymes de la vitrine** (`S.vit`,
+  cellules ≥ 5 agents, semaine entière, agence au choix ou toutes, chiffres `NL_DONNEES` : agents, TTE moyen, heures sup
+  total / par agent, nuit, dimanche, RHR, journées blanches, paniers, trajets seuls) insérés comme tableau figé
+  (`nlBlocDonnees`). Images : réduites à 1200 px (JPEG) dans la page, stockées en base (table `nl_images`), servies
+  publiquement `GET /nl/img/<id>` (pour les messageries). Contenu nettoyé dans la page (`nlNettoyer`, balises et attributs
+  autorisés) et au serveur (`nlPropre`). **Envoi quand l'admin le décide** (pas de récurrence, choix de l'utilisateur) :
+  « M'envoyer un essai » (à son propre e-mail, objet « [Essai] ») puis « Envoyer aux N abonnés » (comptes validés et cochés,
+  un e-mail par personne, confirmation). **Toutes les newsletters sont gardées** (table `newsletters` : titre, html, cree,
+  maj, envoye, nb) : brouillon = « Ouvrir » ; envoyée = lecture seule, « Réutiliser comme modèle » (nouveau brouillon).
+  API admin : `GET|POST|DELETE /api/newsletter`, `POST /api/newsletter/image`, `POST /api/newsletter/envoi` ({id, test}).
+  **Désabonnement** : lien signé dans chaque e-mail (HMAC du courriel, secret aléatoire `config` clé `nlsecret`) + en-tête
+  `List-Unsubscribe` ; `GET /nl/desabo` affiche une confirmation, le bouton (POST) décoche `newsletter` (un simple aperçu du
+  lien par la messagerie ne désabonne personne) ; signature fausse = 400 comptée comme essai. Expéditeur : « Récap Corridor ».
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
   ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
   `APP_URL` réglée sur les deux services Render.

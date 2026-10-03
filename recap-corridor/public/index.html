@@ -676,6 +676,10 @@ table.cmp tr.rsel td{box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(-
 .lg-l{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
 .lg-t{display:flex;gap:6px}.lg-t .sg{flex:1}
 .ut td input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
+.nl-ed{min-height:320px;border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:#fff;color:#111;font:15px/1.55 Arial,sans-serif;outline:none;overflow-wrap:anywhere}
+.nl-ed:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.nl-ed h2{font-size:20px;margin:14px 0 6px;color:#111}.nl-ed h3{font-size:17px;margin:12px 0 4px;color:#111}.nl-ed p{margin:0 0 8px}
+.nl-ed img{max-width:100%;height:auto}.nl-ed a{color:#EC0016}.nl-ed table{width:auto}.nl-ed td{color:#111;text-align:left;background:transparent;font-size:14px}
 
 /* ---------- petits écrans : menu en tiroir sous une barre fixe ---------- */
 @media (max-width:1080px){
@@ -3142,7 +3146,7 @@ function barChart(items,opts={}){
    11. VUES
    ========================================================================== */
 const el=id=>document.getElementById(id);
-const TI={compte:'M8 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4',utilisateurs:'M8 1.8 13.5 4v4c0 3-2.3 5.2-5.5 6.2C4.8 13.2 2.5 11 2.5 8V4zM5.8 8l1.6 1.6L10.5 6.5',planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2',production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
+const TI={newsletter:'M2 3.5h12v9H2zM2 4l6 5 6-5',compte:'M8 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4',utilisateurs:'M8 1.8 13.5 4v4c0 3-2.3 5.2-5.5 6.2C4.8 13.2 2.5 11 2.5 8V4zM5.8 8l1.6 1.6L10.5 6.5',planif:'M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2',production:'M2 13.5h12M3.5 13.5V9h2.5v4.5M7 13.5V6h2.5v7.5M10.5 13.5V3h2.5v10.5',synthese:'M2.5 2.5h4.5v5H2.5zM9 2.5h4.5v3H9zM9 7.5h4.5v6H9zM2.5 9.5h4.5v4H2.5z',verifier:'M8 2 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
   agents:'M6 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1.8 13.5c.5-2.4 2.2-3.8 4.2-3.8s3.7 1.4 4.2 3.8M10.5 2.8a2.3 2.3 0 0 1 0 4.4M12 9.9c1.2.5 2 1.7 2.3 3.6',
   rhr:'M13 9.5A5.5 5.5 0 1 1 6.5 3a4.3 4.3 0 0 0 6.5 6.5z',blanches:'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3',
   graphiques:'M3 13.5V8M6.5 13.5V3.5M10 13.5V6.5M13.5 13.5V10',stats:'M2 12l3.5-4 3 2.5L14 4M10.5 4H14v3.5',
@@ -3160,19 +3164,19 @@ const DROITS_L=[['vitrine','Vitrine'],['coco','Coco'],['lecture','Consultation c
 /** Onglets encore en travail (demandé par l'utilisateur) : la Planification ne s'affiche que sur le site de test
     (Production publiée sur le principal à la demande de l'utilisateur) */
 const EN_TRAVAIL=['planif'], enTest=()=>document.documentElement.dataset.env==='dev';
-const tabVisible=t=>EN_TRAVAIL.includes(t.k)&&!enTest()?false:t.k==='compte'?!!S.user:t.k==='utilisateurs'?backend.mode==='web'&&peut('admin'):S.role==='aucun'?false
+const tabVisible=t=>EN_TRAVAIL.includes(t.k)&&!enTest()?false:t.k==='compte'?!!S.user:t.k==='utilisateurs'||t.k==='newsletter'?backend.mode==='web'&&peut('admin'):S.role==='aucun'?false
   :S.role==='admin'?t.k!=='mentions'&&(peut('modif')||!['import','reglages','planif'].includes(t.k))
   :S.role==='covoit'?t.k==='coco':S.role==='mixte'?['vitrine','coco','lecture','mentions'].includes(t.k):['vitrine','lecture','mentions'].includes(t.k);
 const TABS=[
   {k:'synthese',l:'Synthèse',g:'Pilotage'},{k:'production',l:'Production',g:'Pilotage'},{k:'planif',l:'Planification',g:'Pilotage'},{k:'verifier',l:'À vérifier',g:'Pilotage'},
   {k:'agents',l:'Agents',g:'Détail'},{k:'rhr',l:'RHR',g:'Détail'},{k:'blanches',l:'Journées blanches',g:'Détail'},
   {k:'graphiques',l:'Graphiques',g:'Analyse'},{k:'stats',l:'Statistiques',g:'Analyse'},{k:'comparer',l:'Comparer',g:'Analyse'},
-  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},{k:'coco',l:'Coco',g:'Diffusion'},
+  {k:'vitrine',l:'Vitrine',g:'Diffusion'},{k:'exports',l:'Exports',g:'Diffusion'},{k:'lecture',l:'Guide de lecture',g:'Diffusion'},{k:'mentions',l:'Mentions légales',g:'Diffusion'},{k:'coco',l:'Coco',g:'Diffusion'},{k:'newsletter',l:'Newsletter',g:'Diffusion'},
   {k:'import',l:'Import',g:'Administration'},{k:'reglages',l:'Réglages',g:'Administration'},
   {k:'utilisateurs',l:'Utilisateurs',g:'Administration'},{k:'compte',l:'Mon compte',g:'Administration'}
 ];
 /** Sous-titre de chaque section, affiché sous le titre de page */
-const TAB_CTX={utilisateurs:'comptes e-mail : validation des inscriptions, droits, mots de passe',compte:'vos droits et votre mot de passe',planif:'missions de la semaine, trains réguliers, glisser-déposer et alertes de l’accord',production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
+const TAB_CTX={newsletter:'message libre aux abonnés : mise en forme, chiffres anonymes, images, liens ; envois gardés comme modèles',utilisateurs:'comptes e-mail : validation des inscriptions, droits, mots de passe',compte:'vos droits et votre mot de passe',planif:'missions de la semaine, trains réguliers, glisser-déposer et alertes de l’accord',production:'repos, utilisation du personnel, temps non productif, irrégularités et pistes d’optimisation',synthese:'chiffres clés du périmètre',agents:'une ligne par personne',rhr:'conducteurs — coupures hors résidence',
   blanches:'cases vides entre deux services',graphiques:'comparer agences, métiers et semaines',
   lecture:'comment l’outil lit le fichier et calcule chaque chiffre',stats:'comparatifs, heures chaudes, évolutions et distributions',exports:'Excel, CSV et rapport autonome',
   comparer:'deux périodes, deux agences, ou plusieurs agents côte à côte',verifier:'alertes, écarts inhabituels et fichiers suspects, avec leur suivi',vitrine:'statistiques anonymes, ce que voit le code visiteur',mentions:'éditeur, hébergement et données personnelles',coco:'copain covoit — missions de la semaine des agents choisis',import:'ajouter ou remplacer des semaines',reglages:'règles de calcul et résidences'};
@@ -5748,7 +5752,7 @@ function render(){
   el('shell').hidden=false; el('login').hidden=true;
   renderFilters(); renderTabs();
   const v=el('view');
-  const body = S.tab==='compte'&&S.user?viewCompte(): S.tab==='utilisateurs'&&peut('admin')?viewUtilisateurs(): S.role==='aucun'?viewAttente(): S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='planif'?viewPlanif(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
+  const body = S.tab==='compte'&&S.user?viewCompte(): S.tab==='utilisateurs'&&peut('admin')?viewUtilisateurs(): S.tab==='newsletter'&&peut('admin')?viewNewsletter(): S.role==='aucun'?viewAttente(): S.tab==='synthese'?viewSynthese(): S.tab==='production'?viewProduction(): S.tab==='planif'?viewPlanif(): S.tab==='agents'?viewAgents(): S.tab==='rhr'?viewRHR():
     S.tab==='blanches'?viewBlanches(): S.tab==='graphiques'?viewGraphiques(): S.tab==='exports'?viewExports():
     S.role==='covoit'||S.tab==='coco'?viewCoco(): S.tab==='lecture'?viewGuide(): S.tab==='mentions'&&S.role!=='admin'?viewMentions(): S.tab==='stats'?viewStats(): S.tab==='vitrine'?viewVitrine(): S.tab==='verifier'?viewVerifier(): S.tab==='comparer'?viewComparer(): S.tab==='import'?viewImport(): viewReglages();
   // mémorise le défilement des tableaux, rendu puis restitution : un tri ne fait pas sauter la page
@@ -5868,6 +5872,128 @@ const fmtDH=x=>x?new Date(x).toLocaleString('fr-FR',{dateStyle:'short',timeStyle
     jour par jour. Covoiturage seulement si le compte a le droit Coco : parmi les agents de la vue Coco, comme l'onglet Coco
     (prise et fin de service à 30 min près) ; sans ce droit, rien n'apparaît. */
 const capsU=d=>{ const c=Object.fromEntries(DROITS_L.map(([k])=>[k,!!(d&&d[k])])); if(c.admin) for(const k in c) c[k]=true; if(c.modif) c.lecture=true; return c; };
+/* ==========================================================================
+   NEWSLETTER (demandée par l'utilisateur) — message libre rédigé ici et envoyé quand l'admin le décide aux comptes cochés
+   « Newsletter » (Utilisateurs → Comptes). Éditeur : titre, gras, italique, souligné, police, titres, listes, liens, images,
+   données anonymes du site (agrégats de la vitrine : groupes d'au moins 5 agents). Chaque newsletter est gardée et peut
+   resservir de modèle ; lien de désabonnement dans chaque e-mail (serveur).
+   ========================================================================== */
+const NL_POLICES=['Arial','Georgia','Times New Roman','Verdana','Trebuchet MS','Courier New'];
+const NL_DONNEES=[['n','Agents',v=>nf(v.n)],['tte','TTE moyen par agent',v=>fmtH(v.s.heuresPlanifiees/v.n)],['hs','Heures sup (total)',v=>fmtH(v.s.heuresSup)],
+  ['hsm','Heures sup par agent',v=>fmtH(v.s.heuresSup/v.n)],['nuit','Heures de nuit (total)',v=>fmtH(v.s.heuresNuit)],['dim','Heures du dimanche (total)',v=>fmtH(v.s.heuresDimanche)],
+  ['rhr','RHR',v=>nf(v.s.nbRHR)],['jb','Journées blanches',v=>nf(v.s.journeesBlanches)],['pan','Paniers repas',v=>nf(v.s.nbPaniers)],['ts','Trajets seuls',v=>nf(v.s.nbTrajetsSeuls)]];
+async function loadNl(){ try{ S.nl=await withLoad(backend.call('newsletter')); }catch(e){ S.msg={m:'Newsletter : '+e.message,t:'c'}; } if(!S.nlEd) S.nlEd={id:null,titre:'',html:''}; render(); }
+/** Contenu de l'éditeur nettoyé : balises et attributs autorisés seulement (le serveur retire en plus tout ce qui s'exécute) */
+function nlNettoyer(html){
+  const OK=new Set(['P','BR','B','STRONG','I','EM','U','H2','H3','A','IMG','UL','OL','LI','FONT','SPAN','DIV','TABLE','TBODY','THEAD','TR','TD','TH','BLOCKQUOTE','HR']);
+  const tpl=document.createElement('template'); tpl.innerHTML=html||'';
+  const net=n=>{ for(const c of [...n.childNodes]){ if(c.nodeType===3) continue; if(c.nodeType!==1){ c.remove(); continue; }
+      if(!OK.has(c.tagName)){ if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META)$/.test(c.tagName)) c.remove(); else { net(c); c.replaceWith(...c.childNodes); } continue; }
+      for(const a of [...c.attributes]){ const k=a.name.toLowerCase(), v=a.value;
+        const garde=(k==='href'&&c.tagName==='A'&&/^(https?:|mailto:)/i.test(v))||(k==='src'&&c.tagName==='IMG'&&/^https?:/i.test(v))||(k==='alt'&&c.tagName==='IMG')
+          ||(k==='face'&&c.tagName==='FONT')||(k==='style'&&!/url\(|expression|javascript/i.test(v))||(k==='colspan'||k==='width'||k==='cellpadding'||k==='cellspacing');
+        if(!garde) c.removeAttribute(a.name); }
+      if(c.tagName==='A'){ c.setAttribute('target','_blank'); c.setAttribute('rel','noopener'); }
+      net(c); } };
+  net(tpl.content); return tpl.innerHTML;
+}
+document.addEventListener('selectionchange',()=>{ if(S.tab==='newsletter') nlGarderSel(); });
+document.addEventListener('focusin',e=>{ if(e.target.id==='nlEd') document.execCommand('defaultParagraphSeparator',false,'p'); });   // une ligne = un paragraphe
+document.addEventListener('mousedown',e=>{ if(e.target.closest&&e.target.closest('[data-nlcmd]')) e.preventDefault(); });   // la sélection reste dans l'éditeur
+function nlSync(){ const e=el('nlEd'); if(e&&S.nlEd) S.nlEd.html=e.innerHTML; const t=el('nlTitre'); if(t&&S.nlEd) S.nlEd.titre=t.value; }
+function nlGarderSel(){ const s=getSelection(), e=el('nlEd'); if(s&&s.rangeCount&&e&&e.contains(s.anchorNode)) S.nlRange=s.getRangeAt(0).cloneRange(); }
+function nlRendreSel(){ const e=el('nlEd'); if(!e) return; e.focus(); const s=getSelection();
+  if(S.nlRange&&e.contains(S.nlRange.startContainer)){ s.removeAllRanges(); s.addRange(S.nlRange); }
+  else { const r=document.createRange(); r.selectNodeContents(e); r.collapse(false); s.removeAllRanges(); s.addRange(r); } }
+function nlCmd(cmd,val){ nlRendreSel(); document.execCommand('styleWithCSS',false,false); document.execCommand(cmd,false,val); nlGarderSel(); nlSync(); }
+/** Bloc de chiffres anonymes de la vitrine (semaine entière, agence choisie ou toutes, tous métiers) */
+function nlBlocDonnees(w,ag,cles){
+  const V=S.vit; if(!V) return '';
+  const cells=V.cells.filter(c=>c.w===w&&!c.p&&(!ag||c.ag===ag)); if(!cells.length) return '';
+  const g=vAgg(cells), sw=V.semaines.find(x=>x.weekId===w), lab=sw?`S${String(sw.week).padStart(2,'0')} ${sw.year}`:w;
+  const L=NL_DONNEES.filter(([k])=>cles.includes(k));
+  return `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:10px 0;border:1px solid #e3e3e3;border-radius:8px;font-size:14px">
+    <tr><td colspan="2" style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#111">Chiffres de la semaine ${esc(lab)} · ${esc(ag||'toutes agences')}</td></tr>
+    ${L.map(([,l,f])=>`<tr><td style="padding:5px 12px;color:#555;border-top:1px solid #eee">${l}</td><td style="padding:5px 12px;font-weight:bold;border-top:1px solid #eee;text-align:right !important">${f(g)}</td></tr>`).join('')}
+  </table><p><br></p>`;
+}
+function viewNewsletter(){
+  const N=S.nl, E=S.nlEd||{id:null,titre:'',html:''};
+  if(!N) return `<section class="card"><div class="card-b"><p class="mut">Chargement…</p></div></section>`;
+  const env=E.id&&(N.liste||[]).find(x=>x.id===E.id&&x.envoye);
+  const bt=(c,l,t,v)=>`<button class="btn btn-sm" data-nlcmd="${c}"${v?` data-v="${esc(v)}"`:''} title="${t}">${l}</button>`;
+  const outils=`<div class="frow" style="gap:6px;flex-wrap:wrap;align-items:center">
+    ${bt('bold','<b>G</b>','Gras')}${bt('italic','<i>I</i>','Italique')}${bt('underline','<u>S</u>','Souligné')}
+    <select id="nlBloc" title="Titre"><option value="">Style…</option><option value="P">Texte</option><option value="H2">Titre</option><option value="H3">Sous-titre</option></select>
+    <select id="nlFont" title="Police"><option value="">Police…</option>${NL_POLICES.map(f=>`<option value="${f}" style="font-family:${f}">${f}</option>`).join('')}</select>
+    ${bt('insertUnorderedList','• Liste','Liste à puces')}${bt('lien','🔗 Lien','Lien sur le texte sélectionné')}${bt('image','🖼 Image','Insérer une image (fichier)')}
+    ${bt('donnee','📊 Donnée du site','Chiffres anonymes du site (groupes d’au moins 5 agents)')}${bt('removeFormat','Effacer','Effacer la mise en forme de la sélection')}
+    <input type="file" id="nlImg" accept="image/jpeg,image/png,image/gif,image/webp" hidden></div>`;
+  const V=S.vit, sem=V?V.semaines.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)):[], AG=V?[...new Set(V.cells.map(c=>c.ag))].sort((a,b)=>a.localeCompare(b,'fr')):[];
+  const D=S.nlD||{};
+  const panneau=S.nlD?`<div class="note" style="margin-top:8px"><b>Insérer des chiffres anonymes</b> (agrégats de la vitrine : groupes d’au moins 5 agents, aucune donnée individuelle)
+    ${V?`<div class="frow mt" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <label class="fld"><span class="flabel">Semaine</span><select id="nlDw">${sem.map(w=>`<option value="${w.weekId}"${w.weekId===D.w?' selected':''}>S${String(w.week).padStart(2,'0')} ${w.year}</option>`).join('')}</select></label>
+      <label class="fld"><span class="flabel">Agence</span><select id="nlDag"><option value="">Toutes</option>${AG.map(a=>`<option${a===D.ag?' selected':''}>${esc(a)}</option>`).join('')}</select></label></div>
+      <div class="frow mt" style="gap:12px;flex-wrap:wrap">${NL_DONNEES.map(([k,l])=>`<label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-nldk="${k}"${(D.k||['n','tte','hs','rhr']).includes(k)?' checked':''}> ${l}</label>`).join('')}</div>
+      <p class="mt"><button class="btn btn-sm btn-pri" id="nlDgo">Insérer</button> <button class="btn btn-sm" id="nlDx">Fermer</button></p>`:'<p class="mut">Chargement des statistiques…</p>'}</div>`:'';
+  const liste=(N.liste||[]).map(x=>`<tr${x.id===E.id?' style="background:var(--hl,rgba(236,0,22,.06))"':''}><td class="l nm">${esc(x.titre||'(sans titre)')}</td>
+    <td class="l">${x.envoye?`<span class="pill pill-g">envoyée</span> ${fmtDH(x.envoye)} · ${nf(x.nb||0)} destinataire${x.nb>1?'s':''}`:`<span class="pill pill-n">brouillon</span> ${fmtDH(x.maj)}`}</td>
+    <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap">${x.envoye?`<button class="btn btn-sm" data-nlmodele="${x.id}" title="Nouveau brouillon à partir de cette newsletter">Réutiliser comme modèle</button>`:`<button class="btn btn-sm" data-nlouvrir="${x.id}">Ouvrir</button>`}
+      <button class="btn btn-sm dgr" data-nldel="${x.id}">Supprimer</button></span></td></tr>`).join('');
+  return `<section class="card"><div class="card-h"><div><h2>${E.id?(env?'Newsletter envoyée (lecture seule)':'Brouillon'):'Nouvelle newsletter'}</h2>
+      <p class="card-s">${nf(N.abonnes||0)} abonné${N.abonnes>1?'s':''} (case « Newsletter » dans Utilisateurs → Comptes) · envoi quand vous le décidez · lien de désabonnement ajouté en bas de chaque e-mail${N.mail?'':' · <b>e-mail non configuré</b>'}</p></div>
+      <button class="btn btn-sm" id="nlNew">Nouvelle</button></div>
+    <div class="card-b stack">
+      <label class="fld"><span class="flabel">Titre de la newsletter (objet de l’e-mail)</span><input type="text" id="nlTitre" value="${esc(E.titre)}" maxlength="200" placeholder="Ex. : Les nouvelles du corridor — octobre"${env?' disabled':''}></label>
+      ${env?'':outils}${panneau}
+      <div id="nlEd" class="nl-ed" contenteditable="${env?'false':'true'}" spellcheck="true">${E.html||'<p><br></p>'}</div>
+      <div class="frow" style="gap:8px;flex-wrap:wrap">${env?`<button class="btn btn-pri" data-nlmodele="${E.id}">Réutiliser comme modèle</button>`:`<button class="btn" id="nlSave">Enregistrer le brouillon</button>
+        <button class="btn" id="nlTest"${N.mail?'':' disabled'}>M’envoyer un essai</button>
+        <button class="btn btn-pri" id="nlSend"${N.mail&&N.abonnes?'':' disabled'}>Envoyer aux ${nf(N.abonnes||0)} abonné${N.abonnes>1?'s':''}</button>`}</div>
+    </div></section>
+  <section class="card"><div class="card-h"><div><h2>Newsletters enregistrées</h2><p class="card-s">brouillons et envois, réutilisables comme modèles</p></div></div>
+    <div class="card-b">${liste?`<div class="tw"><table class="ut"><thead><tr><th class="l">Titre</th><th class="l">État</th><th class="l">Actions</th></tr></thead><tbody>${liste}</tbody></table></div>`:'<p class="mut">Aucune newsletter pour l’instant.</p>'}</div></section>`;
+}
+async function nlEnregistrer(){ nlSync(); const E=S.nlEd; const r=await withLoad(backend.call('newsletter',{method:'POST',body:JSON.stringify({id:E.id,titre:E.titre,html:nlNettoyer(E.html)})}));
+  E.id=r.id; S.nl=await backend.call('newsletter'); return r.id; }
+/** Image choisie : réduite à 1200 px de large (JPEG), puis enregistrée sur le serveur pour être visible dans les messageries */
+async function nlImage(f){
+  let type=f.type, data;
+  if(/gif/.test(type)&&f.size<1.5e6) data=await new Promise(ok=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.readAsDataURL(f); });
+  else { const img=await createImageBitmap(f), k=Math.min(1,1200/img.width), c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+    const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height); type='image/jpeg'; data=c.toDataURL(type,0.85).split(',')[1]; }
+  const r=await withLoad(backend.call('newsletter/image',{method:'POST',body:JSON.stringify({type,data})}));
+  nlCmd('insertHTML',`<img src="${esc(r.url)}" alt="" style="max-width:100%;height:auto">`);
+}
+async function actionNl(b){
+  try{
+    const E=S.nlEd;
+    if(b.dataset.nlcmd){ const c=b.dataset.nlcmd;
+      if(c==='lien'){ nlGarderSel(); const u=prompt('Adresse du lien (https://…) :','https://'); if(!u||!/^(https?:\/\/|mailto:)/i.test(u.trim())) return;
+        nlRendreSel(); const s=getSelection(); if(s.isCollapsed) nlCmd('insertHTML',`<a href="${esc(u.trim())}">${esc(u.trim())}</a>`); else nlCmd('createLink',u.trim()); return; }
+      if(c==='image'){ nlGarderSel(); el('nlImg').click(); return; }
+      if(c==='donnee'){ nlGarderSel(); nlSync(); S.nlD={w:(S.nlD&&S.nlD.w)||null}; render(); if(!S.vit){ await loadVitrine(); }
+        if(S.vit&&!S.nlD.w){ const W=S.vit.semaines.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)); S.nlD.w=W[0]&&W[0].weekId; } render(); return; }
+      nlCmd(c); return; }
+    if(b.id==='nlDx'){ nlSync(); S.nlD=null; render(); return; }
+    if(b.id==='nlDgo'){ const w=el('nlDw').value, ag=el('nlDag').value, k=[...document.querySelectorAll('[data-nldk]')].filter(x=>x.checked).map(x=>x.dataset.nldk);
+      if(!k.length) throw new Error('Cochez au moins un chiffre.'); const h=nlBlocDonnees(w,ag,k); if(!h) throw new Error('Aucun chiffre publiable pour ce choix (groupes de moins de 5 agents).');
+      S.nlD={w,ag,k}; nlCmd('insertHTML',h); nlSync(); S.nlD=null; render(); return; }
+    if(b.id==='nlNew'){ nlSync(); if(E&&(E.titre||E.html)&&!E.id&&!confirm('Abandonner la newsletter en cours (non enregistrée) ?')) return; S.nlEd={id:null,titre:'',html:''}; S.nlD=null; render(); return; }
+    if(b.id==='nlSave'){ await nlEnregistrer(); S.msg={m:'Brouillon enregistré.'}; render(); return; }
+    if(b.id==='nlTest'){ const id=await nlEnregistrer(); await withLoad(backend.call('newsletter/envoi',{method:'POST',body:JSON.stringify({id,test:true})})); S.msg={m:`Essai envoyé à ${S.user?S.user.email:'vous'}.`}; render(); return; }
+    if(b.id==='nlSend'){ nlSync(); if(!S.nlEd.titre.trim()) throw new Error('Donnez un titre à la newsletter.');
+      if(!confirm(`Envoyer « ${S.nlEd.titre} » à ${S.nl.abonnes} abonné${S.nl.abonnes>1?'s':''} ? L’envoi ne peut pas être annulé.`)) return;
+      const id=await nlEnregistrer(); const r=await withLoad(backend.call('newsletter/envoi',{method:'POST',body:JSON.stringify({id})}));
+      S.nl=await backend.call('newsletter'); S.msg={m:`Newsletter envoyée à ${r.nb} abonné${r.nb>1?'s':''}${r.total>r.nb?` (${r.total-r.nb} échec${r.total-r.nb>1?'s':''})`:''}.`}; render(); return; }
+    if(b.dataset.nlouvrir||b.dataset.nlmodele){ nlSync(); const id=Number(b.dataset.nlouvrir||b.dataset.nlmodele), x=(S.nl.liste||[]).find(y=>y.id===id); if(!x) return;
+      S.nlEd=b.dataset.nlmodele?{id:null,titre:x.titre,html:x.html}:{id:x.id,titre:x.titre,html:x.html}; S.nlD=null;
+      if(b.dataset.nlmodele) S.msg={m:'Nouveau brouillon créé à partir du modèle : modifiez-le puis enregistrez.'}; render(); scrollTo({top:0,behavior:'smooth'}); return; }
+    if(b.dataset.nldel){ const id=Number(b.dataset.nldel); if(!confirm('Supprimer cette newsletter de la liste ?')) return;
+      await withLoad(backend.call('newsletter?id='+id,{method:'DELETE'})); if(E&&E.id===id) S.nlEd={id:null,titre:E.titre,html:E.html}; S.nl=await backend.call('newsletter'); render(); return; }
+  }catch(e){ S.msg={m:e.message,t:'c'}; render(); }
+}
 /** Récap par e-mail : tuiles comme la fiche agent (demandé), en tableaux — seul format lu par tous les clients mail */
 function recapTuiles(a){
   const t=(k,v,s,n)=>`<td${n?` colspan="${n}"`:''} width="${n?66:33}%" style="padding:4px;vertical-align:top"><div style="border:1px solid #e3e3e3;border-radius:8px;padding:8px 10px">
@@ -6269,6 +6395,8 @@ document.addEventListener('click',async e=>{
   if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
     if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
   if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
+  { const b=S.tab==='newsletter'&&e.target.closest('[data-nlcmd],[data-nlouvrir],[data-nlmodele],[data-nldel],#nlDx,#nlDgo,#nlNew,#nlSave,#nlTest,#nlSend');   // newsletter
+    if(b){ await actionNl(b); return; } }
   { const b=S.tab==='utilisateurs'&&e.target.closest('[data-uag],[data-uagdel],[data-uagset],[data-urecap],[data-ucal],[data-ucaloff],#uAgX,#uRcX,#uRcGo');   // récap de la semaine
     if(b){ await actionRecap(b); return; } }
   { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
@@ -6428,7 +6556,7 @@ document.addEventListener('click',async e=>{
       ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=cur==='dark'?'light':'dark'; savePrefs(); return; }
   if(t.dataset.tab||t.dataset.goto){ S.tab=t.dataset.tab||t.dataset.goto; S.scopeOpen=false; savePrefs(); menuClose();
-    if(S.tab==='utilisateurs'){ S.uLien=null; render(); await loadUsers(); } else if(S.tab==='compte'){ render(); } else if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.tab==='planif'){ render(); await loadPlanif(); } else if(S.role==='admin') await ensureLoaded(toLoad());
+    if(S.tab==='utilisateurs'){ S.uLien=null; render(); await loadUsers(); } else if(S.tab==='newsletter'){ render(); await loadNl(); } else if(S.tab==='compte'){ render(); } else if(S.tab==='vitrine'){ render(); await loadVitrine(); } else if(S.tab==='coco'){ render(); await loadCoco(); } else if(S.tab==='planif'){ render(); await loadPlanif(); } else if(S.role==='admin') await ensureLoaded(toLoad());
     render(); if(scrollY>120) scrollTo({top:0,behavior:'smooth'}); return; }
   if(t.id==='scopeBtn'){ S.scopeOpen=!S.scopeOpen; S.agtOpen=false; render(); return; }
   if(t.id==='agtBtn'){ S.agtOpen=!S.agtOpen; S.scopeOpen=false; render(); if(S.agtOpen) el('agtQ')?.focus(); return; }
@@ -6549,6 +6677,9 @@ document.addEventListener('change',async e=>{
       S.msg={m:'Sauvegarde restaurée.'}; }
     catch(err){ S.msg={m:'Restauration impossible : '+err.message,t:'c'}; }
     render(); return; }
+  if(e.target.id==='nlBloc'&&e.target.value){ const v=e.target.value; e.target.value=''; nlCmd('formatBlock',v); return; }
+  if(e.target.id==='nlFont'&&e.target.value){ const v=e.target.value; e.target.value=''; nlCmd('fontName',v); return; }
+  if(e.target.id==='nlImg'&&e.target.files&&e.target.files[0]){ const f=e.target.files[0]; e.target.value=''; try{ await nlImage(f); }catch(err){ S.msg={m:err.message,t:'c'}; render(); } return; }
   if(e.target.id==='uRcW'&&S.uRc){ S.uRc.w=e.target.value; render(); await recapCharger(); return; }
   if(e.target.id==='cocoW'){ S.cocoW=e.target.value; await loadCoco(); return; }
   if(e.target.id==='vWeek'){ S.vf.w=e.target.value; render(); return; }
@@ -6557,6 +6688,7 @@ document.addEventListener('change',async e=>{
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='palIn'){ S.pal.i=0; palRender(e.target.value); return; }
+  if(e.target.id==='nlEd'||e.target.id==='nlTitre'){ nlSync(); return; }
   if(e.target.id==='uAgQ'){ S.uAgQ=e.target.value; const p=e.target.selectionStart; render(); const n=el('uAgQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } return; }
   if(e.target.id==='cocoQ'){ S.cocoQ=e.target.value; const p=e.target.selectionStart; render(); const n=el('cocoQ'); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(x){} } return; }
   if(e.target.dataset&&e.target.dataset.mn){ const first=!S.mnDraft; S.mnDraft=S.mnDraft||{...(S.mentions||{})}; S.mnDraft[e.target.dataset.mn]=e.target.value;
@@ -6659,6 +6791,7 @@ async function boot(){
     if(backend.mode==='web'&&peut('admin')) api.users().then(u=>{ S.users=u; renderTabs(); }).catch(()=>{});   // compteur : inscriptions à valider, mots de passe oubliés
     if(S.tab==='compte'){ render(); if(S.role==='admin') await ensureLoaded(toLoad()); }
     else if(S.tab==='utilisateurs'){ render(); await loadUsers(); }
+    else if(S.tab==='newsletter'&&peut('admin')){ render(); await loadNl(); }
     else if(S.role==='covoit'){ S.tab='coco'; render(); await loadCoco(); }
     else if(S.role==='mixte'&&S.tab==='coco'){ render(); await loadCoco(); }
     else if(S.role!=='admin'){ if(!['lecture','mentions'].includes(S.tab)) S.tab='vitrine'; render(); await loadVitrine(true); }
@@ -6679,7 +6812,7 @@ const saisieEnCours=()=>{ const a=document.activeElement; return !!(a&&/^(INPUT|
 let rafEnCours=false;
 async function rafraichir(){
   if(rafEnCours||document.hidden||!S.role||S.busy||S.queue.length||saisieEnCours()) return;
-  if(S.role==='admin'&&['reglages','import','planif'].includes(S.tab)||['compte','utilisateurs'].includes(S.tab)||S.role==='aucun') return;
+  if(S.role==='admin'&&['reglages','import','planif'].includes(S.tab)||['compte','utilisateurs','newsletter'].includes(S.tab)||S.role==='aucun') return;
   rafEnCours=true;
   try{
     if(S.role==='covoit'||S.role==='mixte'&&S.tab==='coco'){ const r=await api.coco(S.cocoW); if(JSON.stringify(r)!==JSON.stringify(S.cocoData)&&!saisieEnCours()){ S.cocoData=r; if(r&&Array.isArray(r.agents)) S.coco={agents:r.agents}; render(); } return; }
