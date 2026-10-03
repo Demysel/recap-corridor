@@ -70,8 +70,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
 - Connexion par **e-mail + mot de passe** (écran par défaut). **Codes d'accès retirés du site principal** (demandé par
   l'utilisateur) : le serveur les refuse (`CODES` = site de test ou variable Render `CODES_ACCES=oui`, secours), `/api/ping`
   renvoie `codes`, la page masque l'onglet « Code d'accès » (`S.codesOff`) et oublie un code mémorisé ; sur le site de test
-  les codes restent valables en parallèle. Choix de l'utilisateur : 5 droits séparés, inscription libre + validation, **aucun e-mail envoyé**
-  (Brevo abandonné : SMS de confirmation jamais reçu ; l'admin transmet lui-même les liens par SMS, WhatsApp…).
+  les codes restent valables en parallèle. Choix de l'utilisateur : 5 droits séparés, inscription libre + validation.
+  **E-mails par Brevo** (réinstallé à la demande de l'utilisateur) : variables Render `BREVO_API_KEY` et `MAIL_FROM` (expéditeur
+  validé dans Brevo), sur les deux services, **jamais dans le dépôt** ; `mail()` / `mailLien()` (API HTTP Brevo) ; `MAIL` exposé
+  dans `/api/ping`, `/api/auth/oubli` et `GET /api/utilisateurs` (`mail`) pour adapter les textes. Sans ces variables ou si
+  l'envoi échoue : aucun e-mail, l'admin transmet lui-même les liens (SMS, WhatsApp…).
 - **Droits** (`DROITS`, `capsDe`) : `vitrine` (statistiques anonymes), `coco` (vue covoiturage), `lecture` (consultation
   complète nominative, sans rien modifier), `modif` (import, réglages, corrections, planification, choix Coco ; comprend
   lecture), `admin` (gestion des comptes ; comprend tout). CODE_ADMIN = tous ; CODE_LECTURE = vitrine ; CODE_COVOIT = coco.
@@ -84,7 +87,9 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   compteur d'essais `echec`) ; `POST /api/auth/logout|mdp` ; `GET|POST|PUT|DELETE /api/utilisateurs` (droit admin :
   liste, invitation avec lien 3 jours, droits / validation / suspension, lien de mot de passe 24 h, suppression ; **le
   dernier administrateur ne peut être ni retiré ni supprimé**). « Mot de passe oublié » note la demande (colonne
-  `demande`) : pastille et bandeau dans Utilisateurs, compteur sur l'onglet (inscriptions en attente + demandes) ; l'admin
+  `demande`) et, si Brevo est configuré, envoie en arrière-plan un lien valable 1 h (comptes validés seulement, même réponse
+  et même délai que l'adresse existe ou non) ; invitation et « Lien mot de passe » de l'admin partent aussi par e-mail (`envoye`)
+  et restent affichés à copier : pastille et bandeau dans Utilisateurs, compteur sur l'onglet (inscriptions en attente + demandes) ; l'admin
   crée le lien (`/?reinit=…`, 24 h, invitation 3 jours, usage unique, bouton « Copier ») et le transmet ; la demande
   s'efface quand le mot de passe est changé ; toutes les sessions sont fermées après changement. Variable Render `APP_URL`
   (adresse du site dans les liens).

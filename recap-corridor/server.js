@@ -11,7 +11,9 @@
      CODE_COVOIT    code « Coco » (copain covoit) : missions de la semaine des seuls agents choisis par l'admin
      CODES_ACCES    « oui » : accepte aussi les codes sur le site principal (secours ; par défaut, codes refusés sur le
                     principal à la demande de l'utilisateur, acceptés sur le site de test)
-     APP_URL        adresse du site (liens de mot de passe créés par l'admin), ex. https://recap-corridor.onrender.com
+     APP_URL        adresse du site (liens de mot de passe), ex. https://recap-corridor.onrender.com
+     BREVO_API_KEY  clé de l'API Brevo (envoi des e-mails de mot de passe) ; sans elle, aucun e-mail : l'admin transmet les liens
+     MAIL_FROM      adresse d'expédition validée dans Brevo
      PORT           fourni par Render
      DB_SCHEMA      schéma Postgres (défaut « recap » ; « recap_dev » pour le site de test)
      APP_ENV        « dev » : site de test, couleurs différentes et bandeau « SITE DE TEST »
@@ -147,6 +149,31 @@ async function lienMdp(p, req, email, heures) {
   const b = base(req);
   return b ? `${b}/?reinit=${j}` : null;
 }
+/** Envoi d'un e-mail par l'API Brevo (clé et expéditeur dans les variables Render) ; false si non configuré ou refusé */
+const MAIL = !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM);
+async function mail(to, sujet, html) {
+  if (!MAIL) return false;
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + 'Récap Corridor' }, to: [{ email: to }],
+        subject: (DEV ? '[TEST] ' : '') + sujet,
+        htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111">${html}</div>` }),
+    });
+    if (!r.ok) console.error('Brevo : envoi refusé', r.status, (await r.text()).slice(0, 300));
+    return r.ok;
+  } catch (e) { console.error('Brevo : envoi impossible', e.message); return false; }
+}
+const escH = (t) => String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** E-mail contenant un lien de mot de passe (oubli, réinitialisation par l'admin, invitation) */
+function mailLien(email, lien, invitation, duree) {
+  if (!lien) return Promise.resolve(false);
+  const b = `<a href="${escH(lien)}" style="display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">${invitation ? 'Choisir mon mot de passe' : 'Choisir un nouveau mot de passe'}</a>`;
+  return invitation
+    ? mail(email, 'Invitation à Récap Corridor', `<p>Bonjour,</p><p>Un compte Récap Corridor a été créé pour vous. Choisissez votre mot de passe :</p><p>${b}</p><p>Ce lien est valable ${duree} et ne sert qu’une fois.</p>`)
+    : mail(email, 'Mot de passe Récap Corridor', `<p>Bonjour,</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien :</p><p>${b}</p><p>Il est valable ${duree} et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message : votre mot de passe actuel reste valable.</p>`);
+}
 const nbAdmins = async (p, sauf) => (await p.query(`select count(*)::int n from ${SCHEMA}.utilisateurs where valide and (droits->>'admin')::boolean is true and email <> $1`, [sauf || ''])).rows[0].n;
 const droitsPropres = (d) => Object.fromEntries(DROITS.filter((k) => d && d[k]).map((k) => [k, true]));
 const emailNorm = (e) => String(e || '').trim().toLowerCase().slice(0, 254);
@@ -181,9 +208,11 @@ async function authPublique(req, res, route, ip) {
   }
   if (route === 'auth/oubli') {
     echec(ip);
-    // la demande est notée : l'admin la voit dans Utilisateurs et transmet lui-même un lien
-    if (EMAIL.test(email)) await p.query(`update ${SCHEMA}.utilisateurs set demande = now() where email = $1`, [email]);
-    return json(req, res, 200, { ok: true });   // même réponse que l'adresse existe ou non
+    // la demande est notée (l'admin la voit dans Utilisateurs) ; si Brevo est configuré, un lien valable 1 h part aussi par e-mail
+    const u = EMAIL.test(email) && (await p.query(`update ${SCHEMA}.utilisateurs set demande = now() where email = $1 returning valide`, [email])).rows[0];
+    if (u && u.valide && MAIL)   // envoi en arrière-plan : même délai de réponse que l'adresse existe ou non
+      lienMdp(p, req, email, 1).then((l) => mailLien(email, l, false, '1 heure')).catch((e) => console.error('oubli :', e.message));
+    return json(req, res, 200, { ok: true, mail: MAIL });   // même réponse que l'adresse existe ou non
   }
   if (route === 'auth/reinit') {
     const j = String(body.jeton || '');
@@ -269,7 +298,7 @@ const MENTIONS = [['site', 300], ['editeur', 300], ['editeurAdresse', 300], ['co
 const ID = /^\d{4}-S\d{2}$/;
 async function api(req, res, url) {
   const route = url.pathname.replace(/^\/api\/?/, '');
-  if (route === 'ping') return json(req, res, 200, { ok: true, codes: CODES });
+  if (route === 'ping') return json(req, res, 200, { ok: true, codes: CODES, mail: MAIL });
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   if (trop(ip)) return json(req, res, 429, { error: 'Trop d’essais. Réessayez dans quelques minutes.' });
   if (['auth/login', 'auth/inscription', 'auth/oubli', 'auth/reinit'].includes(route)) return authPublique(req, res, route, ip);
@@ -301,21 +330,24 @@ async function api(req, res, url) {
     const moi = A.user ? A.user.email : '';
     if (req.method === 'GET') {
       const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
-      return json(req, res, 200, { utilisateurs: q.rows, moi });
+      return json(req, res, 200, { utilisateurs: q.rows, moi, mail: MAIL });
     }
     if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
       const body = await readBody(req), email = emailNorm(body.email), nom = String(body.nom || '').trim().slice(0, 120);
       if (!EMAIL.test(email)) return json(req, res, 400, { error: 'Adresse e-mail invalide.' });
       const ins = await p.query(`insert into ${SCHEMA}.utilisateurs(email, nom, hash, droits, valide) values ($1, $2, 'aucun', $3, true) on conflict (email) do nothing`, [email, nom, droitsPropres(body.droits)]);
       if (!ins.rowCount) return json(req, res, 409, { error: 'Cette adresse a déjà un compte.' });
-      return json(req, res, 200, { ok: true, lien: await lienMdp(p, req, email, 72) });
+      const lien = await lienMdp(p, req, email, 72);
+      return json(req, res, 200, { ok: true, lien, envoye: await mailLien(email, lien, true, '3 jours') });
     }
     if (req.method === 'PUT') {
       const body = await readBody(req), email = emailNorm(body.email);
       const u = (await p.query(`select email, nom, droits, valide from ${SCHEMA}.utilisateurs where email = $1`, [email])).rows[0];
       if (!u) return json(req, res, 404, { error: 'Compte introuvable.' });
-      if (body.action === 'reinit')   // lien de réinitialisation, transmis par l'administrateur lui-même
-        return json(req, res, 200, { ok: true, lien: await lienMdp(p, req, email, 24) });
+      if (body.action === 'reinit') {   // lien de réinitialisation : envoyé par e-mail si Brevo est configuré, et affiché à l'admin
+        const lien = await lienMdp(p, req, email, 24);
+        return json(req, res, 200, { ok: true, lien, envoye: await mailLien(email, lien, false, '24 heures') });
+      }
       const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;
       const restaitAdmin = valide && !!droits.admin;
       if (u.valide && u.droits && u.droits.admin && !restaitAdmin && !(await nbAdmins(p, email)))
