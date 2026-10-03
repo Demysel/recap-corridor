@@ -117,6 +117,7 @@ async function tablesAuth(p) {
       email text not null references ${SCHEMA}.utilisateurs(email) on delete cascade on update cascade, expire timestamptz not null);
     alter table ${SCHEMA}.utilisateurs add column if not exists demande timestamptz;
     alter table ${SCHEMA}.utilisateurs add column if not exists agent jsonb;
+    alter table ${SCHEMA}.utilisateurs add column if not exists cal text;
     alter table ${SCHEMA}.utilisateurs enable row level security;
     alter table ${SCHEMA}.sessions enable row level security;
     alter table ${SCHEMA}.jetons_mdp enable row level security;`);
@@ -152,7 +153,7 @@ async function lienMdp(p, req, email, heures) {
 }
 /** Envoi d'un e-mail par l'API Brevo (clé et expéditeur dans les variables Render) ; false si non configuré ou refusé */
 const MAIL = !!(process.env.BREVO_API_KEY && process.env.MAIL_FROM);
-async function mail(to, sujet, html) {
+async function mail(to, sujet, html, pj) {
   if (!MAIL) return false;
   try {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -160,7 +161,8 @@ async function mail(to, sujet, html) {
       headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ sender: { email: process.env.MAIL_FROM, name: (DEV ? '[TEST] ' : '') + 'Récap Corridor' }, to: [{ email: to }],
         subject: (DEV ? '[TEST] ' : '') + sujet,
-        htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111">${html}</div>` }),
+        htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#111">${html}</div>`,
+        ...(pj ? { attachment: [{ name: pj.nom, content: Buffer.from(pj.texte, 'utf8').toString('base64') }] } : {}) }),
     });
     if (!r.ok) console.error('Brevo : envoi refusé', r.status, (await r.text()).slice(0, 300));
     return r.ok;
@@ -174,6 +176,16 @@ function mailLien(email, lien, invitation, duree) {
   return invitation
     ? mail(email, 'Invitation à Récap Corridor', `<p>Bonjour,</p><p>Un compte Récap Corridor a été créé pour vous. Choisissez votre mot de passe :</p><p>${b}</p><p>Ce lien est valable ${duree} et ne sert qu’une fois.</p>`)
     : mail(email, 'Mot de passe Récap Corridor', `<p>Bonjour,</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien :</p><p>${b}</p><p>Il est valable ${duree} et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message : votre mot de passe actuel reste valable.</p>`);
+}
+/** E-mail du lien d'abonnement à l'agenda, avec la marche à suivre iPhone / Android / Outlook */
+function mailAgenda(email, lien) {
+  const w = lien.replace(/^https?:/, 'webcal:'), b = `display:inline-block;background:#EC0016;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold`;
+  return mail(email, 'Votre planning dans votre agenda', `<p>Bonjour,</p><p>Ajoutez une seule fois votre planning (missions, RP, CP, RHR) à l’agenda de votre téléphone : il se mettra ensuite à jour tout seul à chaque nouvelle semaine.</p>
+    <p><b>iPhone</b> : touchez ce bouton puis « S’abonner ».</p><p><a href="${escH(w)}" style="${b}">Ajouter à mon agenda</a></p>
+    <p><b>Android (Google Agenda)</b> : sur un ordinateur, ouvrez calendar.google.com, puis à gauche « Autres agendas » → « + » → « À partir de l’URL », et collez ce lien (l’agenda apparaît ensuite sur le téléphone ; Google le met à jour toutes les quelques heures) :</p>
+    <p style="word-break:break-all;font-family:monospace;font-size:13px">${escH(lien)}</p>
+    <p><b>Outlook</b> : « Ajouter un calendrier » → « À partir d’Internet », puis collez le même lien.</p>
+    <p style="color:#666;font-size:13px">Ce lien est personnel : ne le partagez pas. Un administrateur peut le couper à tout moment.</p>`);
 }
 const nbAdmins = async (p, sauf) => (await p.query(`select count(*)::int n from ${SCHEMA}.utilisateurs where valide and (droits->>'admin')::boolean is true and email <> $1`, [sauf || ''])).rows[0].n;
 const droitsPropres = (d) => Object.fromEntries(DROITS.filter((k) => d && d[k]).map((k) => [k, true]));
@@ -227,6 +239,28 @@ async function authPublique(req, res, route, ip) {
   return json(req, res, 404, { error: 'Adresse inconnue.' });
 }
 
+/** Lien d'abonnement à l'agenda (GET /cal/<jeton>.ics, sans connexion) : planning des 12 dernières semaines importées de
+    l'agent rattaché au compte (missions, RP, CP, RHR), calculé avec les règles du site. Jeton inconnu : 404 et essai compté. */
+async function agenda(req, res, url) {
+  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  if (trop(ip)) return send(req, res, 429, 'Trop d’essais.', 'text/plain; charset=utf-8');
+  const j = (url.pathname.match(/^\/cal\/([A-Za-z0-9_-]{20,100})\.ics$/) || [])[1];
+  const p = await db(); await tablesAuth(p);
+  const u = j && (await p.query(`select nom, agent, valide from ${SCHEMA}.utilisateurs where cal = $1`, [sha(j)])).rows[0];
+  if (!u || !u.valide || !u.agent || !u.agent.pk) { echec(ip); return send(req, res, 404, 'Agenda introuvable.', 'text/plain; charset=utf-8'); }
+  const cle = sha(j);
+  if (!calCache.has(cle)) {
+    const ids = (await p.query(`select week_id from ${SCHEMA}.semaines order by week_id desc limit 12`)).rows.map((x) => x.week_id);
+    const d = await p.query(`select week_id, data from ${SCHEMA}.details where week_id = any($1) and agence_slug <> '~source' order by week_id, agence_slug`, [ids]);
+    const weeks = new Map();
+    for (const x of d.rows) { if (!weeks.has(x.week_id)) weeks.set(x.week_id, { meta: x.data.meta, agents: [] }); weeks.get(x.week_id).agents.push(...(x.data.agents || [])); }
+    const c = await p.query(`select valeur from ${SCHEMA}.config where cle = 'regles'`);
+    const E = engine();
+    calCache.set(cle, String(E.calAgent([...weeks.values()], E.loadRules(c.rows[0]?.valeur || null), u.agent.pk, u.agent.nom || u.nom || '')));
+  }
+  return send(req, res, 200, calCache.get(cle), 'text/calendar; charset=utf-8', { 'Content-Disposition': 'inline; filename="planning.ics"' });
+}
+
 const echecs = new Map();   // ralentit les essais de code répétés
 function trop(ip) {
   const e = echecs.get(ip); const now = Date.now();
@@ -268,13 +302,14 @@ function engine() {
   const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
   const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
   const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules,cocoCalcul};', ctx);
+  vm.runInContext(code + ';globalThis.__E={vitrineData,loadRules,cocoCalcul,calAgent};', ctx);
   moteur = ctx.__E;
   return moteur;
 }
 let vitrineCache = null;       // recalculée après chaque import, suppression ou changement de règles
 const cocoCache = new Map();   // vue Coco par semaine (la page du code covoit la redemande toutes les 2 minutes)
-function invalider() { vitrineCache = null; cocoCache.clear(); }
+const calCache = new Map();    // agenda (.ics) par lien d'abonnement
+function invalider() { vitrineCache = null; cocoCache.clear(); calCache.clear(); }
 async function vitrine(p) {
   if (vitrineCache) return vitrineCache;
   const d = await p.query(`select week_id, data from ${SCHEMA}.details where agence_slug <> '~source' order by week_id, agence_slug`);
@@ -330,7 +365,7 @@ async function api(req, res, url) {
     await tablesAuth(p);
     const moi = A.user ? A.user.email : '';
     if (req.method === 'GET') {
-      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande, agent from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
+      const q = await p.query(`select email, nom, droits, valide, cree, derniere, demande, agent, (cal is not null) as cal from ${SCHEMA}.utilisateurs order by valide, demande is null, lower(nom), email`);
       return json(req, res, 200, { utilisateurs: q.rows, moi, mail: MAIL });
     }
     if (req.method === 'POST') {   // invitation : compte validé avec les droits choisis, mot de passe choisi par la personne via le lien
@@ -353,14 +388,29 @@ async function api(req, res, url) {
         const a = body.agent && typeof body.agent.pk === 'string' && body.agent.pk.trim()
           ? { pk: body.agent.pk.trim().slice(0, 200), nom: String(body.agent.nom || '').trim().slice(0, 120) } : null;
         await p.query(`update ${SCHEMA}.utilisateurs set agent = $2, maj = now() where email = $1`, [email, a]);
+        calCache.clear();
+        return json(req, res, 200, { ok: true });
+      }
+      if (body.action === 'cal') {   // lien d'abonnement à l'agenda : nouveau jeton (l'ancien lien cesse de marcher), empreinte seule en base
+        if (!u.valide) return json(req, res, 400, { error: 'Ce compte n’est pas validé.' });
+        const j = jetonNeuf(), b = base(req);
+        await p.query(`update ${SCHEMA}.utilisateurs set cal = $2, maj = now() where email = $1`, [email, sha(j)]);
+        calCache.clear();
+        const lien = b ? `${b}/cal/${j}.ics` : null;
+        return json(req, res, 200, { ok: true, lien, envoye: lien ? await mailAgenda(email, lien) : false });
+      }
+      if (body.action === 'calOff') {
+        await p.query(`update ${SCHEMA}.utilisateurs set cal = null, maj = now() where email = $1`, [email]);
+        calCache.clear();
         return json(req, res, 200, { ok: true });
       }
       if (body.action === 'recap') {   // récap de la semaine de l'agent rattaché, préparé par la page de l'admin, envoyé à ce compte seulement
         if (!MAIL) return json(req, res, 400, { error: 'Envoi d’e-mail non configuré (BREVO_API_KEY, MAIL_FROM).' });
         if (!u.valide) return json(req, res, 400, { error: 'Ce compte n’est pas validé.' });
-        const sujet = String(body.sujet || '').trim().slice(0, 200), html = String(body.html || '');
-        if (!sujet || !html || html.length > 300000) return json(req, res, 400, { error: 'Récap vide ou trop long.' });
-        if (!(await mail(email, sujet, html))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
+        const sujet = String(body.sujet || '').trim().slice(0, 200), html = String(body.html || ''), ics = String(body.ics || '');
+        if (!sujet || !html || html.length > 300000 || ics.length > 300000) return json(req, res, 400, { error: 'Récap vide ou trop long.' });
+        const pj = /^BEGIN:VCALENDAR/.test(ics) ? { nom: String(body.nomIcs || 'planning.ics').replace(/[^\w.-]/g, '_').slice(0, 60), texte: ics } : null;
+        if (!(await mail(email, sujet, html, pj))) return json(req, res, 502, { error: 'L’e-mail n’a pas pu partir (voir les journaux Render).' });
         return json(req, res, 200, { ok: true, envoye: true });
       }
       const droits = body.droits ? droitsPropres(body.droits) : u.droits, valide = body.valide == null ? u.valide : !!body.valide;
@@ -560,6 +610,7 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+    if (url.pathname.startsWith('/cal/')) return await agenda(req, res, url);
     if (url.pathname === '/robots.txt') return send(req, res, 200, 'User-agent: *\nDisallow: /\n', 'text/plain; charset=utf-8');
     if (ICONES[url.pathname]) return await icone(req, res, url.pathname);
     return await statique(req, res, url);

@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,rpSemaines,coutHeuresSup,semainesEcoulees};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,rpSemaines,coutHeuresSup,semainesEcoulees,calAgent,calEvenements,icsTexte};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -679,6 +679,21 @@ test('vue Coco : missions et RHR des agents choisis, mission de nuit sur deux jo
   assert.equal(a.jours[2].m.length + a.jours[3].m.length, 2);   // mission de nuit : mercredi et suite jeudi
   assert.equal(a.jours[3].m[0].suite, true);
   assert.ok(!('heuresSup' in a) && !('codes' in a) && !/RP/.test(JSON.stringify(sem)));   // ni heures ni codes
+});
+
+test('agenda .ics : missions en heure de Paris, RP et CP en journée entière, RHR, rien d’autre', () => {
+  const j1 = [svc(['T1', 'HENDAYE', 'BORDEAUX', 7, '06:00', 7, '10:00']), svc(['T2', 'BORDEAUX', 'HENDAYE', 8, '06:00', 8, '10:00']), 'CP', 'MAL', 'RP-12', 'RP-13', 'RF'];
+  const w = E.parseWeek(week([2026, 9, 7], [{ mat: '1', nom: 'CHOISI', j: j1 }, { mat: '2', nom: 'AUTRE', j: j1 }]));
+  const ics = E.calAgent([w], E.loadRules({ residences: { Hendaye: 'HENDAYE' } }), 'm:1', 'Choisi');
+  const ev = ics.split('BEGIN:VEVENT').slice(1);
+  assert.equal(ev.length, 6);                                              // 2 missions, CP, 2 RP, 1 RHR (ni MAL ni RF)
+  assert.ok(ics.includes('DTSTART;TZID=Europe/Paris:20260907T060000'));   // heure du fichier, sans décalage
+  assert.ok(ics.includes('DTSTART;VALUE=DATE:20260909') && ics.includes('SUMMARY:CP'));
+  assert.ok(ics.includes('SUMMARY:RP-12') && ics.includes('DTEND;VALUE=DATE:20260912'));
+  assert.ok(/SUMMARY:RHR · BORDEAUX/.test(ics) && ics.includes('LOCATION:HENDAYE → BORDEAUX'));
+  assert.ok(!/MAL|SUMMARY:RF/.test(ics) && !ics.includes('AUTRE'));
+  assert.ok(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75));   // lignes pliées
+  assert.equal(E.calAgent([w], E.loadRules({}), 'm:1', 'x').match(/UID:[^\r]+/g).join(), ics.match(/UID:[^\r]+/g).join());   // UID stables
 });
 
 test('Production : repos pris / dus, week-end complet, heures neutralisées, trajet seul remplaçable par un train', () => {

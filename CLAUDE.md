@@ -104,6 +104,16 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (missions, trajet, horaire, pauses, codes, RHR). **Covoiturage seulement si le compte a le droit Coco** (sinon la partie
   n'apparaît pas) : « vous avez accès à la vue Coco » + covoiturages possibles avec qui, calculés comme l'onglet Coco
   (`cocoCalcul` + `cocoCovoit`, parmi les agents de la vue Coco ; agent absent de la vue Coco : dit, sans calcul).
+- **Agenda du téléphone** (demandé par l'utilisateur : les deux façons, avec missions, RP, CP et RHR) — moteur testé :
+  `calEvenements(semaines lues, pk)` (missions avec trajet et pause ; codes de famille RP et CP seulement, en journée entière
+  avec le code écrit ; RHR, « suite la semaine suivante » si non clos) et `icsTexte` (iCalendar, **heure de Paris** : les
+  horaires du fichier sont des heures locales, écrites telles quelles avec `TZID=Europe/Paris` + VTIMEZONE ; UID stables ;
+  lignes pliées à 75 octets). (1) **Pièce jointe** `planning-Sxx-aaaa.ics` du récap (PUT `action:'recap'` avec `ics`,
+  pièce jointe Brevo). (2) **Lien d'abonnement** : bouton « Agenda » de la colonne Agent (PUT `action:'cal'` : nouveau jeton,
+  l'ancien cesse de marcher ; empreinte dans la colonne `cal` ; e-mail `mailAgenda` avec la marche à suivre iPhone `webcal:`,
+  Google Agenda depuis un ordinateur « À partir de l'URL », Outlook ; « × » = `calOff`). Route publique `GET /cal/<jeton>.ics`
+  (`agenda` : 12 dernières semaines importées, `calAgent` dans le moteur du serveur avec les règles du site, `calCache` vidé
+  avec `invalider` ; jeton inconnu = 404 compté comme essai). Un agent exclu des chiffres garde son planning dans l'agenda.
 - **Ne jamais écrire d'e-mail ni de mot de passe (même en empreinte) dans le dépôt** : les deux premiers administrateurs
   ont été ajoutés directement dans Supabase (`recap_dev` et `recap`, tables créées au nom de `recap_dev_app` / `recap_app`).
   `APP_URL` réglée sur les deux services Render.

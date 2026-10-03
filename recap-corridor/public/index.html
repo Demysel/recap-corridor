@@ -2596,6 +2596,48 @@ function cocoCalcul(weeks,rulesIn,id,sel){
   return cocoSemaine(v.meta,v.agents.filter(a=>!a.exclu),sel,[...map.entries()].filter(([k])=>k!==id).flatMap(([,x])=>x.agents));
 }
 
+/** Agenda d'un agent (demandé par l'utilisateur) : missions, jours RP et CP (journée entière, code écrit dans le fichier) et
+    RHR, sur des semaines déjà lues avec les règles du site. Fichier .ics (iCalendar) en heure de Paris : les horaires du
+    fichier sont des heures locales (gardées telles quelles, sans conversion). Sert à la pièce jointe du récap et au lien
+    d'abonnement (calAgent, calculé sur le serveur). */
+function calEvenements(vs,pk){
+  const ev=[], vus=new Set(), rhr=new Map();
+  for(const v of vs){ const a=v&&v.agents.find(x=>personKey(x)===pk); if(!a) continue;
+    const D=v.meta.days, fin=new Date(Date.parse(D[6]+'T00:00:00Z')+DAY).toISOString();
+    a.jours.forEach((j,k)=>{
+      if(j.kind==='SERVICE') for(const m of j.missions||[]){ if(!m.start||!m.end) continue; const id='m|'+m.start+'|'+m.label; if(vus.has(id)) continue; vus.add(id);
+        ev.push({id,debut:m.start,fin:m.end,titre:m.label||'Mission',lieu:m.from||m.to?`${m.from||'?'} → ${m.to||'?'}`:'',note:m.pauseMin?`Pause ${m.pauseMin} min`:''}); }
+      else if(j.kind==='CODE'&&(j.family==='RP'||j.family==='CP')){ const id='c|'+D[k]; if(vus.has(id)) return; vus.add(id); ev.push({id,jour:D[k],titre:j.code||j.family}); } });
+    for(const r of a.rhr||[]){ if(!r.debut) continue; const x=rhr.get(r.debut); if(x&&x.fin&&!r.fin) continue;
+      rhr.set(r.debut,{id:'r|'+r.debut,debut:r.debut,fin:r.fin||fin,titre:`RHR${r.lieu?' · '+r.lieu:''}${r.fin?'':' (suite la semaine suivante)'}`,lieu:r.lieu||''}); } }
+  return [...ev,...rhr.values()].sort((x,y)=>(x.debut||x.jour).localeCompare(y.debut||y.jour));
+}
+function icsTexte(ev,nom,stamp){
+  const t=s=>String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const dt=s=>String(s).slice(0,19).replace(/[-:]/g,''), d8=s=>String(s).slice(0,10).replace(/-/g,'');
+  const uid=s=>{ let h=5381,g=52711; for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h=Math.imul(h,33)^c; g=Math.imul(g,31)^c; } return (h>>>0).toString(16)+(g>>>0).toString(16)+'@recap-corridor'; };
+  const plier=l=>{ let out='', n=0; for(const ch of l){ const b=ch.codePointAt(0)<0x80?1:ch.codePointAt(0)<0x800?2:ch.codePointAt(0)<0x10000?3:4;
+      if(n+b>74){ out+='\r\n '; n=1; } out+=ch; n+=b; } return out; };
+  const st=dt(new Date(stamp||Date.now()).toISOString())+'Z', L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Recap Corridor//Planning//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'X-WR-CALNAME:'+t('Planning '+(nom||'')),'X-WR-TIMEZONE:Europe/Paris','REFRESH-INTERVAL;VALUE=DURATION:PT6H','X-PUBLISHED-TTL:PT6H',
+    'BEGIN:VTIMEZONE','TZID:Europe/Paris','BEGIN:DAYLIGHT','TZOFFSETFROM:+0100','TZOFFSETTO:+0200','TZNAME:CEST','DTSTART:19700329T020000','RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU','END:DAYLIGHT',
+    'BEGIN:STANDARD','TZOFFSETFROM:+0200','TZOFFSETTO:+0100','TZNAME:CET','DTSTART:19701025T030000','RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU','END:STANDARD','END:VTIMEZONE'];
+  for(const e of ev){ L.push('BEGIN:VEVENT','UID:'+uid(e.id),'DTSTAMP:'+st);
+    if(e.jour){ const n=new Date(Date.parse(e.jour+'T00:00:00Z')+DAY).toISOString(); L.push('DTSTART;VALUE=DATE:'+d8(e.jour),'DTEND;VALUE=DATE:'+d8(n),'TRANSP:TRANSPARENT'); }
+    else L.push('DTSTART;TZID=Europe/Paris:'+dt(e.debut),'DTEND;TZID=Europe/Paris:'+dt(e.fin));
+    L.push('SUMMARY:'+t(e.titre)); if(e.lieu) L.push('LOCATION:'+t(e.lieu)); if(e.note) L.push('DESCRIPTION:'+t(e.note)); L.push('END:VEVENT'); }
+  L.push('END:VCALENDAR');
+  return L.map(plier).join('\r\n')+'\r\n';
+}
+/** Serveur (lien d'abonnement) : semaines lues avec les règles du site, comme cocoCalcul, puis agenda de l'agent */
+function calAgent(weeks,rulesIn,pk,nom){
+  const R=rulesIn||{}, rules={...R,agencesAlias:{...autoAliasFrom(weeks.flatMap(w=>w.agents.map(a=>a.agence))),...(R.agencesAlias||{})}};
+  const map=new Map();
+  for(const w of [...weeks].sort((a,b)=>a.meta.weekId.localeCompare(b.meta.weekId))){ const v=applyRules(w,rules); v.agents.forEach(a=>a.weekId=w.meta.weekId); map.set(w.meta.weekId,v); }
+  reconcile(map,rules);
+  return icsTexte(calEvenements([...map.values()],pk),nom);   // agent exclu des chiffres : son planning reste dans son agenda
+}
+
 /* ==========================================================================
    5. VITRINE — statistiques anonymes du code visiteur (calculées sur le serveur)
    Aucun nom, matricule ni ligne individuelle ne sort : chaque cellule publiée réunit au moins
@@ -5858,8 +5900,9 @@ function recapSemaine(u,id){
     <p style="margin:0 0 14px;color:#555">${esc(`${a.nom} ${a.prenom}`.trim())} · ${esc(a.agence||'')} · ${esc(a.metier||'')} — du ${jour(w.monday)} au ${jour(w.sunday)}</p>
     <table style="border-collapse:collapse;font-size:14px;width:auto">${chiffres}</table>
     <h3 ${H3}>Planning</h3><table style="border-collapse:collapse;font-size:14px;width:auto">${plan}</table>${cov}
-    <p style="margin:22px 0 0;color:#888;font-size:12px">Chiffres calculés à partir du planning (fichier Récap Corridor), avec les règles du site.</p>`;
-  return {sujet:`Votre récap de la semaine ${weekLabel(w)}`,html};
+    <p style="margin:22px 0 0;color:#555">📅 En pièce jointe : le planning de la semaine (missions, RP, CP, RHR) à ajouter à votre agenda — ouvrez le fichier.</p>
+    <p style="margin:12px 0 0;color:#888;font-size:12px">Chiffres calculés à partir du planning (fichier Récap Corridor), avec les règles du site.</p>`;
+  return {sujet:`Votre récap de la semaine ${weekLabel(w)}`,html,ics:icsTexte(calEvenements([v],pk),`${a.nom} ${a.prenom}`.trim()),nomIcs:`planning-${weekLabel(w).replace(' ','-')}.ics`};
 }
 async function recapCharger(){ const ids=S.weeks.map(w=>w.weekId).sort(), i=ids.indexOf(S.uRc.w); await ensureLoaded([ids[i-1],ids[i],ids[i+1]].filter(Boolean)); render(); }
 function recapPanneaux(U){
@@ -5874,7 +5917,7 @@ function recapPanneaux(U){
     const W=S.weeks.slice().sort((a,b)=>b.weekId.localeCompare(a.weekId)), r=recapSemaine(u,S.uRc.w);
     return `<section class="card"><div class="card-h"><div><h2>Récap de la semaine — ${esc(u.nom||u.email)}</h2><p class="card-s">agent ${esc(u.agent.nom||u.agent.pk)} · envoyé à ${esc(u.email)}${capsU(u.droits).coco?' · avec le covoiturage (droit Coco)':''}</p></div><button class="btn btn-sm" id="uRcX">Fermer</button></div>
       <div class="card-b stack"><div class="frow"><label class="fld"><span class="flabel">Semaine</span><select id="uRcW">${W.map(w=>`<option value="${w.weekId}"${w.weekId===S.uRc.w?' selected':''}>${weekLabel(w)} · ${weekRange(w)}</option>`).join('')}</select></label>
-        <button class="btn btn-pri" id="uRcGo"${r?'':' disabled'}>Envoyer le récap</button></div>
+        <button class="btn btn-pri" id="uRcGo"${r?'':' disabled'}>Envoyer le récap</button>${r?`<span class="mut sm">pièce jointe : ${esc(r.nomIcs)}</span>`:''}</div>
       ${r?`<div class="rcp" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:14px;background:#fff;color:#111;font-family:Arial,sans-serif;font-size:14px;line-height:1.45;overflow-x:auto">${r.html}</div>`
         :`<p class="mut">${S.loaded.has(S.uRc.w)?'Cet agent n’apparaît pas dans cette semaine.':'Chargement de la semaine…'}</p>`}</div></section>`; }
   return '';
@@ -5887,10 +5930,15 @@ async function actionRecap(b){
     if(b.dataset.uagset!=null){ const email=S.uAg, nom=b.dataset.nom||'';
       await withLoad(api.userSet({email,action:'agent',agent:{pk:b.dataset.uagset,nom}})); S.uAg=null; S.msg={m:`${nom} rattaché à ${email}.`}; await loadUsers(); return; }
     if(b.dataset.uagdel!=null){ await withLoad(api.userSet({email:b.dataset.uagdel,action:'agent',agent:null})); S.msg={m:'Agent retiré du compte.'}; await loadUsers(); return; }
+    if(b.dataset.ucal!=null){ const email=b.dataset.ucal, u=(S.users.utilisateurs||[]).find(x=>x.email===email);
+      if(u&&u.cal&&!confirm(`Créer un nouveau lien d’agenda pour ${email} ? L’ancien cessera de fonctionner.`)) return;
+      const r=await withLoad(api.userSet({email,action:'cal'})); S.uLien={email,lien:r.lien,envoye:r.envoye,cal:true,duree:'lien d’agenda permanent, jusqu’à ce qu’il soit coupé'}; await loadUsers(); return; }
+    if(b.dataset.ucaloff!=null){ const email=b.dataset.ucaloff; if(!confirm(`Couper le lien d’agenda de ${email} ? Son agenda ne se mettra plus à jour.`)) return;
+      await withLoad(api.userSet({email,action:'calOff'})); if(S.uLien&&S.uLien.cal&&S.uLien.email===email) S.uLien=null; S.msg={m:'Lien d’agenda coupé.'}; await loadUsers(); return; }
     if(b.dataset.urecap!=null){ const ids=S.weeks.map(w=>w.weekId).sort(); S.uRc={email:b.dataset.urecap,w:ids[ids.length-1]}; S.uAg=null; render(); await recapCharger(); return; }
     if(b.id==='uRcGo'&&S.uRc){ const u=(S.users.utilisateurs||[]).find(x=>x.email===S.uRc.email), r=recapSemaine(u,S.uRc.w);
       if(!r) throw new Error('Récap indisponible pour cette semaine.');
-      await withLoad(api.userSet({email:u.email,action:'recap',sujet:r.sujet,html:r.html}));
+      await withLoad(api.userSet({email:u.email,action:'recap',sujet:r.sujet,html:r.html,ics:r.ics,nomIcs:r.nomIcs}));
       S.msg={m:`Récap ${weekLabel(S.weeks.find(w=>w.weekId===S.uRc.w))} envoyé à ${u.email}.`}; render(); return; }
   }catch(e){ S.msg={m:e.message,t:'c'}; render(); }
 }
@@ -5902,7 +5950,7 @@ function viewUtilisateurs(){
     return `<tr><td class="l nm">${esc(u.nom||'—')}${u.email===U.moi?' <span class="pill pill-n">vous</span>':''}</td><td class="l mono">${esc(u.email)}</td>
       <td class="l">${u.valide?'<span class="pill pill-g">validé</span>':'<span class="pill pill-w">en attente</span>'}${u.demande?' <span class="pill pill-c">mot de passe oublié</span>':''}</td>
       <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.agent?`${esc(u.agent.nom||u.agent.pk)} <button class="lnk" data-uagdel="${esc(u.email)}" title="Retirer l’agent">×</button>`:''}
-        <button class="btn btn-sm" data-uag="${esc(u.email)}">${u.agent?'Changer':'Rattacher'}</button>${u.agent&&u.valide&&U.mail?`<button class="btn btn-sm" data-urecap="${esc(u.email)}" title="Envoyer par e-mail le récap d’une semaine">Récap</button>`:''}</span></td>
+        <button class="btn btn-sm" data-uag="${esc(u.email)}">${u.agent?'Changer':'Rattacher'}</button>${u.agent&&u.valide&&U.mail?`<button class="btn btn-sm" data-urecap="${esc(u.email)}" title="Envoyer par e-mail le récap d’une semaine">Récap</button>`:''}${u.agent&&u.valide?`<button class="btn btn-sm${u.cal?' btn-pri':''}" data-ucal="${esc(u.email)}" title="${u.cal?'Agenda abonné : créer un nouveau lien (l’ancien cesse de marcher)':'Créer le lien d’abonnement à l’agenda (missions, RP, CP, RHR)'}${U.mail?', envoyé par e-mail':''}">Agenda</button>${u.cal?`<button class="lnk" data-ucaloff="${esc(u.email)}" title="Couper le lien d’agenda">×</button>`:''}`:''}</span></td>
       ${DROITS_L.map(([k,l])=>{ const impl=(k!=='admin'&&d.admin)||(k==='lecture'&&d.modif);
         return `<td><input type="checkbox" data-udr="${esc(u.email)}|${k}"${d[k]||impl?' checked':''}${impl?' disabled':''} title="${l}${impl?' (compris dans un droit supérieur)':''}" aria-label="${l}"></td>`; }).join('')}
       <td class="l"><span class="btns" style="gap:5px;flex-wrap:nowrap;white-space:nowrap">${u.valide?`<button class="btn btn-sm" data-uval="${esc(u.email)}" data-v="">Suspendre</button>`:`<button class="btn btn-sm btn-pri" data-uval="${esc(u.email)}" data-v="1">Valider</button>`}
@@ -5911,7 +5959,7 @@ function viewUtilisateurs(){
       <td class="l mono">${fmtDH(u.derniere)}</td></tr>`; };
   const cases=DROITS_L.map(([k,l])=>`<label style="display:inline-flex;gap:6px;align-items:center;margin-right:12px"><input type="checkbox" data-uinv="${k}"${k==='vitrine'?' checked':''}> ${l}</label>`).join(' ');
   const dem=L.filter(u=>u.demande);
-  return `${S.uLien?`<div class="note">${S.uLien.envoye?`<b>E-mail envoyé à ${esc(S.uLien.email)}</b> avec le lien ; vous pouvez aussi le transmettre vous-même`:`<b>Lien à transmettre à ${esc(S.uLien.email)}</b>${S.users&&S.users.mail?' (l’e-mail n’a pas pu partir)':''}`} (SMS, WhatsApp…) — ${esc(S.uLien.duree)}, une seule utilisation :
+  return `${S.uLien?`<div class="note">${S.uLien.envoye?`<b>E-mail envoyé à ${esc(S.uLien.email)}</b> avec le lien ; vous pouvez aussi le transmettre vous-même`:`<b>Lien à transmettre à ${esc(S.uLien.email)}</b>${S.users&&S.users.mail?' (l’e-mail n’a pas pu partir)':''}`} (SMS, WhatsApp…) — ${esc(S.uLien.duree)}${S.uLien.cal?'':', une seule utilisation'} :
     ${S.uLien.lien?`<span class="mono" style="word-break:break-all">${esc(S.uLien.lien)}</span> <button class="btn btn-sm" id="uCopy">Copier</button>`:'adresse du site inconnue : renseignez APP_URL dans Render'}</div>`:''}
   ${recapPanneaux(U)}
   ${dem.length?`<div class="note w"><b>Mot de passe oublié</b> : ${dem.map(u=>`${esc(u.nom||u.email)} (${fmtDH(u.demande)})`).join(', ')} — ${S.users&&S.users.mail?'un lien leur a été envoyé par e-mail ; sans réponse, cliquez « Lien mot de passe » sur leur ligne.':'cliquez « Lien mot de passe » sur sa ligne et transmettez le lien.'}</div>`:''}
@@ -6171,7 +6219,7 @@ document.addEventListener('click',async e=>{
   if(!S.role){ const b=e.target.closest('[data-lg],#lgGo');   // écran de connexion
     if(b){ if(b.dataset.lg){ S.lg=b.dataset.lg; S.err=null; S.lgInfo=null; render(); } else lgValider(); return; } }
   if(e.target.closest('#uCopy')&&S.uLien){ try{ await navigator.clipboard.writeText(S.uLien.lien); S.msg={m:'Lien copié.'}; }catch(_){ S.msg={m:'Copie impossible : sélectionnez le lien à la main.',t:'c'}; } render(); return; }
-  { const b=S.tab==='utilisateurs'&&e.target.closest('[data-uag],[data-uagdel],[data-uagset],[data-urecap],#uAgX,#uRcX,#uRcGo');   // récap de la semaine
+  { const b=S.tab==='utilisateurs'&&e.target.closest('[data-uag],[data-uagdel],[data-uagset],[data-urecap],[data-ucal],[data-ucaloff],#uAgX,#uRcX,#uRcGo');   // récap de la semaine
     if(b){ await actionRecap(b); return; } }
   { const b=e.target.closest('#cpGo,[data-uval],[data-ureinit],[data-udel],#uiGo');   // mon compte, utilisateurs
     if(b){ await actionComptes(b); return; } }
