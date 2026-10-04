@@ -104,6 +104,11 @@ existantes**, n'appliquer que ce qui est demandé. Ne pas réorganiser ni « mod
   (missions, trajet, horaire, pauses, codes, RHR). **Covoiturage seulement si le compte a le droit Coco** (sinon la partie
   n'apparaît pas) : « vous avez accès à la vue Coco » + covoiturages possibles avec qui, calculés comme l'onglet Coco
   (`cocoCalcul` + `cocoCovoit`, parmi les agents de la vue Coco ; agent absent de la vue Coco : dit, sans calcul).
+  **Récap à tous** (demandé par l'utilisateur) : bouton « Récap à tous (N) » en haut de Comptes (Brevo configuré) ; panneau :
+  semaine au choix (dernière par défaut), liste des comptes validés ayant un agent rattaché (`recapDestinataires`) avec
+  « sera envoyé » ou « absent de la semaine : pas d'envoi » ; après confirmation, chaque compte reçoit le récap de **son**
+  agent (même `recapSemaine` et même envoi PUT `action:'recap'` qu'à l'unité), un par un, progression et résultat par ligne
+  (envoyé / échec).
 - **Agenda du téléphone** (demandé par l'utilisateur : les deux façons, avec missions, RP, CP et RHR) — moteur testé :
   `calEvenements(semaines lues, pk)` (missions avec trajet et pause ; codes de famille RP et CP seulement, en journée entière
   avec le code écrit ; RHR, « suite la semaine suivante » si non clos) et `icsTexte` (iCalendar, **heure de Paris** : les
