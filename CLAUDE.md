@@ -494,10 +494,16 @@ quatre indicateurs principaux puis un bandeau compact pour les autres.
 - **Render**, service `recap-corridor` (gratuit, Francfort), déployé automatiquement à chaque
   commit sur `main`. Build : `cd recap-corridor && npm install --omit=dev`.
   Démarrage : `cd recap-corridor && npm start`.
-- Site principal gardé éveillé (demandé par l'utilisateur, offre gratuite conservée) : tâche GitHub Actions
-  `.github/workflows/garder-eveille.yml` qui appelle `https://recap-corridor.onrender.com/api/ping` toutes les 10 min.
-  Jamais pour le site de test (750 h gratuites par mois pour tout le compte). GitHub la désactive après 60 jours sans
-  commit : la réactiver dans l'onglet Actions.
+- Site principal gardé éveillé **de 6 h à 23 h, heure de Paris** (demandé par l'utilisateur, offre gratuite conservée ;
+  le site était parfois très lent : réveil Render de 30 à 60 s) : tâche planifiée **dans Supabase** (extensions `pg_cron`
+  + `pg_net`, tâche `reveil-recap-corridor`, toutes les 10 min, heure testée en `Europe/Paris` donc juste aux changements
+  d'heure) qui appelle `https://recap-corridor.onrender.com/api/ping`. La nuit, le site peut s'endormir (750 h gratuites par
+  mois pour tout le compte Render, partagées avec le site de test : environ 530 h pour le principal). Le réveil GitHub
+  Actions (`.github/workflows/garder-eveille.yml`, peu fiable : passages décalés de plusieurs heures) n'a plus de
+  planification, seulement un lancement manuel. Arrêter : `select cron.unschedule('reveil-recap-corridor');`.
+  Étude d'hébergement (octobre 2026) : Netlify gratuit écarté (fonctions aux États-Unis sans choix de région, données
+  nominatives hors d'Europe, 10 s par appel) ; Render gardé. Bande passante gratuite Render réduite à 5 Go / mois
+  (avril 2026), facturée au-delà : à surveiller.
 - **Supabase**, projet `recap-corridor`, schéma `recap` (tables `semaines`, `details`, `config`),
   accessible uniquement par le rôle `recap_app`.
 - Codes d'accès et chaîne de connexion : variables d'environnement Render (`CODE_ADMIN`,

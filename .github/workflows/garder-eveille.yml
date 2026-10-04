@@ -1,12 +1,9 @@
-# Garde le site principal éveillé (offre gratuite Render : mise en veille après 15 min sans visite).
-# Appelle /api/ping toutes les 10 minutes. Uniquement le site principal : le site de test peut dormir
-# (l'offre gratuite donne 750 h par mois pour tout le compte, le principal en consomme environ 744).
-# GitHub peut retarder un passage de quelques minutes, et désactive la tâche après 60 jours sans commit :
-# la réactiver dans l'onglet Actions du dépôt si besoin.
+# Ancien réveil du site principal. Remplacé (demandé par l'utilisateur) par une tâche planifiée dans Supabase
+# (pg_cron + pg_net, tâche « reveil-recap-corridor ») qui appelle /api/ping toutes les 10 minutes de 6 h à 23 h,
+# heure de Paris : GitHub décalait souvent ses passages de plusieurs heures et le site s'endormait.
+# Gardé seulement pour un réveil manuel (onglet Actions → « Run workflow »).
 name: Garder le site éveillé
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 permissions: {}
 jobs:
