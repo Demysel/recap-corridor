@@ -481,6 +481,13 @@ Serveur : page lue, empreinte (ETag) et version compressée calculées une fois 
 base connectée, moteur chargé et vitrine préparée d'avance ; vue Coco gardée en mémoire par semaine (`cocoCache`),
 vidée comme la vitrine à chaque import, suppression, changement de règles ou de sélection Coco (`invalider`).
 Page : semaines demandées au serveur en parallèle, 6 à la fois (`ensureLoaded`).
+**Calcul allégé** (demandé par l'utilisateur, « sans toucher à l'intégrité ») : petites fonctions appelées des centaines de
+milliers de fois mises en mémoire, même résultat garanti (mêmes entrées ⇒ même sortie) — `deacc`, `normLieu`, `isTrajetSeul`
+(cartes plafonnées à 20 000 entrées), `missionMinutes` (par mission, recalculé si début, fin, pauseMin ou pauses changent),
+`isoD` sans `toISOString`, `nf` avec un `Intl.NumberFormat` par nombre de décimales ; rapprochement des semaines
+(`reconcilier`) refait seulement si une semaine a été ajoutée, retirée ou recalculée (`recomputeLoaded` le force). Vérifié sur
+93 semaines fabriquées depuis une vraie semaine : empreintes identiques avant / après (semaines calculées, vitrine,
+production, conformité) ; calcul −25 à −60 % selon l'onglet, moteur −37 % (aussi côté serveur : vitrine).
 **Cache local des semaines** (demandé par l'utilisateur, le site ramait) : `cacheSem` (IndexedDB `recap-cache`, magasin
 `semaines`) garde le détail brut de chaque semaine avec sa signature (date d'import + nombre de lignes) ; `ensureLoaded` lit
 d'abord le cache, ne demande au serveur que les semaines absentes ou réimportées, puis les met en cache ; semaines supprimées

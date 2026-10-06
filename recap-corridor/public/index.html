@@ -870,7 +870,10 @@ function parseSheet(x,ss,maxCols=60){
 const serialDate=n=>{ if(typeof n!=='number'||!isFinite(n))return null;
   const d=new Date(Math.round((n-25569)*864e5));
   return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); };
-const deacc=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
+/* Performances (demandé par l'utilisateur, sans changer aucun résultat) : les petites fonctions appelées des centaines de
+   milliers de fois gardent leurs résultats en mémoire (mêmes entrées ⇒ même sortie) */
+const DEACC=new Map();
+const deacc=s=>{ s=String(s); let r=DEACC.get(s); if(r===undefined){ r=s.normalize('NFD').replace(/[̀-ͯ]/g,''); if(DEACC.size>20000) DEACC.clear(); DEACC.set(s,r); } return r; };
 
 /** Onglet « Extract » (anciens fichiers, S01 à S19) : une ligne par agent et par jour. Pause de la journée = WorkDuration (T)
     − WorkDurationEffective (U), précisé par l'utilisateur. Clé : matricule|date → [T, U] en minutes. */
@@ -944,7 +947,8 @@ const FAM_REPOS=['RP','RF','JF','RCL','RCC'], FAM_CONGES=['CP','CPAT','CFAM','CS
 const codeFam=c=>{const s=String(c).trim().split('/')[0].trim().replace(/[\s,.;:]+$/,'');for(const f of CODEF)if(f.t(s))return f.k;return 'AUTRE';};
 const codeTxt=c=>{const p=String(c).trim().split('/').map(x=>x.trim());return p.length===2&&p[0]===p[1]?p[0]:String(c).trim();};
 /** Lieux comparés sans majuscules, accents ni ponctuation : « Hendaye », « HENDAYE » et « hendaye » sont le même lieu */
-const normLieu=s=>deacc(String(s??'')).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const NLIEU=new Map();
+const normLieu=s=>{ s=String(s??''); let r=NLIEU.get(s); if(r===undefined){ r=deacc(s).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim(); if(NLIEU.size>20000) NLIEU.clear(); NLIEU.set(s,r); } return r; };
 /** Métiers : les anciens fichiers écrivent CDR, Coordo, « CDR + AFR » */
 function normMetier(m){
   const u=deacc(String(m??'')).toUpperCase().replace(/\s+/g,' ').trim();
@@ -966,7 +970,13 @@ const r2=n=>Math.round(n*100)/100;
     amplitude = fin − début ; pauses = réunion des pauses « P: » ramenées dans la mission (deux pauses qui se
     chevauchent ne sont pas déduites deux fois). Semaines importées sans le détail des pauses : pauseMin enregistré. */
 const hhmm=s=>{const d=new Date(s);return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;};
+const MMIN=new WeakMap();
 function missionMinutes(m){
+  const c=MMIN.get(m), sig=m.start+'|'+m.end+'|'+m.pauseMin+'|'+(m.pauses?m.pauses.length:-1);
+  if(c&&c.sig===sig&&c.p===m.pauses) return {amp:c.amp,pause:c.pause};
+  const r=missionMinutesCalc(m); MMIN.set(m,{sig,p:m.pauses,amp:r.amp,pause:r.pause}); return r;
+}
+function missionMinutesCalc(m){
   const S=Date.parse(m.start), E=Date.parse(m.end);
   const amp=Math.max(0,Math.round((E-S)/6e4));
   const P=(m.pauses||[]).filter(Array.isArray);
@@ -1041,7 +1051,7 @@ function isoWeek(dt){
   ft.setUTCDate(ft.getUTCDate()-((ft.getUTCDay()+6)%7)+3);
   return {year:d.getUTCFullYear(), week:1+Math.round((d-ft)/(7*864e5))};
 }
-const isoD=d=>d.toISOString().slice(0,10);
+const isoD=d=>{ const y=d.getUTCFullYear(), m=d.getUTCMonth()+1, j=d.getUTCDate(); return (y<1000||y>9999)?d.toISOString().slice(0,10):y+(m<10?'-0':'-')+m+(j<10?'-0':'-')+j; };
 const slug=s=>deacc(s).replace(/[^A-Za-z0-9._~:@+-]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase()||'x';
 
 const MOIS=['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
@@ -1405,7 +1415,13 @@ const missionTTE=(m,rules)=>{ if(isATCMD(m)) return rules.heuresATCMD; if(missio
 /** Trajet seul : l'intitulé contient VOY ou VS (types réglables) comme mot à part — encadré par le début, la fin,
     un tiret, un espace, un point… — et jamais collé à un « + » (« CSE+VOY », « VOY+PREPA » : pas un trajet seul).
     VOY-541-BX, 541-VOY, VS 12 : trajet seul. (Règle précisée par l'utilisateur.) */
+const TRAJ=new Map();
 function isTrajetSeul(label,types){
+  const k=(types||[]).join('\u0001')+'\u0000'+String(label||''); let r=TRAJ.get(k);
+  if(r===undefined){ r=isTrajetSeulCalc(label,types); if(TRAJ.size>20000) TRAJ.clear(); TRAJ.set(k,r); }
+  return r;
+}
+function isTrajetSeulCalc(label,types){
   const L=deacc(String(label||'')).toUpperCase();
   for(const t0 of types||[]){ const t=deacc(String(t0)).toUpperCase().trim(); if(!t) continue;
     const re=new RegExp('(^|[^A-Z0-9])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Z0-9])','g'); let m;
@@ -2801,7 +2817,8 @@ function buildXlsx(sheets){
 /* ==========================================================================
    7. FORMATAGE
    ========================================================================== */
-const nf=(n,d=0)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const NF={};   // un seul formateur par nombre de décimales (même affichage que toLocaleString, beaucoup plus rapide)
+const nf=(n,d=0)=>(n==null||isNaN(n))?'—':(NF[d]||(NF[d]=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d}))).format(Number(n));
 /** Durées : les minutes sont arrondies avant de séparer les heures (jamais « 7h60 ») */
 const hmin=h=>{const t=Math.round(h*60);return [Math.floor(t/60),t%60];};
 const fmtH=h=>{if(h==null||isNaN(h))return '—';const [H_,M_]=hmin(h);return `${H_}h${String(M_).padStart(2,'0')}`;};
@@ -3070,13 +3087,21 @@ async function ensureLoaded(ids){
     const v=applyRules({meta,agents},effRules()); v.agents.forEach(a=>a.weekId=id);
     S.loaded.set(id,v);
   }
-  reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
+  reconcilier();
+}
+/** Rapprochement des semaines voisines (RHR à cheval, journées blanches, numéros de RP) : refait seulement si une semaine a
+    été ajoutée, retirée ou recalculée depuis le dernier passage (performances ; même résultat) */
+const RECON=new WeakSet();
+function reconcilier(force){
+  const e=[...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0])), sig=e.map(x=>x[0]).join();
+  if(!force&&sig===S.reconSig&&e.every(([,v])=>RECON.has(v))) return;
+  reconcile(new Map(e),S.rules); S.reconSig=sig; e.forEach(([,v])=>RECON.add(v));
 }
 function recomputeLoaded(){
   S.rv=(S.rv||0)+1;
   const R=effRules();
   for(const [id,p] of S.parsedCache){ const v=applyRules(p,R); v.agents.forEach(a=>a.weekId=id); S.loaded.set(id,v); }
-  reconcile(new Map([...S.loaded.entries()].sort((a,b)=>a[0].localeCompare(b[0]))),S.rules);
+  reconcilier(true);
 }
 /** L'évolution hebdomadaire et l'historique portent sur toutes les semaines enregistrées */
 const needsAll=()=>['graphiques','exports','stats','verifier','comparer'].includes(S.tab);
