@@ -220,14 +220,14 @@ Chiffres orientés production, calculés sur le planning seulement (ni réalisé
   agents en retard / en avance, arrondi au RP près, + à l'heure et moyenne ; clic → Agents). Agents, Synthèse et Production
   chargent toute l'année de la période.
 - **+3RP/S et +3 RP consécutifs** (demandé par l'utilisateur, remplacent les colonnes « RP triples / quadruples / 5 et + ») :
-  « +3RP/S » = nombre de semaines civiles (lundi → dimanche) avec **3 RP ou plus**, qu'ils se suivent ou non (`rpSemaines`,
-  semaines de la période repérées par leur dimanche) ; « +3 RP consécutifs » = nombre de suites d'**au moins 3 RP d'affilée**
+  « +3RP/S » = nombre de semaines civiles (lundi → dimanche) avec **plus de 3 RP (4 ou plus)**, qu'ils se suivent ou non (`rpSemaines`,
+  semaines de la période repérées par leur dimanche) ; « +3 RP consécutifs » = nombre de suites de **plus de 3 RP d'affilée (4 ou plus)**
   au calendrier, même à cheval sur deux semaines (`rpSuites`, suites de la période repérées par leur dernier jour) ; **tout
   autre jour coupe la suite** (RF, JF, RCL, RCC, congé, service, case vide, jour absent des fichiers — choix de l'utilisateur) ;
   RP seulement, numéro déjà lu non recompté (moteur, testé). Colonnes de l'onglet Agents (groupe Repos & absences),
   cliquables (`detailControle` `rp3s` / `rp3c`) : jours de repos avec le code écrit et le nombre de RP. Mêmes deux lignes dans
-  la carte Production « Heures sup et repos, semaine par semaine » (agents avec 3 RP ou plus dans la semaine ; agents dont une
-  suite d'au moins 3 RP finit dans la semaine).
+  la carte Production « Heures sup et repos, semaine par semaine » (agents avec 4 RP ou plus dans la semaine ; agents dont une
+  suite d'au moins 4 RP finit dans la semaine). Seuil précisé par l'utilisateur : « +3 » = à partir de 4 RP, pour les deux colonnes.
 - **Coût des heures sup** (demandé par l'utilisateur ; choix : taux saisis par l'utilisateur, vides par défaut) : Réglages →
   Production, taux AFR / coordo et conducteurs (€/h) + majoration % (`rules.production.coutHS` {afr, cdr, maj}) ;
   `coutHeuresSup` (moteur, testé) = heures sup × taux du métier × (1 + majoration) ; carte Production « Heures sup et repos,

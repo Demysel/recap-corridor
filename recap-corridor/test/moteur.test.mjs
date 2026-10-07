@@ -937,6 +937,7 @@ test('RP par semaine : 4 RP dans la même semaine = quadruple, même non conséc
   // +3 RP consécutifs : la suite ven-sam-dim + lun-mar (à cheval sur deux semaines) = une suite de 5 ; sam-dim seuls = 2, pas comptés
   const c = JSON.parse(JSON.stringify(E.rpSuites([w1, w2]).get(E.personKey(w1))));
   assert.deepEqual(c.map((x) => [x.debut, x.fin, x.n]), [['2026-09-11', '2026-09-15', 5]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(E.rpSuites([w1, w2], 4).get(E.personKey(w1)))).map((x) => x.n), [5]);   // colonne : plus de 3 RP
   // un autre repos (RF) coupe la suite ; un jour absent des fichiers aussi
   const w3 = run(week([2026, 9, 21], [{ mat: '1', nom: 'TEST', j: ['RP', 'RP', 'RF', 'RP', 'RP', 'RP', d(27)] }]), RES).agents[0];
   assert.deepEqual(JSON.parse(JSON.stringify(E.rpSuites([w3]).get(E.personKey(w3)))).map((x) => [x.debut, x.n]), [['2026-09-24', 3]]);
