@@ -483,7 +483,9 @@ vidée comme la vitrine à chaque import, suppression, changement de règles ou 
 Page : semaines demandées au serveur en parallèle, 6 à la fois (`ensureLoaded`).
 **Calcul allégé** (demandé par l'utilisateur, « sans toucher à l'intégrité ») : petites fonctions appelées des centaines de
 milliers de fois mises en mémoire, même résultat garanti (mêmes entrées ⇒ même sortie) — `deacc`, `normLieu`, `isTrajetSeul`
-(cartes plafonnées à 20 000 entrées), `missionMinutes` (par mission, recalculé si début, fin, pauseMin ou pauses changent),
+(cartes plafonnées à 20 000 entrées) ; **pas** `missionMinutes` (sa mise en mémoire par mission faisait dépasser la mémoire du
+serveur de test au calcul de la vitrine : plantages en boucle, retirée) ; serveur lancé avec `--max-old-space-size=320` (512 Mo
+chez Render, tas de 256 Mo par défaut, pic mesuré à 375 Mo sur le principal) ;
 `isoD` sans `toISOString`, `nf` avec un `Intl.NumberFormat` par nombre de décimales ; rapprochement des semaines
 (`reconcilier`) refait seulement si une semaine a été ajoutée, retirée ou recalculée (`recomputeLoaded` le force). Vérifié sur
 93 semaines fabriquées depuis une vraie semaine : empreintes identiques avant / après (semaines calculées, vitrine,
