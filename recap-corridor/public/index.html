@@ -2109,17 +2109,36 @@ function decalageRP(rows,fin,rulesIn){
     out.set(pk,{reel,source:num!=null?'numero':'compte',date:nDate,attendu,ecart:reel-attendu,rpAn,sem}); }
   return out;
 }
-/** RP par semaine (demandé par l'utilisateur ; règle précisée : triple / quadruple = 3 / 4 RP dans la même semaine civile,
-    du lundi au dimanche, qu'ils se suivent ou non ; 5 et plus à part ; RP seulement, numéro déjà lu non recompté).
-    Renvoie personne → [{lundi, dimanche, n}] (semaines avec au moins un RP). */
+/** RP par semaine (demandé par l'utilisateur) : nombre de RP dans la même semaine civile, du lundi au dimanche, qu'ils se
+    suivent ou non ; RP seulement, numéro déjà lu non recompté. Colonne « +3RP/S » = semaines avec 3 RP ou plus.
+    Renvoie personne → [{lundi, dimanche, n, jours:[{date, code}]}] (semaines avec au moins un RP). */
 function rpSemaines(rows){
   const out=new Map();
   for(const [pk,l] of groupBy(rows,personKey)){ const sem=new Map(), vus=new Set();
     for(const a of l) for(const j of a.jours||[]){ if(!j.date||vus.has(j.date)) continue; vus.add(j.date);
       if(j.kind!=='CODE'||j.family!=='RP'||j.rpDouble) continue;
       const d=Date.parse(j.date+'T00:00:00Z'), lun=isoD(new Date(d-((new Date(d).getUTCDay()+6)%7)*DAY));
-      if(!sem.has(lun)) sem.set(lun,{lundi:lun,dimanche:isoD(new Date(Date.parse(lun+'T00:00:00Z')+6*DAY)),n:0}); sem.get(lun).n++; }
+      if(!sem.has(lun)) sem.set(lun,{lundi:lun,dimanche:isoD(new Date(Date.parse(lun+'T00:00:00Z')+6*DAY)),n:0,jours:[]});
+      const x=sem.get(lun); x.n++; x.jours.push({date:j.date,code:j.code}); }
+    for(const x of sem.values()) x.jours.sort((a,b)=>a.date.localeCompare(b.date));
     out.set(pk,[...sem.values()].sort((x,y)=>x.lundi.localeCompare(y.lundi))); }
+  return out;
+}
+/** RP consécutifs (demandé par l'utilisateur) : suites d'au moins `min` jours de RP qui se suivent au calendrier, même à
+    cheval sur deux semaines ; tout autre jour (RF, JF, RCL, RCC, congé, service, case vide, jour absent des fichiers) coupe
+    la suite (choix de l'utilisateur) ; RP seulement, numéro déjà lu non recompté (il coupe aussi la suite).
+    Renvoie personne → [{debut, fin, n, jours:[{date, code}]}]. */
+function rpSuites(rows,min=3){
+  const out=new Map();
+  for(const [pk,l] of groupBy(rows,personKey)){ const rp=new Map(), vus=new Set();
+    for(const a of l) for(const j of a.jours||[]){ if(!j.date||vus.has(j.date)) continue; vus.add(j.date);
+      if(j.kind==='CODE'&&j.family==='RP'&&!j.rpDouble) rp.set(j.date,j.code); }
+    const ds=[...rp.keys()].sort(), suites=[]; let cur=null;
+    for(const d of ds){
+      if(cur&&Date.parse(d+'T00:00:00Z')-Date.parse(cur.fin+'T00:00:00Z')===DAY){ cur.fin=d; cur.jours.push({date:d,code:rp.get(d)}); }
+      else { if(cur) suites.push(cur); cur={debut:d,fin:d,jours:[{date:d,code:rp.get(d)}]}; } }
+    if(cur) suites.push(cur);
+    out.set(pk,suites.map(x=>({...x,n:x.jours.length})).filter(x=>x.n>=min)); }
   return out;
 }
 /** Coût approximatif des heures sup (demandé par l'utilisateur) : heures × taux horaire de son métier (AFR / coordo ou
@@ -3471,7 +3490,8 @@ const COLS=[
   {g:'absences',k:'rpDecal',l:'Décalage RP',f:a=>{ const x=a.rpInfo; if(!x) return '<span class="z">—</span>';
     const t=`${x.source==='numero'?`Dernier numéro lu : RP-${x.reel}${x.date?` le ${dISO(x.date)}`:''}`:`${x.reel} RP comptés (aucun numéro RP-n lu)`} · attendu ${nf(x.attendu,1)} (${x.rpAn} / 52 × ${nf(x.sem,1)} semaines) · ${Math.round(x.ecart)<0?'en retard':Math.round(x.ecart)>0?'en avance':'à l’heure'}`;
     return `<span class="${Math.round(x.ecart)<0?'pill pill-w':Math.round(x.ecart)>0?'pill pill-g':''}" title="${esc(t)}">${fmtDecal(x.ecart)}</span>`; },t:a=>a.rpInfo?a.rpInfo.ecart:-1e9},
-  {g:'absences',k:'rp3',l:'RP triples'},{g:'absences',k:'rp4',l:'RP quadruples'},{g:'absences',k:'rp5',l:'RP 5 et +'},
+  {g:'absences',k:'rp3s',l:'+3RP/S',f:a=>a.rp3s?`<button class="lk" data-cdet="rp3s|${esc(personKey(a))}" title="Semaines (lundi → dimanche) avec 3 RP ou plus, qu’ils se suivent ou non : cliquez pour le détail des jours">${nf(a.rp3s)}</button>`:'<span class="z">0</span>',t:a=>a.rp3s},
+  {g:'absences',k:'rp3c',l:'+3 RP consécutifs',f:a=>a.rp3c?`<button class="lk" data-cdet="rp3c|${esc(personKey(a))}" title="Suites d’au moins 3 RP d’affilée, même à cheval sur deux semaines : cliquez pour le détail des jours">${nf(a.rp3c)}</button>`:'<span class="z">0</span>',t:a=>a.rp3c},
   {g:'absences',k:'joursAbsence',l:'Absences'},
   // contrôle (demandé par l'utilisateur) : service + repos + journées blanches + congés + absences = jours de la période
   {g:'absences',k:'totalJours',l:'Total jours',f:a=>`<span title="Jours de service + repos + journées blanches + congés + absences, sur ${nf(a.joursPeriode)} jours de la période">${a.totalJours!==a.joursPeriode?'<span class="pill pill-w">≠</span> ':''}<b>${nf(a.totalJours)}</b> <span class="mut">/ ${nf(a.joursPeriode)}</span></span>`,t:a=>a.totalJours},
@@ -3536,6 +3556,15 @@ function detailControle(kind,pk){
       jr.push(`<tr><td class="l mono">${jours.length===7?'toute la semaine':jours.map(d=>`${JS[(new Date(d+'T00:00:00Z').getUTCDay()+6)%7]} ${dISO(d)}`).join(', ')}</td><td class="l mono">${esc(weekLabel(w))}</td><td class="l">${pq}</td></tr>`); } }
   if(['rjmin','rjsous'].includes(kind)){ for(const x of (a.rjListe||{minimum:[],sous:[]})[{rjmin:'minimum',rjsous:'sous'}[kind]]){ const id=(rows.find(r=>r.jours.some(j=>j.date===x.date))||{}).weekId;
       jr.push(ligne(x.date,id,`<b>${fmtH(x.h)}</b> de repos à résidence : fin ${dtISO(x.fin)} → reprise ${dtISO(x.reprise)} (minimum ${fmtH(x.normal)}${x.sousPlancher?` — <b class="warn">sous la réduction exceptionnelle de l’accord (${fmtH(x.plancher)}${x.nuit?' après une journée de nuit':''})</b>`:''})`)); } }
+  if(kind==='rp3s'||kind==='rp3c'){   // +3RP/S et +3 RP consécutifs : jours de RP avec le code écrit dans le fichier
+    const jl=x=>x.jours.map(j=>`${JS[(new Date(j.date+'T00:00:00Z').getUTCDay()+6)%7]} ${dFull(j.date)} <span class="mut">(${esc(j.code)})</span>`).join(', ');
+    const tr=(a1,a2,a3)=>`<tr><td class="l mono">${a1}</td><td class="l mono">${a2}</td><td class="l">${a3}</td></tr>`;
+    const L=kind==='rp3s'?a.rp3sListe:a.rp3cListe;
+    openPanel(`${kind==='rp3s'?'+3RP/S':'+3 RP consécutifs'} — ${a.nom} ${a.prenom}`,`${esc(periodLabel(S.selWeek,S.weeks))} · ${L.length} ${kind==='rp3s'?'semaine(s) avec 3 RP ou plus':'suite(s) d’au moins 3 RP d’affilée'}`,
+      `<section class="card"><div class="card-b"><div class="tw"><table><thead><tr><th class="l">${kind==='rp3s'?'Semaine':'Du … au …'}</th><th class="l">Nombre de RP</th><th class="l">Jours de repos</th></tr></thead><tbody>${
+        L.map(x=>kind==='rp3s'?tr(`${dFull(x.lundi)} → ${dFull(x.dimanche)}`,`<b>${x.n}</b> RP`,jl(x)):tr(`${dFull(x.debut)} → ${dFull(x.fin)}`,`<b>${x.n}</b> RP d’affilée`,jl(x))).join('')}</tbody></table></div>
+        <p class="mut sm">${kind==='rp3s'?'Semaine civile du lundi au dimanche, RP qui se suivent ou non ; semaines de la période repérées par leur dimanche.':'Jours de RP qui se suivent au calendrier, même à cheval sur deux semaines ; tout autre jour (RF, JF, RCL, RCC, congé, service, case vide) coupe la suite ; suites de la période repérées par leur dernier jour.'} Un RP dont le numéro est déjà lu n’est pas compté.</p></div></section>`);
+    return; }
   const T={autres:'Autres cases vides',hors:'Hors fichier',nonclasses:'Non classés',rjmin:'Repos journaliers au minimum',rjsous:'Repos journaliers sous le minimum'}[kind];
   openPanel(`${T} — ${a.nom} ${a.prenom}`,`${esc(periodLabel(S.selWeek,S.weeks))} · ${a[{autres:'autresVides',hors:'horsFichier',nonclasses:'nonClasses',rjmin:'rjMin',rjsous:'rjSous'}[kind]]} ${kind.startsWith('rj')?'repos':'jour(s)'}`,
     `<section class="card"><div class="card-b">${jr.length?`<div class="tw"><table><thead><tr><th class="l">Jour</th><th class="l">Semaine</th><th class="l">À quoi correspond la case</th></tr></thead><tbody>${jr.join('')}</tbody></table></div>`
@@ -3549,9 +3578,11 @@ function viewAgents(){
   for(const [id,v] of S.loaded){ const w=S.weeks.find(x=>x.weekId===id); if(!w||w.sunday<debCP||w.monday>finCP) continue;
     for(const a of v.agents){ if(a.exclu) continue; const x=sliceAgent(a,debCP,finCP); if(!x) continue;
       const k=personKey(x); cpY.set(k,(cpY.get(k)||0)+((x.codeCounts||{}).CP||0)); } }
-  const jp=joursDePeriode(), dRP=decalagesRP(), bRP=rpSemaines(lignesChargees()), d0=debutPeriode(), d1=finPeriode();
+  const jp=joursDePeriode(), dRP=decalagesRP(), lc=lignesChargees(), bRP=rpSemaines(lc), cRP=rpSuites(lc), d0=debutPeriode(), d1=finPeriode();
   const merged=mergeAcrossWeeks(sc).map(a=>{ const o={...a}, pk=personKey(a), bl=(bRP.get(pk)||[]).filter(b=>b.dimanche>=d0&&b.dimanche<=d1);   // semaines de la période (repérées par leur dimanche)
-    o.rpInfo=dRP.get(pk)||null; o.rpDecal=o.rpInfo?o.rpInfo.ecart:null; o.rp3=bl.filter(b=>b.n===3).length; o.rp4=bl.filter(b=>b.n===4).length; o.rp5=bl.filter(b=>b.n>=5).length; for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
+    o.rpInfo=dRP.get(pk)||null; o.rpDecal=o.rpInfo?o.rpInfo.ecart:null;
+    o.rp3sListe=bl.filter(b=>b.n>=3); o.rp3s=o.rp3sListe.length;
+    o.rp3cListe=(cRP.get(pk)||[]).filter(x=>x.fin>=d0&&x.fin<=d1); o.rp3c=o.rp3cListe.length;   // suites de la période (repérées par leur dernier jour) for(const c of [...FAM_REPOS,'CP']) o['c_'+c]=(a.codeCounts||{})[c]||0; o.cpAnnee=cpY.get(personKey(a))||0;
     const presents=(a.parSemaine||[a]).reduce((s,x)=>s+(x.jours||[]).filter(j=>!j.horsPeriode).length,0);
     o.joursPeriode=jp; o.totalJours=(a.joursService||0)+(a.joursRepos||0)+(a.journeesBlanches||0)+(a.joursCP||0)+(a.joursAbsence||0);
     o.autresVides=Math.max(0,(a.joursVides||0)-(a.journeesBlanches||0));
@@ -3837,16 +3868,17 @@ function viewProduction(){
 function hsSemainesCard(sc){
   const ags=[...new Set(sc.map(a=>a.agence))].sort(), fa=ags.includes(S.prHsAg)?S.prHsAg:'', rows=sc.filter(a=>!fa||a.agence===fa);
   const pks=new Set(rows.map(personKey)), ids=[...new Set(rows.map(a=>a.weekId))].sort(), W=id=>S.weeks.find(w=>w.weekId===id);
-  const bl=[...rpSemaines(lignesChargees()).entries()].filter(([k])=>pks.has(k)).flatMap(([,l])=>l);
+  const lc=lignesChargees(), bl=[...rpSemaines(lc).entries()].filter(([k])=>pks.has(k)).flatMap(([,l])=>l),
+    cl=[...rpSuites(lc).entries()].filter(([k])=>pks.has(k)).map(([,l])=>l);
   const d0=debutPeriode(), d1=finPeriode();
   const sem=ids.map(id=>{ const w=W(id)||{}, r=rows.filter(a=>a.weekId===id), cc=k=>r.reduce((n,a)=>n+((a.codeCounts||{})[k]||0),0);
     const b=bl.filter(x=>x.lundi===w.monday);
     return {id,w,hs:r.reduce((n,a)=>n+(a.heuresSup||0),0),ag:new Set(r.filter(a=>a.heuresSup>0).map(personKey)).size,
-      rp3:b.filter(x=>x.n===3).length,rp4:b.filter(x=>x.n===4).length,rp5:b.filter(x=>x.n>=5).length,CP:cc('CP'),RCL:cc('RCL'),RCC:cc('RCC')}; });
+      rp3s:b.filter(x=>x.n>=3).length,rp3c:cl.filter(l=>l.some(x=>x.fin>=w.monday&&x.fin<=w.sunday)).length,CP:cc('CP'),RCL:cc('RCL'),RCC:cc('RCC')}; });
   if(!sem.length) return '';
   const lab=x=>x.w.week?`S${String(x.w.week).padStart(2,'0')}`:x.id, maxH=Math.max(1e-9,...sem.map(x=>x.hs)), n=sem.length;
   const top=[...sem].sort((a,b)=>b.hs-a.hs).filter(x=>x.hs>0).slice(0,3);
-  const LIG=[['rp3','RP triples','agents avec 3 RP dans la semaine'],['rp4','RP quadruples','agents avec 4 RP dans la semaine'],['rp5','RP 5 et +','agents avec 5 RP ou plus dans la semaine'],
+  const LIG=[['rp3s','+3RP/S','agents avec 3 RP ou plus dans la semaine'],['rp3c','+3 RP consécutifs','agents dont une suite d’au moins 3 RP d’affilée finit dans la semaine'],
     ['CP','CP','jours de CP'],['RCL','RCL','jours de RCL'],['RCC','RCC','jours de RCC']];
   const cells=LIG.map(([k,l,t])=>{ const mx=Math.max(1e-9,...sem.map(x=>x[k]));
     return `<div class="hw-r"><span class="hw-l" title="${esc(t)}">${l}</span>${sem.map(x=>`<span class="hw-c" style="background:${x[k]?`color-mix(in srgb,var(--accent) ${Math.round(15+85*x[k]/mx)}%,var(--surface-2))`:'var(--surface-2)'}" data-tip="${esc(`<b>${lab(x)} · ${weekRange(x.w)}</b><span class="tr"><span>${t}</span><b>${nf(x[k])}</b></span><span class="tr"><span>Heures sup</span><b>${fmtH(x.hs)}</b></span>`)}">${x[k]?nf(x[k]):''}</span>`).join('')}</div>`; }).join('');
@@ -3865,7 +3897,7 @@ function hsSemainesCard(sc){
     <label class="fld"><span class="flabel">Agence</span><select data-prhsag><option value="">Toutes (filtre du haut)</option>${ags.map(a=>`<option${a===fa?' selected':''}>${esc(a)}</option>`).join('')}</select></label></div>
     <div class="card-b stack">${cout}
       <div class="tw"><div class="hw" style="--hwn:${n}">${barres}${axe}${cells}</div></div>
-      <p class="mut sm">Barres : heures sup de la semaine (au-delà de ${nf(S.rules.seuilHebdo||35)} h par agent). Cellules : nombre d’agents ayant 3, 4, 5 RP ou plus dans la semaine (lundi → dimanche, qu’ils se suivent ou non) et jours de CP, RCL, RCC ; chaque ligne a sa propre échelle de couleur (plus foncé = plus fréquent). Survolez pour le détail.</p></div></section>`;
+      <p class="mut sm">Barres : heures sup de la semaine (au-delà de ${nf(S.rules.seuilHebdo||35)} h par agent). Cellules : nombre d’agents ayant 3 RP ou plus dans la semaine (lundi → dimanche, qu’ils se suivent ou non), nombre d’agents dont une suite d’au moins 3 RP d’affilée (même commencée la semaine d’avant) finit dans la semaine, et jours de CP, RCL, RCC ; chaque ligne a sa propre échelle de couleur (plus foncé = plus fréquent). Survolez pour le détail.</p></div></section>`;
 }
 /** Planning type de la semaine qui suit la dernière importée (trame service / repos, sans trains) */
 function trameCard(){

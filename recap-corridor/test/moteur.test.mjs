@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf
 const a = html.indexOf('1. LECTURE DU FICHIER'), b = html.indexOf('8. ACCÈS AU SERVEUR');
 const code = html.slice(html.lastIndexOf('<script>', a) + 8, html.lastIndexOf('/* ====', b));
 const ctx = vm.createContext({ console, Blob, Response, DecompressionStream, TextDecoder, TextEncoder, URL, Date, Math, structuredClone });
-vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,rpSemaines,coutHeuresSup,semainesEcoulees,calAgent,calEvenements,icsTexte};', ctx);
+vm.runInContext(code + ';globalThis.E={parseWeek,applyRules,reconcile,sliceAgent,moisParts,nettoyerFeuille,readExtract,cocoCalcul,agg,mergeAcrossWeeks,fmtH,fmtHour,buildXlsx,readRecapSheet,vitrineData,loadRules,productionData,conformiteData,equiteData,trameSemaine,personKey,trainsReguliers,missionDuJour,planifAlertes,planifPreremplir,reposJournaliersCourts,planifAuto,planifRelier,planifTrajets,decalageRP,rpSemaines,rpSuites,coutHeuresSup,semainesEcoulees,calAgent,calEvenements,icsTexte};', ctx);
 const E = ctx.E;
 
 /* ---- fabrique de feuilles fictives ---- */
@@ -931,7 +931,16 @@ test('RP par semaine : 4 RP dans la même semaine = quadruple, même non conséc
   const w1 = one([d(7), d(8), d(9), d(10), 'RP', 'RP', 'RP'], {}, RES);
   const w2 = run(week([2026, 9, 14], [{ mat: '1', nom: 'TEST', j: ['RP-88', 'RP-89', d(16), d(17), d(18), 'RP-90', 'RP-91'] }]), RES).agents[0];
   const b = E.rpSemaines([w1, w2]).get(E.personKey(w1));
-  assert.deepEqual(JSON.parse(JSON.stringify(b)), [{ lundi: '2026-09-07', dimanche: '2026-09-13', n: 3 }, { lundi: '2026-09-14', dimanche: '2026-09-20', n: 4 }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(b)).map((x) => ({ ...x, jours: x.jours.map((j) => j.date + ' ' + j.code) })), [
+    { lundi: '2026-09-07', dimanche: '2026-09-13', n: 3, jours: ['2026-09-11 RP', '2026-09-12 RP', '2026-09-13 RP'] },
+    { lundi: '2026-09-14', dimanche: '2026-09-20', n: 4, jours: ['2026-09-14 RP-88', '2026-09-15 RP-89', '2026-09-19 RP-90', '2026-09-20 RP-91'] }]);
+  // +3 RP consécutifs : la suite ven-sam-dim + lun-mar (à cheval sur deux semaines) = une suite de 5 ; sam-dim seuls = 2, pas comptés
+  const c = JSON.parse(JSON.stringify(E.rpSuites([w1, w2]).get(E.personKey(w1))));
+  assert.deepEqual(c.map((x) => [x.debut, x.fin, x.n]), [['2026-09-11', '2026-09-15', 5]]);
+  // un autre repos (RF) coupe la suite ; un jour absent des fichiers aussi
+  const w3 = run(week([2026, 9, 21], [{ mat: '1', nom: 'TEST', j: ['RP', 'RP', 'RF', 'RP', 'RP', 'RP', d(27)] }]), RES).agents[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(E.rpSuites([w3]).get(E.personKey(w3)))).map((x) => [x.debut, x.n]), [['2026-09-24', 3]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(E.rpSuites([w1, w3]).get(E.personKey(w1)))).map((x) => [x.debut, x.fin]), [['2026-09-11', '2026-09-13'], ['2026-09-24', '2026-09-26']]);
   assert.equal(E.coutHeuresSup(10, 'CONDUCTEUR', {}), null);
   assert.equal(E.coutHeuresSup(10, 'CONDUCTEUR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 250);
   assert.equal(E.coutHeuresSup(10, 'AFR', { production: { coutHS: { cdr: 20, afr: 18, maj: 25 } } }), 225);
